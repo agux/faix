@@ -36,11 +36,11 @@ input = tf.unstack(x, time_steps, 1)
 
 # defining the network
 lstm_layer = rnn.BasicLSTMCell(num_units, forget_bias=1)
-outputs, _ = rnn.static_rnn(lstm_layer, input, dtype="float32")
-lout = tf.nn.dropout(outputs[-1],keep_prob=keep_prob)
+dw_cell = rnn.DropoutWrapper(lstm_layer, output_keep_prob=keep_prob)
+outputs, _ = rnn.static_rnn(dw_cell, input, dtype="float32")
 
 # converting last output of dimension [batch_size,num_units] to [batch_size,n_classes] by out_weight multiplication
-prediction = tf.matmul(lout, out_weights) + out_bias
+prediction = tf.matmul(outputs[-1], out_weights) + out_bias
 
 # loss_function
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
