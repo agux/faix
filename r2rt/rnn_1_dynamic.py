@@ -83,45 +83,14 @@ init_state = tf.zeros([batch_size, state_size])
 RNN Inputs
 """
 
-# Turn our x placeholder into a list of one-hot tensors:
-# rnn_inputs is a list of num_steps tensors with shape [batch_size, num_classes]
-x_one_hot = tf.one_hot(x, num_classes)
-rnn_inputs = tf.unstack(x_one_hot, axis=1)
+rnn_inputs = tf.one_hot(x, num_classes)
 
 """
 Definition of rnn_cell
 
-This is very similar to the __call__ method on Tensorflow's BasicRNNCell. See:
-https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/rnn/python/ops/core_rnn_cell_impl.py#L95
 """
-with tf.variable_scope('rnn_cell'):
-    W = tf.get_variable('W', [num_classes + state_size, state_size])
-    b = tf.get_variable('b', [state_size],
-                        initializer=tf.constant_initializer(0.0))
-
-
-def rnn_cell(rnn_input, state):
-    with tf.variable_scope('rnn_cell', reuse=True):
-        W = tf.get_variable('W', [num_classes + state_size, state_size])
-        b = tf.get_variable('b', [state_size],
-                            initializer=tf.constant_initializer(0.0))
-    return tf.tanh(tf.matmul(tf.concat([rnn_input, state], 1), W) + b)
-
-
-"""
-Adding rnn_cells to graph
-
-This is a simplified version of the "static_rnn" function from Tensorflow's api. See:
-https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/rnn/python/ops/core_rnn.py#L41
-Note: In practice, using "dynamic_rnn" is a better choice that the "static_rnn":
-https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/ops/rnn.py#L390
-"""
-state = init_state
-rnn_outputs = []
-for rnn_input in rnn_inputs:
-    state = rnn_cell(rnn_input, state)
-    rnn_outputs.append(state)
-final_state = rnn_outputs[-1]
+cell = tf.contrib.rnn.BasicRNNCell(state_size)
+rnn_outputs, final_state = tf.nn.dynamic_rnn(cell, rnn_inputs, initial_state=init_state)
 
 """
 Predictions, loss, training step
@@ -131,20 +100,15 @@ function from Tensorflow's API, except that here we are using a list of 2D tenso
 https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/seq2seq/python/ops/loss.py#L30
 """
 
-#logits and predictions
 with tf.variable_scope('softmax'):
     W = tf.get_variable('W', [state_size, num_classes])
-    b = tf.get_variable('b', [num_classes],
-                        initializer=tf.constant_initializer(0.0))
-logits = [tf.matmul(rnn_output, W) + b for rnn_output in rnn_outputs]
-predictions = [tf.nn.softmax(logit) for logit in logits]
+    b = tf.get_variable('b', [num_classes], initializer=tf.constant_initializer(0.0))
+logits = tf.reshape(
+            tf.matmul(tf.reshape(rnn_outputs, [-1, state_size]), W) + b,
+            [batch_size, num_steps, num_classes])
+predictions = tf.nn.softmax(logits)
 
-# Turn our y placeholder into a list of labels
-y_as_list = tf.unstack(y, num=num_steps, axis=1)
-
-#losses and train_step
-losses = [tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=logit) for
-          logit, label in zip(logits, y_as_list)]
+losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits)
 total_loss = tf.reduce_mean(losses)
 train_step = tf.train.AdagradOptimizer(learning_rate).minimize(total_loss)
 

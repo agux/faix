@@ -1,10 +1,10 @@
 import tensorflow as tf
 
-e = tf.get_variable("embedding", [5, 10], tf.float32)
+e = tf.get_variable("onehot", [1, 1], tf.int32)
 
-i = tf.nn.embedding_lookup(e, [0, 1, 3, 2, 4])
+i = tf.one_hot(e, 3)
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
     print(sess.run(i))
-    print(i[:, 1, :])
+    print(i)
