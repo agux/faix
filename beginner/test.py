@@ -1,10 +1,24 @@
+from __future__ import print_function
 import tensorflow as tf
 
-e = tf.get_variable("onehot", [1, 1], tf.int32)
+def length(sequence):
+  used = tf.sign(tf.reduce_max(tf.abs(sequence), 2))
+  length = tf.reduce_sum(used, 1)
+  length = tf.cast(length, tf.int32)
+  return length
 
-i = tf.one_hot(e, 3)
+seq = [
+  [[1,2,3],[2,3,4]],
+  [[3,4,5],[1,0,0]]
+]
+le = length(seq)
+
+ts = tf.zeros([2,2], dtype=tf.float32)
+ts[1,0] = 3
 
 with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    print(sess.run(i))
-    print(i)
+    l = sess.run(le)
+    print(l)
+    print(ts)
+
+
