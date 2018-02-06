@@ -15,11 +15,13 @@ def tagDataTrained(uuids, batch_no):
         cursor = cnx.cursor()
         stmt = (
             "update kpts "
-            "set flag = %s "
-            "where uuid in (%s)"
+            "set flag = '{}' "
+            "where uuid in ({})"
         )
-        cursor.execute(stmt, flag, uuidval)
+        cursor.execute(stmt.format(flag,uuidval))
+        cnx.commit()
     except:
+        cnx.rollback()
         print(sys.exc_info()[0])
         raise
     finally:
@@ -42,10 +44,9 @@ def loadTestSet(batch_size, max_step):
             '            WHERE '
             "               flag = 'TEST') "
             'ORDER BY RAND() '
-            "LIMIT %s "
+            "LIMIT {} "
         )
-        print(query, batch_size)
-        cursor.execute(query, batch_size)
+        cursor.execute(query.format(batch_size))
         query = (
             "SELECT "
             "    SUBSTR(b.date, 1, 4) yyyy, "
@@ -69,7 +70,7 @@ def loadTestSet(batch_size, max_step):
             "    code = %s "
             "        AND klid BETWEEN %s AND %s "
             "ORDER BY klid "
-            "LIMIT %s" 
+            "LIMIT {}" 
         )
         data = []   # [batch, max_step, feature]
         labels = [] # [batch, label]  one-hot labels
@@ -80,7 +81,7 @@ def loadTestSet(batch_size, max_step):
             label[int(score)+10] = 1
             labels.append(label)
             fcursor = cnx.cursor()
-            fcursor.execute(query, (code,klid - 999, klid, max_step))
+            fcursor.execute(query.format(max_step), (code,klid - 999, klid))
             s_idx = 0
             steps = np.zeros((max_step,11), dtype='f')
             for (yyyy,mm,dd,o,h,l,c,vr,k,d,j) in fcursor:
@@ -117,10 +118,10 @@ def loadTrainingData(batch_size, max_step):
             "                       flag = 'TEST') "
             '   and flag is null '
             'ORDER BY RAND() '
-            'LIMIT %s'
+            'LIMIT {}'
         )
         # print(query)
-        cursor.execute(query, batch_size)
+        cursor.execute(query.format(batch_size))
         query = (
             "SELECT "
             "    SUBSTR(b.date, 1, 4) yyyy, "
@@ -144,7 +145,7 @@ def loadTrainingData(batch_size, max_step):
             "    code = %s "
             "        AND klid BETWEEN %s AND %s "
             "ORDER BY klid "
-            "LIMIT %s" 
+            "LIMIT {}" 
         )
         data = []   # [batch, max_step, feature]
         labels = [] # [batch, label]  one-hot labels
@@ -155,7 +156,7 @@ def loadTrainingData(batch_size, max_step):
             label[int(score)+10] = 1
             labels.append(label)
             fcursor = cnx.cursor()
-            fcursor.execute(query, (code,klid - 999, klid, max_step))
+            fcursor.execute(query.format(max_step), (code,klid - 999, klid))
             s_idx = 0
             steps = np.zeros((max_step,11), dtype='f')
             for (yyyy,mm,dd,o,h,l,c,vr,k,d,j) in fcursor:

@@ -44,12 +44,13 @@ class SecurityGradePredictor:
         # Softmax layer.
         weight, bias = self._weight_and_bias(
             self._num_hidden, int(self.target.get_shape()[1]))
-        prediction = tf.nn.softmax(tf.matmul(last, weight) + bias)
+        prediction = tf.matmul(last, weight) + bias
         return prediction
 
     @lazy_property
     def cost(self):
-        cross_entropy = -tf.reduce_sum(self.target * tf.log(self.prediction))
+        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.target, logits=self.prediction))
+        # cross_entropy = -tf.reduce_sum(self.target * tf.log(self.prediction))
         return cross_entropy
 
     @lazy_property
@@ -66,7 +67,7 @@ class SecurityGradePredictor:
 
     @staticmethod
     def _weight_and_bias(in_size, out_size):
-        weight = tf.truncated_normal([in_size, out_size], stddev=0.01)
+        weight = tf.truncated_normal([in_size, out_size], stddev=0.1)
         bias = tf.constant(0.1, shape=[out_size])
         return tf.Variable(weight), tf.Variable(bias)
 
