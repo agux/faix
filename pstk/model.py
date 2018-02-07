@@ -1,6 +1,7 @@
 import functools
 import tensorflow as tf
 
+
 def lazy_property(function):
     attribute = '_' + function.__name__
 
@@ -15,11 +16,13 @@ def lazy_property(function):
 
 class SecurityGradePredictor:
 
-    def __init__(self, data, target, num_hidden=200, num_layers=2):
+    def __init__(self, data, target, dropout, num_hidden=200, num_layers=2, learning_rate=1e-4):
         self.data = data
         self.target = target
+        self.dropout = dropout
         self._num_hidden = num_hidden
         self._num_layers = num_layers
+        self._learning_rate = learning_rate
         self.prediction
         self.error
         self.optimize
@@ -34,14 +37,22 @@ class SecurityGradePredictor:
     @lazy_property
     def prediction(self):
         # Recurrent network.
+        cells = []
+        for _ in range(self._num_layers):
+            cell = tf.nn.rnn_cell.GRUCell(
+                self._num_hidden)  # Or LSTMCell(num_units)
+            cell = tf.nn.rnn_cell.DropoutWrapper(
+                cell, output_keep_prob=1.0 - self.dropout)
+            cells.append(cell)
+        cell = tf.nn.rnn_cell.MultiRNNCell(cells)
+
         output, _ = tf.nn.dynamic_rnn(
-            tf.contrib.rnn.GRUCell(self._num_hidden),
+            cell,
             self.data,
             dtype=tf.float32,
             sequence_length=self.length,
         )
         last = self._last_relevant(output, self.length)
-        # Softmax layer.
         weight, bias = self._weight_and_bias(
             self._num_hidden, int(self.target.get_shape()[1]))
         prediction = tf.matmul(last, weight) + bias
@@ -49,14 +60,14 @@ class SecurityGradePredictor:
 
     @lazy_property
     def cost(self):
-        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.target, logits=self.prediction))
+        cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.target, logits=self.prediction))
         # cross_entropy = -tf.reduce_sum(self.target * tf.log(self.prediction))
         return cross_entropy
 
     @lazy_property
     def optimize(self):
-        learning_rate = 0.003
-        optimizer = tf.train.RMSPropOptimizer(learning_rate)
+        optimizer = tf.train.AdamOptimizer(self._learning_rate)
         return optimizer.minimize(self.cost)
 
     @lazy_property
