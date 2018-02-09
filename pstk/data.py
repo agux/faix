@@ -29,27 +29,33 @@ def tagDataTrained(uuids, batch_no):
         cnx.close()
 
 
-def loadTestSet(batch_size, max_step):
+def loadTestSet(max_step):
     cnx = mysql.connector.connect(
         host='localhost', user='mysql', database='secu', password='123456')
     try:
         cursor = cnx.cursor(buffered=True)
-        query = (
-            'SELECT '
-            '   uuid, code, klid, score '
-            'FROM '
-            '   kpts '
-            'WHERE '
-            '   code IN (SELECT '
-            '               code '
-            '            FROM '
-            '               kpts '
-            '            WHERE '
-            "               flag = 'TEST') "
-            'ORDER BY RAND() '
-            "LIMIT {} "
+        pick = (
+            "SELECT  "
+            "    flag "
+            "FROM "
+            "    kpts "
+            "WHERE "
+            "    flag LIKE 'TEST\\_%' "
+            "ORDER BY RAND() "
+            "LIMIT 1"
         )
-        cursor.execute(query.format(batch_size))
+        cursor.execute(pick)
+        row = cursor.fetchone()
+        print('{} selected test set: {}'.format(strftime("%H:%M:%S"), row[0]))
+        query = (
+            "SELECT "
+            "   uuid, code, klid, score "
+            "FROM "
+            "   kpts "
+            "WHERE "
+            "   flag = '{}' "
+        )
+        cursor.execute(query.format(row[0]))
         query = (
             "SELECT "
             "    SUBSTR(b.date, 1, 4) yyyy, "
@@ -59,6 +65,15 @@ def loadTestSet(batch_size, max_step):
             "    b.high h, "
             "    b.low l, "
             "    b.close c, "
+            "    n.open n_o, "
+            "    n.high n_h, "
+            "    n.low n_l, "
+            "    n.close n_c, "
+            "    p.open p_o, "
+            "    p.high p_h, "
+            "    p.low p_l, "
+            "    p.close p_c, "
+            "    p.volume vol, "
             "    p.varate_rgl vr, "
             "    i.kdj_k k, "
             "    i.kdj_d d, "
@@ -67,6 +82,8 @@ def loadTestSet(batch_size, max_step):
             "    kline_d_b b "
             "        INNER JOIN "
             "    kline_d p USING (code , klid , date) "
+            "        INNER JOIN "
+            "    kline_d_n n USING (code , klid , date) "
             "        INNER JOIN "
             "    indicator_d i USING (code , klid , date) "
             "WHERE "
@@ -86,10 +103,10 @@ def loadTestSet(batch_size, max_step):
             fcursor = cnx.cursor()
             fcursor.execute(query.format(max_step), (code, klid - 999, klid))
             s_idx = 0
-            steps = np.zeros((max_step, 12), dtype='f')
-            for (yyyy, mm, dd, o, h, l, c, vr, k, d, j) in fcursor:
-                steps[s_idx] = [int(code), yyyy, mm, dd, o,
-                                h, l, c, vr, k, d, j]
+            steps = np.zeros((max_step, 20), dtype='f')
+            for (yyyy, mm, dd, o, h, l, c, n_o, n_h, n_l, n_c, p_o, p_h, p_l, p_c, vol, vr, k, d, j) in fcursor:
+                steps[s_idx] = [yyyy, mm, dd, o,
+                                h, l, c, n_o, n_h, n_l, n_c, p_o, p_h, p_l, p_c, vol, vr, k, d, j]
                 s_idx += 1
             data.append(steps)
             fcursor.close()
@@ -129,6 +146,15 @@ def loadPrepTrainingData(batch_no, max_step):
             "    b.high h, "
             "    b.low l, "
             "    b.close c, "
+            "    n.open n_o, "
+            "    n.high n_h, "
+            "    n.low n_l, "
+            "    n.close n_c, "
+            "    p.open p_o, "
+            "    p.high p_h, "
+            "    p.low p_l, "
+            "    p.close p_c, "
+            "    p.volume vol, "
             "    p.varate_rgl vr, "
             "    i.kdj_k k, "
             "    i.kdj_d d, "
@@ -137,6 +163,8 @@ def loadPrepTrainingData(batch_no, max_step):
             "    kline_d_b b "
             "        INNER JOIN "
             "    kline_d p USING (code , klid , date) "
+            "        INNER JOIN "
+            "    kline_d_n n USING (code , klid , date) "
             "        INNER JOIN "
             "    indicator_d i USING (code , klid , date) "
             "WHERE "
@@ -156,10 +184,10 @@ def loadPrepTrainingData(batch_no, max_step):
             fcursor = cnx.cursor()
             fcursor.execute(query.format(max_step), (code, klid - 999, klid))
             s_idx = 0
-            steps = np.zeros((max_step, 12), dtype='f')
-            for (yyyy, mm, dd, o, h, l, c, vr, k, d, j) in fcursor:
-                steps[s_idx] = [int(code), yyyy, mm, dd, o,
-                                h, l, c, vr, k, d, j]
+            steps = np.zeros((max_step, 20), dtype='f')
+            for (yyyy, mm, dd, o, h, l, c, n_o, n_h, n_l, n_c, p_o, p_h, p_l, p_c, vol, vr, k, d, j) in fcursor:
+                steps[s_idx] = [yyyy, mm, dd, o,
+                                h, l, c, n_o, n_h, n_l, n_c, p_o, p_h, p_l, p_c, vol, vr, k, d, j]
                 s_idx += 1
             data.append(steps)
             fcursor.close()

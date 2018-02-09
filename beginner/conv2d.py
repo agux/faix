@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 k = tf.constant([
     [1, 0, 1],
@@ -16,4 +17,4 @@ image = tf.reshape(i, [1, 4, 4, 1], name='image')
 res = tf.squeeze(tf.nn.conv2d(image, kernel, [1, 1, 1, 1], "VALID"))
 # VALID means no padding
 with tf.Session() as sess:
-   print sess.run(res)
+   print(sess.run(res))

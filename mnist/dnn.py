@@ -1,3 +1,4 @@
+from __future__ import print_function
 from tensorflow.examples.tutorials.mnist import input_data
 from time import gmtime, strftime
 import tensorflow as tf

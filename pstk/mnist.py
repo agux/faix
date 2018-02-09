@@ -1,19 +1,25 @@
 from __future__ import print_function
+
+from tensorflow.examples.tutorials.mnist import input_data
+print("downloading mnist data...")
+mnist = input_data.read_data_sets(
+    "mnist/input_data", source_url="http://yann.lecun.com/exdb/mnist/", one_hot=True)
+
 import tensorflow as tf
 from model import SecurityGradePredictor
 from time import strftime
 import data as dat
 import os
 
-EPOCH_SIZE = 4130
-HIDDEN_SIZE = 200
-NUM_LAYERS = 2
-#BATCH_SIZE = 200
-MAX_STEP = 500
-FEAT_SIZE = 20
-NUM_CLASSES = 21
-DROPOUT_RATE = 0.5
+EPOCH_SIZE = 5000
+HIDDEN_SIZE = 1000
+NUM_LAYERS = 3
+BATCH_SIZE = 128
+MAX_STEP = 28
+FEAT_SIZE = 28
+NUM_CLASSES = 10
 LEARNING_RATE = 1e-3
+DROPOUT_RATE = 0.5
 LOG_DIR = 'logdir'
 
 if __name__ == '__main__':
@@ -30,8 +36,6 @@ if __name__ == '__main__':
     tf.summary.scalar("Train Error", model.error*100)
     summary = tf.summary.merge_all()
     saver = tf.train.Saver()
-    print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    _, tdata, tlabels = dat.loadTestSet(MAX_STEP)
     with tf.Session() as sess:
         summary_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
         sess.run(tf.global_variables_initializer())
@@ -42,18 +46,21 @@ if __name__ == '__main__':
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                uuid, trdata, labels = dat.loadPrepTrainingData(bno, MAX_STEP)
+                batch_x, batch_y = mnist.train.next_batch(batch_size=BATCH_SIZE)
+                batch_x = batch_x.reshape((BATCH_SIZE, MAX_STEP, FEAT_SIZE))
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
-                                        data: trdata, target: labels, dropout: DROPOUT_RATE})
+                    data: batch_x, target: batch_y, dropout: DROPOUT_RATE})
                 summary_writer.add_summary(summary_str, bno)
                 summary_writer.flush()
                 # print('{} tagging data as trained, batch no: {}'.format(
                 #     strftime("%H:%M:%S"), bno))
                 # dat.tagDataTrained(uuid, bno)
             print('{} running on test set...'.format(strftime("%H:%M:%S")))
+            test_data = mnist.test.images.reshape((-1, MAX_STEP, FEAT_SIZE))
+            test_label = mnist.test.labels
             error = sess.run(
-                model.error, {data: tdata, target: tlabels, dropout: 0})
+                model.error, {data: test_data, target: test_label, dropout: 0})
             print('{} Epoch {:2d} error {:3.1f}%'.format(
                 strftime("%H:%M:%S"), epoch + 1, 100 * error))
             checkpoint_file = os.path.join(LOG_DIR, 'model.ckpt')

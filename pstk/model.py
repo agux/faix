@@ -40,7 +40,7 @@ class SecurityGradePredictor:
         cells = []
         for _ in range(self._num_layers):
             cell = tf.nn.rnn_cell.GRUCell(
-                self._num_hidden)  # Or LSTMCell(num_units)
+                self._num_hidden)  # Or LSTMCell(num_units), or use ConvLSTMCell?
             cell = tf.nn.rnn_cell.DropoutWrapper(
                 cell, output_keep_prob=1.0 - self.dropout)
             cells.append(cell)
@@ -60,7 +60,7 @@ class SecurityGradePredictor:
 
     @lazy_property
     def cost(self):
-        cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
             labels=self.target, logits=self.prediction))
         # cross_entropy = -tf.reduce_sum(self.target * tf.log(self.prediction))
         return cross_entropy
