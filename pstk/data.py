@@ -6,6 +6,77 @@ import tensorflow as tf
 from pprint import pprint
 from time import strftime
 
+ftQuery = (
+    "SELECT "
+    "    SUBSTR(b.date, 1, 4) yyyy, "
+    "    SUBSTR(b.date, 6, 2) mm, "
+    "    SUBSTR(b.date, 9, 2) dd, "
+    "    b.open o, "
+    "    b.high h, "
+    "    b.low l, "
+    "    b.close c, "
+    "    n.open n_o, "
+    "    n.high n_h, "
+    "    n.low n_l, "
+    "    n.close n_c, "
+    "    p.open p_o, "
+    "    p.high p_h, "
+    "    p.low p_l, "
+    "    p.close p_c, "
+    "    p.volume vol, "
+    "    p.varate_rgl vr, "
+    "    i.kdj_k k, "
+    "    i.kdj_d d, "
+    "    i.kdj_j j, "
+    "    COALESCE(shidx.sh_o, 0) sh_o, "
+    "    COALESCE(shidx.sh_h, 0) sh_h, "
+    "    COALESCE(shidx.sh_c, 0) sh_c, "
+    "    COALESCE(shidx.sh_l, 0) sh_l, "
+    "    COALESCE(shidx.sh_vol, 0) sh_vol, "
+    "    COALESCE(szidx.sz_o, 0) sz_o, "
+    "    COALESCE(szidx.sz_h, 0) sz_h, "
+    "    COALESCE(szidx.sz_c, 0) sz_c, "
+    "    COALESCE(szidx.sz_l, 0) sz_l, "
+    "    COALESCE(szidx.sz_vol, 0) sz_vol "
+    "FROM "
+    "    kline_d_b b "
+    "        INNER JOIN "
+    "    kline_d p USING (code , klid , date) "
+    "        INNER JOIN "
+    "    kline_d_n n USING (code , klid , date) "
+    "        INNER JOIN "
+    "    indicator_d i USING (code , klid , date) "
+    "        LEFT OUTER JOIN "
+    "    (SELECT  "
+    "        date, "
+    "            open sh_o, "
+    "            high sh_h, "
+    "            close sh_c, "
+    "            low sh_l, "
+    "            volume sh_vol "
+    "    FROM "
+    "        kline_d "
+    "    WHERE "
+    "        code = 'sh000001') shidx USING (date) "
+    "        LEFT OUTER JOIN "
+    "    (SELECT  "
+    "        date, "
+    "            open sz_o, "
+    "            high sz_h, "
+    "            close sz_c, "
+    "            low sz_l, "
+    "            volume sz_vol "
+    "    FROM "
+    "        kline_d "
+    "    WHERE "
+    "        code = 'sz399001') szidx USING (date) "
+    "WHERE "
+    "    code = %s "
+    "        AND klid BETWEEN %s AND %s "
+    "ORDER BY klid "
+    "LIMIT {}"
+)
+
 
 def tagDataTrained(uuids, batch_no):
     cnx = mysql.connector.connect(
@@ -56,42 +127,6 @@ def loadTestSet(max_step):
             "   flag = '{}' "
         )
         cursor.execute(query.format(row[0]))
-        query = (
-            "SELECT "
-            "    SUBSTR(b.date, 1, 4) yyyy, "
-            "    SUBSTR(b.date, 6, 2) mm, "
-            "    SUBSTR(b.date, 9, 2) dd, "
-            "    b.open o, "
-            "    b.high h, "
-            "    b.low l, "
-            "    b.close c, "
-            "    n.open n_o, "
-            "    n.high n_h, "
-            "    n.low n_l, "
-            "    n.close n_c, "
-            "    p.open p_o, "
-            "    p.high p_h, "
-            "    p.low p_l, "
-            "    p.close p_c, "
-            "    p.volume vol, "
-            "    p.varate_rgl vr, "
-            "    i.kdj_k k, "
-            "    i.kdj_d d, "
-            "    i.kdj_j j "
-            "FROM "
-            "    kline_d_b b "
-            "        INNER JOIN "
-            "    kline_d p USING (code , klid , date) "
-            "        INNER JOIN "
-            "    kline_d_n n USING (code , klid , date) "
-            "        INNER JOIN "
-            "    indicator_d i USING (code , klid , date) "
-            "WHERE "
-            "    code = %s "
-            "        AND klid BETWEEN %s AND %s "
-            "ORDER BY klid "
-            "LIMIT {}"
-        )
         data = []   # [batch, max_step, feature]
         labels = []  # [batch, label]  one-hot labels
         uuids = []
@@ -101,12 +136,11 @@ def loadTestSet(max_step):
             label[int(score)+10] = 1
             labels.append(label)
             fcursor = cnx.cursor()
-            fcursor.execute(query.format(max_step), (code, klid - 999, klid))
+            fcursor.execute(ftQuery.format(max_step), (code, klid - 999, klid))
             s_idx = 0
-            steps = np.zeros((max_step, 20), dtype='f')
-            for (yyyy, mm, dd, o, h, l, c, n_o, n_h, n_l, n_c, p_o, p_h, p_l, p_c, vol, vr, k, d, j) in fcursor:
-                steps[s_idx] = [yyyy, mm, dd, o,
-                                h, l, c, n_o, n_h, n_l, n_c, p_o, p_h, p_l, p_c, vol, vr, k, d, j]
+            steps = np.zeros((max_step, len(fcursor.column_names)), dtype='f')
+            for row in fcursor:
+                steps[s_idx] = [col for col in row]
                 s_idx += 1
             data.append(steps)
             fcursor.close()
@@ -137,42 +171,6 @@ def loadPrepTrainingData(batch_no, max_step):
         )
         # print(query)
         cursor.execute(query.format(batch_no))
-        query = (
-            "SELECT "
-            "    SUBSTR(b.date, 1, 4) yyyy, "
-            "    SUBSTR(b.date, 6, 2) mm, "
-            "    SUBSTR(b.date, 9, 2) dd, "
-            "    b.open o, "
-            "    b.high h, "
-            "    b.low l, "
-            "    b.close c, "
-            "    n.open n_o, "
-            "    n.high n_h, "
-            "    n.low n_l, "
-            "    n.close n_c, "
-            "    p.open p_o, "
-            "    p.high p_h, "
-            "    p.low p_l, "
-            "    p.close p_c, "
-            "    p.volume vol, "
-            "    p.varate_rgl vr, "
-            "    i.kdj_k k, "
-            "    i.kdj_d d, "
-            "    i.kdj_j j "
-            "FROM "
-            "    kline_d_b b "
-            "        INNER JOIN "
-            "    kline_d p USING (code , klid , date) "
-            "        INNER JOIN "
-            "    kline_d_n n USING (code , klid , date) "
-            "        INNER JOIN "
-            "    indicator_d i USING (code , klid , date) "
-            "WHERE "
-            "    code = %s "
-            "        AND klid BETWEEN %s AND %s "
-            "ORDER BY klid "
-            "LIMIT {}"
-        )
         data = []   # [batch, max_step, feature]
         labels = []  # [batch, label]  one-hot labels
         uuids = []
@@ -182,12 +180,11 @@ def loadPrepTrainingData(batch_no, max_step):
             label[int(score)+10] = 1
             labels.append(label)
             fcursor = cnx.cursor()
-            fcursor.execute(query.format(max_step), (code, klid - 999, klid))
+            fcursor.execute(ftQuery.format(max_step), (code, klid - 999, klid))
             s_idx = 0
-            steps = np.zeros((max_step, 20), dtype='f')
-            for (yyyy, mm, dd, o, h, l, c, n_o, n_h, n_l, n_c, p_o, p_h, p_l, p_c, vol, vr, k, d, j) in fcursor:
-                steps[s_idx] = [yyyy, mm, dd, o,
-                                h, l, c, n_o, n_h, n_l, n_c, p_o, p_h, p_l, p_c, vol, vr, k, d, j]
+            steps = np.zeros((max_step, len(fcursor.column_names)), dtype='f')
+            for row in fcursor:
+                steps[s_idx] = [col for col in row]
                 s_idx += 1
             data.append(steps)
             fcursor.close()

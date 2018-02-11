@@ -7,13 +7,13 @@ import os
 
 EPOCH_SIZE = 4130
 HIDDEN_SIZE = 200
-NUM_LAYERS = 2
+NUM_LAYERS = 3
 #BATCH_SIZE = 200
-MAX_STEP = 500
-FEAT_SIZE = 20
+W_SIZE = 10
+MAX_STEP = 128
+FEAT_SIZE = 30
 NUM_CLASSES = 21
-DROPOUT_RATE = 0.5
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-4
 LOG_DIR = 'logdir'
 
 if __name__ == '__main__':
@@ -23,11 +23,11 @@ if __name__ == '__main__':
 
     data = tf.placeholder(tf.float32, [None, MAX_STEP, FEAT_SIZE])
     target = tf.placeholder(tf.float32, [None, NUM_CLASSES])
-    dropout = tf.placeholder(tf.float32)
+    training = tf.placeholder(tf.bool)
     model = SecurityGradePredictor(
-        data, target, dropout, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
-    tf.summary.scalar("Training Loss", model.cost)
-    tf.summary.scalar("Train Error", model.error*100)
+        data, target, W_SIZE, training, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
+    tf.summary.scalar("Train Loss", model.cost)
+    tf.summary.scalar("Train Accuracy", model.accuracy*100)
     summary = tf.summary.merge_all()
     saver = tf.train.Saver()
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
@@ -37,24 +37,24 @@ if __name__ == '__main__':
         sess.run(tf.global_variables_initializer())
         bno = 0
         for epoch in range(EPOCH_SIZE):
-            bno = epoch*10
-            for i in range(10):
+            bno = epoch*50
+            for i in range(50):
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
                 uuid, trdata, labels = dat.loadPrepTrainingData(bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
-                                        data: trdata, target: labels, dropout: DROPOUT_RATE})
+                    data: trdata, target: labels, training: True})
                 summary_writer.add_summary(summary_str, bno)
                 summary_writer.flush()
                 # print('{} tagging data as trained, batch no: {}'.format(
                 #     strftime("%H:%M:%S"), bno))
                 # dat.tagDataTrained(uuid, bno)
             print('{} running on test set...'.format(strftime("%H:%M:%S")))
-            error = sess.run(
-                model.error, {data: tdata, target: tlabels, dropout: 0})
-            print('{} Epoch {:2d} error {:3.1f}%'.format(
-                strftime("%H:%M:%S"), epoch + 1, 100 * error))
+            accuracy = sess.run(
+                model.accuracy, {data: tdata, target: tlabels, training: False})
+            print('{} Epoch {:4d} test accuracy {:3.3f}%'.format(
+                strftime("%H:%M:%S"), epoch + 1, 100 * accuracy))
             checkpoint_file = os.path.join(LOG_DIR, 'model.ckpt')
             saver.save(sess, checkpoint_file, global_step=bno)
