@@ -10,10 +10,10 @@ HIDDEN_SIZE = 200
 NUM_LAYERS = 3
 #BATCH_SIZE = 200
 W_SIZE = 10
-MAX_STEP = 128
+MAX_STEP = 60
 FEAT_SIZE = 30
 NUM_CLASSES = 21
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
 if __name__ == '__main__':
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     target = tf.placeholder(tf.float32, [None, NUM_CLASSES])
     training = tf.placeholder(tf.bool)
     model = SecurityGradePredictor(
-        data, target, W_SIZE, training, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
+        data, target, W_SIZE, training, True, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
     tf.summary.scalar("Train Loss", model.cost)
     tf.summary.scalar("Train Accuracy", model.accuracy*100)
     summary = tf.summary.merge_all()

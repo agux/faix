@@ -18,18 +18,21 @@ def primes(n):
     return primfac
 
 
-def numLayers(feat):
-    n = 0
-    while feat > 1:
-        feat = math.ceil(feat/2)
-        n += 1
-    return n
+def numLayers(d1, d2=None):
+    n1 = 0
+    while d1 > 1:
+        d1 = math.ceil(d1/2)
+        n1 += 1
+    n2 = 0
+    if d2 is not None:
+        n2 = numLayers(d2)
+    return max(n1, n2)
 
 
-def factorize(vspan):
-    factors = sorted(primes(vspan))
+def factorize(feature_size):
+    factors = sorted(primes(feature_size))
     if len(factors) < 2:
-        raise ValueError('vspan is not factorizable.')
+        raise ValueError('feature size is not factorizable.')
     return tuple(sorted([reduce(lambda x, y: x*y, factors[:-1]), factors[-1]], reverse=True))
 
 
@@ -47,13 +50,14 @@ def lazy_property(function):
 
 class SecurityGradePredictor:
 
-    def __init__(self, data, target, wsize, training, num_hidden=200, num_layers=2, learning_rate=1e-4):
+    def __init__(self, data, target, wsize, training, is3d=False, num_hidden=200, num_layers=2, learning_rate=1e-4):
         self.data = data
         self.target = target
         self.training = training
         self._num_hidden = num_hidden
         self._num_layers = num_layers
         self._learning_rate = learning_rate
+        self._is3d = is3d
         self._wsize = wsize
         self.prediction
         self.error
@@ -72,7 +76,7 @@ class SecurityGradePredictor:
         wsize = self._wsize
         print("window size:{} step:{} feat:{} #conv layers: {}".format(
             wsize, step, feat, nlayer))
-        filters = max(2, 2 ** (math.ceil(math.log(feat, 2))))
+        filters = max(2, 2 ** (math.ceil(math.log(feat, 2)+1)))
         krange = 3
         drange = 3
         convlayers = np.array([[input for _ in range(drange)]
@@ -82,9 +86,10 @@ class SecurityGradePredictor:
             uf = math.ceil(filters/(krange*drange))
             for k in range(krange):
                 for d in range(drange):
-                    conv = tf.layers.conv2d(
+                    conv = tf.layers.separable_conv2d(
                         inputs=convlayers[k][d],
                         filters=uf,
+                        depth_multiplier=3,
                         dilation_rate=d+1,
                         kernel_size=[k+wsize, k+2],
                         padding="same",
@@ -100,6 +105,62 @@ class SecurityGradePredictor:
         convlayer = tf.concat([c for c in convlayers], 3)
         print("concat: {}".format(convlayer.get_shape()))
         output_layer = tf.squeeze(convlayer, [2])
+        output_layer = tf.layers.batch_normalization(
+            output_layer, training=self.training)
+        print("cnn output layer: {}".format(output_layer.get_shape()))
+        # self.data = output_layer
+        return output_layer
+
+    @lazy_property
+    def multi_cnn3d(self):
+        """Model function for 3D CNN."""
+        step = int(self.data.get_shape()[1])
+        feat = int(self.data.get_shape()[2])
+        # Get 2D dimension length (height, width)
+        h, w = factorize(feat)
+        # Transforms input to 3D [batch, depth, height, width, channel]
+        input = tf.reshape(self.data, [-1, step, h, w, 1])
+        print("input transformed to 3D shape: {}".format(input.get_shape()))
+        nlayer = numLayers(h, w)
+        wsize = self._wsize
+        print("window size:{} step:{} #conv layers: {}".format(
+            wsize, step, nlayer))
+        filters = max(2, 2 ** (math.ceil(math.log(feat, 2)+1)))
+        # krange = min(h, w) // 2
+        # drange = krange
+        krange = 1
+        drange = 1
+        convlayers = np.array([[input for _ in range(drange)]
+                               for _ in range(krange)])
+        for i in range(nlayer):
+            filters *= 4
+            uf = math.ceil(filters/(krange*drange))
+            for k in range(krange):
+                for d in range(drange):
+                    conv = tf.layers.conv3d(
+                        inputs=convlayers[k][d],
+                        filters=uf,
+                        kernel_size=(k+wsize, k+2, k+2),
+                        kernel_initializer=tf.truncated_normal_initializer,
+                        bias_initializer=tf.constant_initializer(0.1),
+                        dilation_rate=(max(2, d+1), d+1, d+1),
+                        padding="same",
+                        activation=tf.nn.elu)
+                    h_stride = 2 if int(conv.get_shape()[2]) >= 2 else 1
+                    w_stride = 2 if int(conv.get_shape()[3]) >= 2 else 1
+                    pool = tf.layers.max_pooling3d(
+                        inputs=conv, pool_size=k+2, strides=[1, h_stride, w_stride],
+                        padding="same")
+                    convlayers[k][d] = pool
+                    print("#{} conv:{} pool: {} wide: {} dilation: {}".format(
+                        i+1, conv.get_shape(), pool.get_shape(), k+2, d+1))
+        # Flatten convlayers
+        convlayers = convlayers.flatten()
+        convlayer = tf.concat([c for c in convlayers], 4)
+        print("concat: {}".format(convlayer.get_shape()))
+        output_layer = tf.squeeze(convlayer, [2, 3])
+        output_layer = tf.layers.batch_normalization(
+            output_layer, training=self.training)
         print("cnn output layer: {}".format(output_layer.get_shape()))
         # self.data = output_layer
         return output_layer
@@ -125,7 +186,7 @@ class SecurityGradePredictor:
 
         output, _ = tf.nn.dynamic_rnn(
             cell,
-            self.multi_cnn,
+            self.multi_cnn3d if self._is3d else self.multi_cnn,
             dtype=tf.float32,
             sequence_length=self.length,
         )
@@ -135,14 +196,16 @@ class SecurityGradePredictor:
         #     self._num_hidden, int(self.target.get_shape()[1]))
         # prediction = tf.matmul(last, weight) + bias
 
+        # norm_last = tf.layers.batch_normalization(
+        #     last, training=self.training)
         dense = tf.layers.dense(
             inputs=last, units=self._num_hidden * 3, activation=tf.nn.elu)
-        dropout = tf.layers.dropout(
-            inputs=dense, rate=math.e/10, training=self.training)
+        # dropout = tf.layers.dropout(
+        #     inputs=dense, rate=math.e/10, training=self.training)
 
         # Logits Layer
         prediction = tf.layers.dense(
-            inputs=dropout, units=int(self.target.get_shape()[1]))
+            inputs=dense, units=int(self.target.get_shape()[1]), activation=tf.nn.relu6)
 
         # prediction = self._cnn_layer(self.data,
         #                              self._ksize,
@@ -159,8 +222,14 @@ class SecurityGradePredictor:
 
     @lazy_property
     def optimize(self):
-        optimizer = tf.train.AdamOptimizer(self._learning_rate)
-        return optimizer.minimize(self.cost, global_step=tf.train.get_global_step())
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        optimizer = None
+        with tf.control_dependencies(update_ops):
+            optimizer = tf.train.AdamOptimizer(self._learning_rate).minimize(
+                self.cost, global_step=tf.train.get_global_step())
+        return optimizer
+        # optimizer = tf.train.AdamOptimizer(self._learning_rate)
+        # return optimizer.minimize(self.cost, global_step=tf.train.get_global_step())
 
     @lazy_property
     def error(self):
