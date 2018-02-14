@@ -1,7 +1,9 @@
 from __future__ import print_function
 import mysql.connector
 import sys
+import sqlalchemy as sqla
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from pprint import pprint
 from time import strftime
@@ -136,7 +138,8 @@ def loadTestSet(max_step):
             label[int(score)+10] = 1
             labels.append(label)
             fcursor = cnx.cursor()
-            fcursor.execute(ftQuery.format(max_step), (code, klid - 999, klid))
+            fcursor.execute(ftQuery.format(max_step),
+                            (code, klid - max_step+1, klid))
             s_idx = 0
             steps = np.zeros((max_step, len(fcursor.column_names)), dtype='f')
             for row in fcursor:
@@ -180,7 +183,8 @@ def loadPrepTrainingData(batch_no, max_step):
             label[int(score)+10] = 1
             labels.append(label)
             fcursor = cnx.cursor()
-            fcursor.execute(ftQuery.format(max_step), (code, klid - 999, klid))
+            fcursor.execute(ftQuery.format(max_step),
+                            (code, klid - max_step+1, klid))
             s_idx = 0
             steps = np.zeros((max_step, len(fcursor.column_names)), dtype='f')
             for row in fcursor:
@@ -198,6 +202,128 @@ def loadPrepTrainingData(batch_no, max_step):
         raise
     finally:
         cnx.close()
+
+
+def loadPrepTrainingData4D(batch_no, max_step):
+    '''
+    returned format: [batch_size, max_step, interleaved_dim, feature_size]
+    '''
+    cnx = mysql.connector.connect(
+        host='localhost', user='mysql', database='secu', password='123456')
+    try:
+        cursor = cnx.cursor(buffered=True)
+        query = (
+            'SELECT '
+            '   uuid, code, klid, score '
+            'FROM'
+            '   kpts '
+            'WHERE '
+            "   flag = 'TRN_{}'"
+        )
+        # print(query)
+        numRels = getNumRelatives(cnx)
+        rels = getRelativeData()
+        relCodes = rels.index.get_level_values('code').tolist()
+        cursor.execute(query.format(batch_no))
+        data = []   # [batch, max_step, feature]
+        labels = []  # [batch, label]  one-hot labels
+        uuids = []
+        ftQuery = (
+            "SELECT "
+            "    b.date d, "
+            "    b.open o, "
+            "    b.high h, "
+            "    b.low l, "
+            "    b.close c, "
+            "    b.volume v "
+            "FROM "
+            "    kline_d_b b "
+            "WHERE "
+            "    b.code = %s "
+            "        AND b.klid BETWEEN %s AND %s "
+            "ORDER BY b.klid "
+            "LIMIT {}"
+        )
+        for (uuid, code, klid, score) in cursor:
+            uuids.append(uuid)
+            label = np.zeros((21), dtype=np.int8)
+            label[int(score)+10] = 1
+            labels.append(label)
+            fcursor = cnx.cursor()
+            fcursor.execute(ftQuery.format(max_step),
+                            (code, klid - max_step+1, klid))
+            s_idx = 0
+            steps = np.zeros(
+                (max_step, numRels*2, len(fcursor.column_names)-1))
+            for row in fcursor:
+                print("#{} populating {} {}".format(s_idx, code, row[0]))
+                for r in range(numRels*2):
+                    if r % 2 == 0:
+                        steps[s_idx][r] = [col for i,
+                                           col in enumerate(row) if i > 0]
+                    else:
+                        try:
+                            steps[s_idx][r] = rels.loc[relCodes[r//2]
+                                                       ].loc[row[0]].as_matrix()
+                        except KeyError:
+                            # not found
+                            pass
+                        except Exception:
+                            raise
+                s_idx += 1
+            data.append(steps)
+            fcursor.close()
+        cursor.close()
+        # pprint(data)
+        # print("\n")
+        # pprint(len(labels))
+        return uuids, data, labels
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        cnx.close()
+
+
+relData = None
+
+
+def getRelativeData():
+    global relData
+    if relData is not None:
+        return relData
+    print("fetching relative data from database, may take a while...")
+    sql = (
+        "SELECT "
+        "    d.code, d.date, d.open, d.high, d.low, d.close, d.volume "
+        "FROM "
+        "    kline_d d "
+        "        INNER JOIN "
+        "    idxlst USING (code)  "
+        "UNION ALL SELECT  "
+        "    * "
+        "FROM "
+        "    (SELECT  "
+        "        b.code, b.date, b.open, b.high, b.close, b.low, b.volume "
+        "    FROM "
+        "        kline_d_b b "
+        "    INNER JOIN cmpool p USING (code) "
+        "    ORDER BY p.seqno) t"
+    )
+    relData = pd.read_sql_query(sql,
+                                sqla.create_engine(
+                                    'mysql+mysqlconnector://mysql:123456@localhost/secu'),
+                                index_col=["code", "date"])
+    print("relative data fetched from database: {}".format(relData.shape))
+    return relData
+
+
+def getNumRelatives(conn):
+    c = conn.cursor()
+    c.execute("select count(*) cnt from cmpool")
+    n = np.asarray(c.fetchone())[0]
+    c.close()
+    return n
 
 
 def loadTrainingData(batch_size, max_step):
@@ -257,7 +383,8 @@ def loadTrainingData(batch_size, max_step):
             label[int(score)+10] = 1
             labels.append(label)
             fcursor = cnx.cursor()
-            fcursor.execute(query.format(max_step), (code, klid - 999, klid))
+            fcursor.execute(query.format(max_step),
+                            (code, klid - max_step+1, klid))
             s_idx = 0
             steps = np.zeros((max_step, 12), dtype='f')
             for (yyyy, mm, dd, o, h, l, c, vr, k, d, j) in fcursor:

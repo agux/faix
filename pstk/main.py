@@ -6,14 +6,14 @@ import data as dat
 import os
 
 EPOCH_SIZE = 4130
-HIDDEN_SIZE = 200
+HIDDEN_SIZE = 512
 NUM_LAYERS = 3
 #BATCH_SIZE = 200
 W_SIZE = 10
 MAX_STEP = 60
 FEAT_SIZE = 30
 NUM_CLASSES = 21
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-4
 LOG_DIR = 'logdir'
 
 if __name__ == '__main__':

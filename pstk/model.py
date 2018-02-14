@@ -174,44 +174,74 @@ class SecurityGradePredictor:
 
     @lazy_property
     def prediction(self):
+        return self.crnn2d
         # Recurrent network.
-        cells = []
-        for _ in range(self._num_layers):
-            cell = tf.nn.rnn_cell.GRUCell(
-                self._num_hidden)  # Or LSTMCell(num_units), or use ConvLSTMCell?
-            # cell = tf.nn.rnn_cell.DropoutWrapper(
-            #     cell, output_keep_prob=1.0 - self.dropout)
-            cells.append(cell)
-        cell = tf.nn.rnn_cell.MultiRNNCell(cells)
+        # cells = []
+        # for _ in range(self._num_layers):
+        #     cell = tf.nn.rnn_cell.GRUCell(
+        #         self._num_hidden)  # Or LSTMCell(num_units), or use ConvLSTMCell?
+        #     # cell = tf.nn.rnn_cell.DropoutWrapper(
+        #     #     cell, output_keep_prob=1.0 - self.dropout)
+        #     cells.append(cell)
+        # cell = tf.nn.rnn_cell.MultiRNNCell(cells)
 
-        output, _ = tf.nn.dynamic_rnn(
-            cell,
-            self.multi_cnn3d if self._is3d else self.multi_cnn,
-            dtype=tf.float32,
-            sequence_length=self.length,
-        )
+        # output, _ = tf.nn.dynamic_rnn(
+        #     cell,
+        #     self.multi_cnn3d if self._is3d else self.multi_cnn,
+        #     dtype=tf.float32,
+        #     sequence_length=self.length,
+        # )
 
-        last = self._last_relevant(output, self.length)
+        # last = self._last_relevant(output, self.length)
         # weight, bias = self._weight_and_bias(
         #     self._num_hidden, int(self.target.get_shape()[1]))
         # prediction = tf.matmul(last, weight) + bias
 
         # norm_last = tf.layers.batch_normalization(
         #     last, training=self.training)
-        dense = tf.layers.dense(
-            inputs=last, units=self._num_hidden * 3, activation=tf.nn.elu)
+        # dense = tf.layers.dense(
+        #     inputs=last, units=self._num_hidden * 3, activation=tf.nn.elu)
         # dropout = tf.layers.dropout(
         #     inputs=dense, rate=math.e/10, training=self.training)
 
         # Logits Layer
-        prediction = tf.layers.dense(
-            inputs=dense, units=int(self.target.get_shape()[1]), activation=tf.nn.relu6)
+        # prediction = tf.layers.dense(
+        #     inputs=dense, units=int(self.target.get_shape()[1]), activation=tf.nn.relu6)
 
         # prediction = self._cnn_layer(self.data,
         #                              self._ksize,
         #                              int(self.target.get_shape()[1]),
         #                              self.training)
-        return prediction
+        # return prediction
+
+    @lazy_property
+    def crnn2d(self):
+        # map [batch, step, feature] to [batch][step, feature] and pass each
+        # [step, feature] to cnn2d
+        cnn = tf.map_fn(lambda input: self.cnn2d(
+            input, self.training), self.data)
+        # can't use batch_norm due to its bug causing "InvalidArgumentError: Retval[0] does not have value"
+        # norm_cnn = tf.layers.batch_normalization(cnn, training=self.training)
+        mix = tf.concat([self.data, cnn], 2)
+        rnn = self.rnn(self, mix)
+
+        dense = tf.layers.dense(
+            inputs=rnn,
+            units=self._num_hidden * 3,
+            # kernel_initializer=tf.truncated_normal_initializer,
+            # bias_initializer=tf.constant_initializer(0.1),
+            activation=tf.nn.elu)
+        dropout = tf.layers.dropout(
+            inputs=dense, rate=math.e/10, training=self.training)
+
+        # Logits Layer
+        output = tf.layers.dense(
+            inputs=dropout,
+            units=int(self.target.get_shape()[1]),
+            # kernel_initializer=tf.truncated_normal_initializer,
+            # bias_initializer=tf.constant_initializer(0.1),
+            activation=tf.nn.relu6)
+        return output
 
     @lazy_property
     def cost(self):
@@ -243,6 +273,103 @@ class SecurityGradePredictor:
             tf.argmax(self.target, 1), tf.argmax(self.prediction, 1))
         return tf.reduce_mean(tf.cast(accuracy, tf.float32))
         # return tf.metrics.accuracy(labels=self.target, predictions=self.prediction)
+
+    @staticmethod
+    def cnn2d(input, training):
+        """Model function for CNN."""
+        print("shape of cnn input: {}".format(input.get_shape()))
+        step = int(input.get_shape()[0])
+        feat = int(input.get_shape()[1])
+        # Get 2D dimension length (height, width)
+        h, w = factorize(feat)
+        # Transforms into 2D compatible format [batch(step), height, width, channel]
+        input2d = tf.reshape(input, [-1, h, w, 1])
+        print("input transformed to 2D shape: {}".format(input2d.get_shape()))
+
+        nlayer = numLayers(h, w)
+        print("step:{} feat:{} #conv layers: {}".format(step, feat, nlayer))
+        filters = max(2, 2 ** (math.ceil(math.log(feat, 2)+1)))
+        # krange = 3
+        # drange = 3
+        krange = 1
+        drange = 1
+        convlayers = np.array([[input2d for _ in range(drange)]
+                               for _ in range(krange)])
+        for i in range(nlayer):
+            filters *= 2
+            uf = math.ceil(filters/(krange*drange))
+            for k in range(krange):
+                for d in range(drange):
+                    conv = tf.layers.conv2d(
+                        inputs=convlayers[k][d],
+                        filters=uf,
+                        kernel_size=k+2,
+                        kernel_initializer=tf.truncated_normal_initializer,
+                        bias_initializer=tf.constant_initializer(0.1),
+                        dilation_rate=d+1,
+                        padding="same",
+                        activation=tf.nn.elu)
+                    h_stride = 2 if int(conv.get_shape()[1]) >= 2 else 1
+                    w_stride = 2 if int(conv.get_shape()[2]) >= 2 else 1
+                    pool = tf.layers.max_pooling2d(
+                        inputs=conv, pool_size=k+2, strides=[h_stride, w_stride],
+                        padding="same")
+                    # can't use for now due to map_fn and batch_norm cooperation bugs
+                    # norm_pool = tf.layers.batch_normalization(
+                    #     pool, training=training)
+                    convlayers[k][d] = pool
+                    print("#{} conv:{} pool: {} ksize: {} dilation: {}".format(
+                        i+1, conv.get_shape(), pool.get_shape(), k+2, d+1))
+        # Flatten convlayers
+        convlayers = convlayers.flatten()
+        convlayer = tf.concat([c for c in convlayers], 3)
+        print("concat: {}".format(convlayer.get_shape()))
+        convlayer = tf.squeeze(convlayer, [1, 2])
+        print("squeeze: {}".format(convlayer.get_shape()))
+        units = 2 ** math.ceil(math.log(feat*3, 2))-feat
+        dense = tf.layers.dense(
+            inputs=convlayer,
+            units=units,
+            kernel_initializer=tf.truncated_normal_initializer,
+            bias_initializer=tf.constant_initializer(0.1),
+            activation=tf.nn.elu)
+        # can't use for now due to map_fn and batch_norm cooperation bugs
+        # norm_dense = tf.layers.batch_normalization(
+        #     dense, training=training)
+        # output_layer = tf.concat([input, norm_dense], 1)
+        print("cnn output layer: {}".format(dense.get_shape()))
+        return dense
+
+    @staticmethod
+    def rnn(self, input):
+        print("rnn input: {}".format(input.get_shape()))
+        # Recurrent network.
+        cells = []
+        for _ in range(self._num_layers):
+            cell = tf.nn.rnn_cell.GRUCell(
+                self._num_hidden,
+                kernel_initializer=tf.truncated_normal_initializer,
+                bias_initializer=tf.constant_initializer(0.1))  # Or LSTMCell(num_units), or use ConvLSTMCell?
+            # cell = tf.nn.rnn_cell.DropoutWrapper(
+            #     cell, output_keep_prob=1.0 - self.dropout)
+            cells.append(cell)
+        cell = tf.nn.rnn_cell.MultiRNNCell(cells)
+
+        output, _ = tf.nn.dynamic_rnn(
+            cell,
+            input,
+            dtype=tf.float32,
+            sequence_length=self.length,
+        )
+
+        last = self._last_relevant(output, self.length)
+        # weight, bias = self._weight_and_bias(
+        #     self._num_hidden, int(self.target.get_shape()[1]))
+        # prediction = tf.matmul(last, weight) + bias
+
+        # norm_last = tf.layers.batch_normalization(
+        #     last, training=self.training)
+        return last
 
     @staticmethod
     def _cnn_layer(input, ksize, num_class, training):
