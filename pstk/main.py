@@ -1,40 +1,40 @@
 from __future__ import print_function
 import tensorflow as tf
-from model import SecurityGradePredictor
+from model import BasicSecGradePredictor
 from time import strftime
-import data as dat
+import data2 as dat
 import os
+import numpy as np
 
-EPOCH_SIZE = 4130
-HIDDEN_SIZE = 512
-NUM_LAYERS = 3
+EPOCH_SIZE = 705
+HIDDEN_SIZE = 64
+NUM_LAYERS = 1
 #BATCH_SIZE = 200
 W_SIZE = 10
-MAX_STEP = 60
-FEAT_SIZE = 30
-NUM_CLASSES = 21
-LEARNING_RATE = 1e-4
+MAX_STEP = 10
+LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
 if __name__ == '__main__':
     if tf.gfile.Exists(LOG_DIR):
         tf.gfile.DeleteRecursively(LOG_DIR)
     tf.gfile.MakeDirs(LOG_DIR)
-
-    data = tf.placeholder(tf.float32, [None, MAX_STEP, FEAT_SIZE])
-    target = tf.placeholder(tf.float32, [None, NUM_CLASSES])
-    training = tf.placeholder(tf.bool)
-    model = SecurityGradePredictor(
-        data, target, W_SIZE, training, True, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
-    tf.summary.scalar("Train Loss", model.cost)
-    tf.summary.scalar("Train Accuracy", model.accuracy*100)
-    summary = tf.summary.merge_all()
-    saver = tf.train.Saver()
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     _, tdata, tlabels = dat.loadTestSet(MAX_STEP)
+    featSize = np.array(tdata).shape[2]
+    numClass = np.array(tlabels).shape[1]
+    data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize])
+    target = tf.placeholder(tf.float32, [None, numClass])
+    training = tf.placeholder(tf.bool)
+    model = BasicSecGradePredictor(
+        data, target, W_SIZE, training, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
     with tf.Session() as sess:
-        summary_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
         sess.run(tf.global_variables_initializer())
+        summary_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
+        tf.summary.scalar("Train Loss", model.cost)
+        tf.summary.scalar("Train Accuracy", model.accuracy*100)
+        summary = tf.summary.merge_all()
+        saver = tf.train.Saver()
         bno = 0
         for epoch in range(EPOCH_SIZE):
             bno = epoch*50
@@ -42,7 +42,7 @@ if __name__ == '__main__':
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                uuid, trdata, labels = dat.loadPrepTrainingData(bno, MAX_STEP)
+                uuid, trdata, labels = dat.loadTrainingData(bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
                     data: trdata, target: labels, training: True})

@@ -1,5 +1,5 @@
 # source: https://r2rt.com/recurrent-neural-networks-in-tensorflow-i.html
-
+from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 #matplotlib inline
