@@ -1,6 +1,6 @@
 from __future__ import print_function
 import tensorflow as tf
-from model import BasicSecGradePredictor
+from model import BasicRnnPredictor
 from time import strftime
 import os
 import numpy as np
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     data = tf.placeholder(tf.float32, [None, MAX_STEP, num_classes])
     target = tf.placeholder(tf.float32, [None, num_classes])
     training = tf.placeholder(tf.bool)
-    model = BasicSecGradePredictor(
+    model = BasicRnnPredictor(
         data, target, W_SIZE, training, num_hidden=HIDDEN_SIZE,
         num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
     with tf.Session() as sess:

@@ -8,6 +8,8 @@ import tensorflow as tf
 from pprint import pprint
 from time import strftime
 
+TIME_SHIFT = 4
+
 nclsQry = (
     "SELECT  "
     "    COUNT(*) "
@@ -31,13 +33,17 @@ ftQuery = (
     "    code = %s "
     "        AND klid BETWEEN %s AND %s "
     "ORDER BY klid "
-    "LIMIT {}"
+    "LIMIT %s "
 )
 
 
-def loadTestSet(max_step):
-    cnx = mysql.connector.connect(
+def connect():
+    return mysql.connector.connect(
         host='localhost', user='mysql', database='secu', password='123456')
+
+
+def loadTestSet(max_step):
+    cnx = connect()
     try:
         nc_cursor = cnx.cursor(buffered=True)
         nc_cursor.execute(nclsQry)
@@ -68,28 +74,18 @@ def loadTestSet(max_step):
             "   flag = '{}' "
         )
         cursor.execute(query.format(row[0]))
-        data = []   # [batch, max_step, feature]
+        kpts = cursor.fetchall()
+        cursor.close()
+        data = []   # [batch, max_step, feature*time_shift]
         labels = []  # [batch, label]  one-hot labels
         uuids = []
-        for (uuid, code, klid, score) in cursor:
+        for (uuid, code, klid, score) in kpts:
             uuids.append(uuid)
             label = np.zeros(nclass, dtype=np.int8)
             label[int(score)+nclass//2] = 1
             labels.append(label)
-            fcursor = cnx.cursor()
-            fcursor.execute(ftQuery.format(max_step),
-                            (code, klid - max_step+1, klid))
-            s_idx = 0
-            steps = np.zeros((max_step, len(fcursor.column_names)), dtype='f')
-            for row in fcursor:
-                steps[s_idx] = [col for col in row]
-                s_idx += 1
-            data.append(steps)
-            fcursor.close()
-        cursor.close()
-        # pprint(data)
-        # print("\n")
-        # pprint(len(labels))
+            s = max(0, klid-max_step+1-TIME_SHIFT)
+            data.append(getBatch(cnx, code, s, klid, max_step))
         return uuids, np.array(data), np.array(labels)
     except:
         print(sys.exc_info()[0])
@@ -98,9 +94,35 @@ def loadTestSet(max_step):
         cnx.close()
 
 
+def getBatch(cnx, code, s, e, max_step):
+    '''
+    [max_step, feature*time_shift]
+    '''
+    fcursor = cnx.cursor(buffered=True)
+    try:
+        fcursor.execute(ftQuery, (code, s, e, max_step+TIME_SHIFT))
+        featSize = len(fcursor.column_names)
+        total = fcursor.rowcount
+        rows = fcursor.fetchall()
+        batch = []
+        for t in range(TIME_SHIFT+1):
+            steps = np.zeros((max_step, featSize), dtype='f')
+            offset = max_step + TIME_SHIFT - total
+            s = max(0, t - offset)
+            e = total - TIME_SHIFT + t
+            for i, row in enumerate(rows[s:e]):
+                steps[i+offset] = [col for col in row]
+            batch.append(steps)
+        return np.concatenate(batch, 1)
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        fcursor.close()
+
+
 def loadTrainingData(batch_no, max_step):
-    cnx = mysql.connector.connect(
-        host='localhost', user='mysql', database='secu', password='123456')
+    cnx = connect()
     try:
         nc_cursor = cnx.cursor(buffered=True)
         nc_cursor.execute(nclsQry)
@@ -118,29 +140,22 @@ def loadTrainingData(batch_no, max_step):
         )
         # print(query)
         cursor.execute(query.format(batch_no))
-        data = []   # [batch, max_step, feature]
+        kpts = cursor.fetchall()
+        cursor.close()
+        data = []   # [batch, max_step, feature*time_shift]
         labels = []  # [batch, label]  one-hot labels
         uuids = []
-        for (uuid, code, klid, score) in cursor:
+        for (uuid, code, klid, score) in kpts:
             uuids.append(uuid)
             label = np.zeros((nclass), dtype=np.int8)
             label[int(score)+nclass//2] = 1
             labels.append(label)
-            fcursor = cnx.cursor()
-            fcursor.execute(ftQuery.format(max_step),
-                            (code, klid - max_step+1, klid))
-            s_idx = 0
-            steps = np.zeros((max_step, len(fcursor.column_names)), dtype='f')
-            for row in fcursor:
-                steps[s_idx] = [col for col in row]
-                s_idx += 1
-            data.append(steps)
-            fcursor.close()
-        cursor.close()
+            s = max(0, klid-max_step+1-TIME_SHIFT)
+            data.append(getBatch(cnx, code, s, klid, max_step))
         # pprint(data)
         # print("\n")
         # pprint(len(labels))
-        return uuids, data, labels
+        return uuids, np.array(data), np.array(labels)
     except:
         print(sys.exc_info()[0])
         raise

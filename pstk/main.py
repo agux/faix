@@ -1,17 +1,18 @@
 from __future__ import print_function
 import tensorflow as tf
-from model import BasicSecGradePredictor
+from model import BasicRnnPredictor
+from model import BasicCnnPredictor
+from model import ShiftRnnPredictor
+from model2 import CRnnPredictorV1
 from time import strftime
-import data2 as dat
+import data4 as dat
 import os
 import numpy as np
 
 EPOCH_SIZE = 705
-HIDDEN_SIZE = 64
+HIDDEN_SIZE = 128
 NUM_LAYERS = 1
-#BATCH_SIZE = 200
-W_SIZE = 10
-MAX_STEP = 10
+MAX_STEP = 50
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -19,16 +20,22 @@ if __name__ == '__main__':
     if tf.gfile.Exists(LOG_DIR):
         tf.gfile.DeleteRecursively(LOG_DIR)
     tf.gfile.MakeDirs(LOG_DIR)
+
+    # tf.logging.set_verbosity(tf.logging.INFO)
+
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     _, tdata, tlabels = dat.loadTestSet(MAX_STEP)
-    featSize = np.array(tdata).shape[2]
-    numClass = np.array(tlabels).shape[1]
+    print(tdata.shape)
+    print(tlabels.shape)
+    featSize = tdata.shape[2]
+    numClass = tlabels.shape[1]
     data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize])
     target = tf.placeholder(tf.float32, [None, numClass])
+    dropout = tf.placeholder(tf.float32)
     training = tf.placeholder(tf.bool)
-    model = BasicSecGradePredictor(
-        data, target, W_SIZE, training, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
     with tf.Session() as sess:
+        model = CRnnPredictorV1(
+            data, target, dat.TIME_SHIFT+1, training, dropout, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
         sess.run(tf.global_variables_initializer())
         summary_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
         tf.summary.scalar("Train Loss", model.cost)
@@ -45,7 +52,7 @@ if __name__ == '__main__':
                 uuid, trdata, labels = dat.loadTrainingData(bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
-                    data: trdata, target: labels, training: True})
+                    data: trdata, target: labels, training: True, dropout: 0.5})
                 summary_writer.add_summary(summary_str, bno)
                 summary_writer.flush()
                 # print('{} tagging data as trained, batch no: {}'.format(
@@ -53,7 +60,7 @@ if __name__ == '__main__':
                 # dat.tagDataTrained(uuid, bno)
             print('{} running on test set...'.format(strftime("%H:%M:%S")))
             accuracy = sess.run(
-                model.accuracy, {data: tdata, target: tlabels, training: False})
+                model.accuracy, {data: tdata, target: tlabels, training: False, dropout: 0})
             print('{} Epoch {:4d} test accuracy {:3.3f}%'.format(
                 strftime("%H:%M:%S"), epoch + 1, 100 * accuracy))
             checkpoint_file = os.path.join(LOG_DIR, 'model.ckpt')
