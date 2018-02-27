@@ -1,15 +1,15 @@
 from __future__ import print_function
 import tensorflow as tf
-from model import BasicRnnPredictor, BasicCnnPredictor, ShiftRnnPredictor
-from model2 import CRnnPredictorV1, CRnnPredictorV2
+from model import model
+from model import model2
+from model import model3
 from time import strftime
-import data4
-import data2
+from data import data2, data4
 import os
 import numpy as np
 
 EPOCH_SIZE = 705
-HIDDEN_SIZE = 128
+HIDDEN_SIZE = 64
 NUM_LAYERS = 1
 MAX_STEP = 50
 LEARNING_RATE = 1e-3
@@ -23,18 +23,22 @@ if __name__ == '__main__':
     # tf.logging.set_verbosity(tf.logging.INFO)
 
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    _, tdata, tlabels = data2.loadTestSet(MAX_STEP)
+    _, tdata, tlabels, tseqlen = data2.loadTestSet(MAX_STEP)
     print(tdata.shape)
     print(tlabels.shape)
     featSize = tdata.shape[2]
     numClass = tlabels.shape[1]
     data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
     target = tf.placeholder(tf.float32, [None, numClass], "labels")
-    # dropout = tf.placeholder(tf.float32, name="dropout")
+    seqlen = tf.placeholder(tf.int32, [None], "seqlen")
+    dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = BasicCnnPredictor(
-            data, target, 5, training, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
+        model = model3.RnnPredictorV1(
+            data, target, seqlen, training, dropout,
+            num_hidden=HIDDEN_SIZE,
+            num_layers=NUM_LAYERS,
+            learning_rate=LEARNING_RATE)
         sess.run(tf.global_variables_initializer())
         summary_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
         tf.summary.scalar("Train Loss", model.cost)
@@ -48,10 +52,11 @@ if __name__ == '__main__':
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                uuid, trdata, labels = data2.loadTrainingData(bno, MAX_STEP)
+                uuid, trdata, labels, trseqlen = data2.loadTrainingData(
+                    bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
-                    data: trdata, target: labels, training: True})
+                    data: trdata, target: labels, seqlen: trseqlen, training: True, dropout: 0.5})
                 summary_writer.add_summary(summary_str, bno)
                 summary_writer.flush()
                 # print('{} tagging data as trained, batch no: {}'.format(
@@ -59,7 +64,8 @@ if __name__ == '__main__':
                 # dat.tagDataTrained(uuid, bno)
             print('{} running on test set...'.format(strftime("%H:%M:%S")))
             accuracy = sess.run(
-                model.accuracy, {data: tdata, target: tlabels, training: False})
+                model.accuracy, {
+                    data: tdata, target: tlabels, seqlen: tseqlen, training: False, dropout: 0})
             print('{} Epoch {:4d} test accuracy {:3.3f}%'.format(
                 strftime("%H:%M:%S"), epoch + 1, 100 * accuracy))
             checkpoint_file = os.path.join(LOG_DIR, 'model.ckpt')

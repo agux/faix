@@ -70,15 +70,17 @@ def loadTestSet(max_step):
         cursor.execute(query.format(row[0]))
         data = []   # [batch, max_step, feature]
         labels = []  # [batch, label]  one-hot labels
+        seqlen = [] # [batch]
         uuids = []
         for (uuid, code, klid, score) in cursor:
             uuids.append(uuid)
             label = np.zeros(nclass, dtype=np.int8)
             label[int(score)+nclass//2] = 1
             labels.append(label)
-            fcursor = cnx.cursor()
+            fcursor = cnx.cursor(buffered=True)
             fcursor.execute(ftQuery.format(max_step),
                             (code, klid - max_step+1, klid))
+            seqlen.append(fcursor.rowcount)
             s_idx = 0
             steps = np.zeros((max_step, len(fcursor.column_names)), dtype='f')
             for row in fcursor:
@@ -90,7 +92,7 @@ def loadTestSet(max_step):
         # pprint(data)
         # print("\n")
         # pprint(len(labels))
-        return uuids, np.array(data), np.array(labels)
+        return uuids, np.array(data), np.array(labels), np.array(seqlen)
     except:
         print(sys.exc_info()[0])
         raise
@@ -120,15 +122,17 @@ def loadTrainingData(batch_no, max_step):
         cursor.execute(query.format(batch_no))
         data = []   # [batch, max_step, feature]
         labels = []  # [batch, label]  one-hot labels
+        seqlen = [] # [batch]
         uuids = []
         for (uuid, code, klid, score) in cursor:
             uuids.append(uuid)
             label = np.zeros((nclass), dtype=np.int8)
             label[int(score)+nclass//2] = 1
             labels.append(label)
-            fcursor = cnx.cursor()
+            fcursor = cnx.cursor(buffered=True)
             fcursor.execute(ftQuery.format(max_step),
                             (code, klid - max_step+1, klid))
+            seqlen.append(fcursor.rowcount)
             s_idx = 0
             steps = np.zeros((max_step, len(fcursor.column_names)), dtype='f')
             for row in fcursor:
@@ -140,7 +144,7 @@ def loadTrainingData(batch_no, max_step):
         # pprint(data)
         # print("\n")
         # pprint(len(labels))
-        return uuids, data, labels
+        return uuids, data, labels, seqlen
     except:
         print(sys.exc_info()[0])
         raise
