@@ -4,6 +4,8 @@ import tensorflow as tf
 import numpy as np
 import math
 
+from model import lazy_property
+
 
 def primes(n):
     primfac = []
@@ -44,18 +46,6 @@ def last_relevant(output, length):
     flat = tf.reshape(output, [-1, output_size])
     relevant = tf.gather(flat, index)
     return relevant
-
-
-def lazy_property(function):
-    attribute = '_' + function.__name__
-
-    @property
-    @functools.wraps(function)
-    def wrapper(self):
-        if not hasattr(self, attribute):
-            setattr(self, attribute, function(self))
-        return getattr(self, attribute)
-    return wrapper
 
 
 class RnnPredictorV1:
@@ -158,10 +148,11 @@ class RnnPredictorV1:
 
 class RnnPredictorV2:
 
-    def __init__(self, data, target, seqlen, training, dropout, num_hidden=200, num_layers=2, learning_rate=1e-4):
+    def __init__(self, data, target, seqlen, width, training, dropout, num_hidden=200, num_layers=2, learning_rate=1e-4):
         self.data = data
         self.target = target
         self.seqlen = seqlen
+        self._input_width = width
         self.training = training
         self.dropout = dropout
         self.training_state = None
@@ -197,9 +188,12 @@ class RnnPredictorV2:
         # TODO add tf.contrib.rnn.ConvLSTMCell?
         step = int(input.get_shape()[1])
         feat = int(input.get_shape()[2])
+        c = feat // self._input_width  # channel
+        # TODO step & width must equal?
+        input = tf.reshape(input, [-1, step, self._input_width, c])
         clc = tf.contrib.rnn.ConvLSTMCell(
             conv_ndims=1,
-            input_shape=[step, feat],
+            input_shape=[step, self._input_width],
             output_channels=self._num_hidden,
             kernel_shape=[3],
             use_bias=True,
@@ -207,28 +201,6 @@ class RnnPredictorV2:
             forget_bias=1.0,
             initializers=None
         )
-        h = int(math.sqrt(feat))
-        w = h
-        input = tf.reshape(input, [-1, step, h, w])
-        # gru = tf.nn.rnn_cell.GRUCell(
-        #     self._num_hidden,
-        #     kernel_initializer=tf.truncated_normal_initializer(
-        #         stddev=0.01),
-        #     bias_initializer=tf.constant_initializer(0.1))
-        # ln_lstm = tf.contrib.rnn.LayerNormBasicLSTMCell(
-        #     self._num_hidden,
-        #     # forget_bias=1.0,
-        #     # input_size=None,
-        #     # activation=tf.tanh,
-        #     # layer_norm=True,
-        #     # norm_gain=1.0,
-        #     # norm_shift=1e-3,
-        #     # dropout_keep_prob=1.0 - self.dropout,
-        #     # dropout_prob_seed=None,
-        #     # reuse=None
-        # )
-        # cell = tf.nn.rnn_cell.DropoutWrapper(
-        #     cell, output_keep_prob=1.0 - self.dropout)
 
         cell = tf.nn.rnn_cell.MultiRNNCell([clc] * self._num_layers)
 
@@ -240,7 +212,7 @@ class RnnPredictorV2:
             initial_state=self.training_state
         )
 
-        output = tf.reshape(output, [-1, step, h*self._num_hidden])
+        output = tf.reshape(output, [-1, step, self._input_width*self._num_hidden])
 
         return self.last_relevant(output, self.seqlen)
 

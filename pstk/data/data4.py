@@ -8,7 +8,7 @@ import tensorflow as tf
 from pprint import pprint
 from time import strftime
 
-TIME_SHIFT = 4
+TIME_SHIFT = 9
 
 nclsQry = (
     "SELECT  "

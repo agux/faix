@@ -1,17 +1,15 @@
 from __future__ import print_function
 import tensorflow as tf
-from model import model
-from model import model2
-from model import model3
+from model import model, model2, model3, model4
 from time import strftime
 from data import data2, data4
 import os
 import numpy as np
 
 EPOCH_SIZE = 705
-HIDDEN_SIZE = 64
+HIDDEN_SIZE = 256
 NUM_LAYERS = 1
-MAX_STEP = 5
+MAX_STEP = 50
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -34,8 +32,8 @@ if __name__ == '__main__':
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model3.RnnPredictorV2(
-            data, target, seqlen, training, dropout,
+        model = model4.ERnnPredictorV1(
+            data, target, seqlen, data4.TIME_SHIFT+1, training, dropout,
             num_hidden=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             learning_rate=LEARNING_RATE)
