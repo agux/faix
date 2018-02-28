@@ -11,7 +11,7 @@ import numpy as np
 EPOCH_SIZE = 705
 HIDDEN_SIZE = 64
 NUM_LAYERS = 1
-MAX_STEP = 50
+MAX_STEP = 5
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     # tf.logging.set_verbosity(tf.logging.INFO)
 
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    _, tdata, tlabels, tseqlen = data2.loadTestSet(MAX_STEP)
+    _, tdata, tlabels, tseqlen = data4.loadTestSet(MAX_STEP)
     print(tdata.shape)
     print(tlabels.shape)
     featSize = tdata.shape[2]
@@ -34,7 +34,7 @@ if __name__ == '__main__':
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model3.RnnPredictorV1(
+        model = model3.RnnPredictorV2(
             data, target, seqlen, training, dropout,
             num_hidden=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
@@ -52,7 +52,7 @@ if __name__ == '__main__':
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                uuid, trdata, labels, trseqlen = data2.loadTrainingData(
+                uuid, trdata, labels, trseqlen = data4.loadTrainingData(
                     bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {

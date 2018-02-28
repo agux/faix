@@ -194,28 +194,43 @@ class RnnPredictorV2:
     @staticmethod
     def rnn(self, input):
         # Recurrent network.
-        #TODO add tf.contrib.rnn.ConvLSTMCell?
-        cell = tf.nn.rnn_cell.GRUCell(
-            self._num_hidden,
-            kernel_initializer=tf.truncated_normal_initializer(
-                stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1))
-        cell = tf.contrib.rnn.LayerNormBasicLSTMCell(
-            self._num_hidden,
-            # forget_bias=1.0,
-            # input_size=None,
-            # activation=tf.tanh,
-            # layer_norm=True,
-            # norm_gain=1.0,
-            # norm_shift=1e-3,
-            # dropout_keep_prob=1.0 - self.dropout,
-            # dropout_prob_seed=None,
-            # reuse=None
+        # TODO add tf.contrib.rnn.ConvLSTMCell?
+        step = int(input.get_shape()[1])
+        feat = int(input.get_shape()[2])
+        clc = tf.contrib.rnn.ConvLSTMCell(
+            conv_ndims=1,
+            input_shape=[step, feat],
+            output_channels=self._num_hidden,
+            kernel_shape=[3],
+            use_bias=True,
+            skip_connection=False,
+            forget_bias=1.0,
+            initializers=None
         )
+        h = int(math.sqrt(feat))
+        w = h
+        input = tf.reshape(input, [-1, step, h, w])
+        # gru = tf.nn.rnn_cell.GRUCell(
+        #     self._num_hidden,
+        #     kernel_initializer=tf.truncated_normal_initializer(
+        #         stddev=0.01),
+        #     bias_initializer=tf.constant_initializer(0.1))
+        # ln_lstm = tf.contrib.rnn.LayerNormBasicLSTMCell(
+        #     self._num_hidden,
+        #     # forget_bias=1.0,
+        #     # input_size=None,
+        #     # activation=tf.tanh,
+        #     # layer_norm=True,
+        #     # norm_gain=1.0,
+        #     # norm_shift=1e-3,
+        #     # dropout_keep_prob=1.0 - self.dropout,
+        #     # dropout_prob_seed=None,
+        #     # reuse=None
+        # )
         # cell = tf.nn.rnn_cell.DropoutWrapper(
         #     cell, output_keep_prob=1.0 - self.dropout)
 
-        cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._num_layers)
+        cell = tf.nn.rnn_cell.MultiRNNCell([clc] * self._num_layers)
 
         output, self.training_state = tf.nn.dynamic_rnn(
             cell,
@@ -224,6 +239,8 @@ class RnnPredictorV2:
             sequence_length=self.seqlen,
             initial_state=self.training_state
         )
+
+        output = tf.reshape(output, [-1, step, h*self._num_hidden])
 
         return self.last_relevant(output, self.seqlen)
 

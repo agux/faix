@@ -78,6 +78,7 @@ def loadTestSet(max_step):
         cursor.close()
         data = []   # [batch, max_step, feature*time_shift]
         labels = []  # [batch, label]  one-hot labels
+        seqlen = [] # [batch]
         uuids = []
         for (uuid, code, klid, score) in kpts:
             uuids.append(uuid)
@@ -85,8 +86,10 @@ def loadTestSet(max_step):
             label[int(score)+nclass//2] = 1
             labels.append(label)
             s = max(0, klid-max_step+1-TIME_SHIFT)
-            data.append(getBatch(cnx, code, s, klid, max_step))
-        return uuids, np.array(data), np.array(labels)
+            batch, total = getBatch(cnx, code, s, klid, max_step)
+            data.append(batch)
+            seqlen.append(total)
+        return uuids, np.array(data), np.array(labels), np.array(seqlen)
     except:
         print(sys.exc_info()[0])
         raise
@@ -96,7 +99,7 @@ def loadTestSet(max_step):
 
 def getBatch(cnx, code, s, e, max_step):
     '''
-    [max_step, feature*time_shift]
+    [max_step, feature*time_shift], length
     '''
     fcursor = cnx.cursor(buffered=True)
     try:
@@ -113,7 +116,7 @@ def getBatch(cnx, code, s, e, max_step):
             for i, row in enumerate(rows[s:e]):
                 steps[i+offset] = [col for col in row]
             batch.append(steps)
-        return np.concatenate(batch, 1)
+        return np.concatenate(batch, 1), total - TIME_SHIFT
     except:
         print(sys.exc_info()[0])
         raise
@@ -144,6 +147,7 @@ def loadTrainingData(batch_no, max_step):
         cursor.close()
         data = []   # [batch, max_step, feature*time_shift]
         labels = []  # [batch, label]  one-hot labels
+        seqlen = [] # [batch]
         uuids = []
         for (uuid, code, klid, score) in kpts:
             uuids.append(uuid)
@@ -151,11 +155,13 @@ def loadTrainingData(batch_no, max_step):
             label[int(score)+nclass//2] = 1
             labels.append(label)
             s = max(0, klid-max_step+1-TIME_SHIFT)
-            data.append(getBatch(cnx, code, s, klid, max_step))
+            batch, total = getBatch(cnx, code, s, klid, max_step)
+            data.append(batch)
+            seqlen.append(total)
         # pprint(data)
         # print("\n")
         # pprint(len(labels))
-        return uuids, np.array(data), np.array(labels)
+        return uuids, np.array(data), np.array(labels), np.array(seqlen)
     except:
         print(sys.exc_info()[0])
         raise
