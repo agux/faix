@@ -5,15 +5,16 @@ import numpy as np
 import math
 
 from model import lazy_property
-from cells import EGRUCell
+from cells import EGRUCell_V1
+
 
 class ERnnPredictorV1:
 
-    def __init__(self, data, target, seqlen, width, training, dropout, num_hidden=200, num_layers=2, learning_rate=1e-4):
+    def __init__(self, data, target, seqlen, height, training, dropout, num_hidden=200, num_layers=2, learning_rate=1e-4):
         self.data = data
         self.target = target
         self.seqlen = seqlen
-        self._input_width = width
+        self._height = height
         self.training = training
         self.dropout = dropout
         self.training_state = None
@@ -46,18 +47,23 @@ class ERnnPredictorV1:
     @staticmethod
     def rnn(self, input):
         # Recurrent network.
-        egru = EGRUCell(
-            num_units = self._num_hidden
+        egru = EGRUCell_V1(
+            num_units=self._num_hidden,
+            shape=[self._height, int(input.get_shape()[2])//self._height],
+            kernel=[3, 3],
+            kernel_initializer=tf.truncated_normal_initializer(
+                stddev=0.01),
+            bias_initializer=tf.constant_initializer(0.1)
         )
 
         cell = tf.nn.rnn_cell.MultiRNNCell([egru] * self._num_layers)
 
-        output, self.training_state = tf.nn.dynamic_rnn(
+        output, _ = tf.nn.dynamic_rnn(
             cell,
             input,
             dtype=tf.float32,
-            sequence_length=self.seqlen,
-            initial_state=self.training_state
+            sequence_length=self.seqlen
+            # initial_state=self.training_state
         )
 
         return self.last_relevant(output, self.seqlen)
