@@ -49,7 +49,7 @@ with tf.Session() as sess:
     print(st.get_shape())
     print(st.eval())
     print(t.get_shape())
-    px1 = tf.placeholder(tf.string, [2, None, 1])
+    px1 = tf.placeholder(tf.string, [None, 3, 1])
     x1 = np.array([[['a'], ['b'], ['c']],
                    [['1'], ['2'], ['3']]])
     x2 = np.array([5, 6])
@@ -59,9 +59,10 @@ with tf.Session() as sess:
     elems = (np.array([1, 2, 3]), np.array([-1, 1, -1]))
     r = tf.map_fn(lambda x: f(x[0],x[1],'3','4',ph), (px1, x2))
     print(sess.run(r, feed_dict={px1: x1, ph: 0.5}))
-    # a = tf.constant([[1, 2, 3], [4, 5, 6]])
-    # b = tf.constant([True, False], dtype=tf.bool)
+    print("---------------------------")
+    a = tf.constant([[1, 2, 3], [4, 5, 6]])
+    b = tf.constant([True, False], dtype=tf.bool)
 
-    # c = tf.map_fn(lambda x: (x[0], x[1]), (a, b))
-    # print(c)
+    c = tf.map_fn(lambda x: (x[0], x[1]), (a, b))
+    print(c)
 

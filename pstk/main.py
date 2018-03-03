@@ -32,20 +32,27 @@ if __name__ == '__main__':
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model4.ERnnPredictorV1(
+        model = model4.ERnnPredictorV2(
             data, target, seqlen, data4.TIME_SHIFT+1, training, dropout,
             num_hidden=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             learning_rate=LEARNING_RATE)
         sess.run(tf.global_variables_initializer())
-        summary_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
-        tf.summary.scalar("Train Loss", model.cost)
-        tf.summary.scalar("Train Accuracy", model.accuracy*100)
+        train_writer = tf.summary.FileWriter(LOG_DIR + "/train", sess.graph)
+        test_writer = tf.summary.FileWriter(LOG_DIR + "/test", sess.graph)
+        tf.summary.scalar("Loss", model.cost)
+        tf.summary.scalar("Accuracy", model.accuracy*100)
         summary = tf.summary.merge_all()
         saver = tf.train.Saver()
         bno = 0
         for epoch in range(EPOCH_SIZE):
             bno = epoch*50
+            print('{} running on test set...'.format(strftime("%H:%M:%S")))
+            test_summary_str, accuracy = sess.run(
+                [summary, model.accuracy], {
+                    data: tdata, target: tlabels, seqlen: tseqlen, training: False, dropout: 0})
+            print('{} Epoch {:4d} test accuracy {:3.3f}%'.format(
+                strftime("%H:%M:%S"), epoch + 1, 100 * accuracy))
             for i in range(50):
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
@@ -55,16 +62,12 @@ if __name__ == '__main__':
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
                     data: trdata, target: labels, seqlen: trseqlen, training: True, dropout: 0.5})
-                summary_writer.add_summary(summary_str, bno)
-                summary_writer.flush()
+                train_writer.add_summary(summary_str, bno)
+                test_writer.add_summary(test_summary_str, bno)
+                train_writer.flush()
+                test_writer.flush()
                 # print('{} tagging data as trained, batch no: {}'.format(
                 #     strftime("%H:%M:%S"), bno))
                 # dat.tagDataTrained(uuid, bno)
-            print('{} running on test set...'.format(strftime("%H:%M:%S")))
-            accuracy = sess.run(
-                model.accuracy, {
-                    data: tdata, target: tlabels, seqlen: tseqlen, training: False, dropout: 0})
-            print('{} Epoch {:4d} test accuracy {:3.3f}%'.format(
-                strftime("%H:%M:%S"), epoch + 1, 100 * accuracy))
             checkpoint_file = os.path.join(LOG_DIR, 'model.ckpt')
             saver.save(sess, checkpoint_file, global_step=bno)
