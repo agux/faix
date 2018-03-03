@@ -45,22 +45,29 @@ def conv2d(input, kernel, filters, seq):
     # can't use tf.nn.batch_normalization in a mapped function
     return pool
 
+
 def conv2dFlipOut(input, kernel, filters, seq):
-    conv = tf.contrib.bayesflow.layers.conv2d_flipout(
+    # can't use divergence_kernel in a while loop
+    # conv = tf.contrib.bayesflow.layers.conv2d_flipout(
+    conv = tf.layers.conv2d(
         inputs=input,
         name="conv_lv{}".format(seq),
         filters=filters,
         kernel_size=kernel,
-        padding="same",
+        kernel_initializer=tf.truncated_normal_initializer(
+            stddev=0.01),
+        bias_initializer=tf.constant_initializer(0.1),
+        padding="SAME",
         reuse=tf.AUTO_REUSE,
         activation=tf.nn.elu)
-    # activation=tf.nn.elu)  # FIXME or perhaps relu6??
-    h_stride = 2 if int(conv.get_shape()[1]) >= 2 else 1
-    w_stride = 2 if int(conv.get_shape()[2]) >= 2 else 1
+    h_stride = 2 if input.get_shape()[1] is not None and int(
+        input.get_shape()[1]) >= 2 else 1
+    w_stride = 2 if input.get_shape()[2] is not None and int(
+        input.get_shape()[2]) >= 2 else 1
     pool = tf.layers.max_pooling2d(
         name="pool_lv{}".format(seq),
         inputs=conv, pool_size=2, strides=[h_stride, w_stride],
-        padding="same")
+        padding="SAME")
     return pool
 
 
@@ -433,19 +440,21 @@ class EGRUCell_V2(_LayerRNNCell):
         convlayer = input2d
         for i in range(nlayer):
             filters *= 2
-            #TODO upgrade to r1.6 and use Conv2DFlipOut
-            convlayer = conv2dFlipOut(convlayer, self._kernel, filters, i)
+            convlayer = conv2dFlipOut(convlayer, self._kernel, int(filters), i)
             convlayer = tf.contrib.layers.layer_norm(
                 scope="conv_ln_{}".format(i),
                 inputs=convlayer,
                 reuse=tf.AUTO_REUSE
             )
         convlayer = tf.squeeze(convlayer, [1, 2])
-        convlayer = tf.contrib.bayesflow.layers.dense_flipout(
+        # can't use divergence_kernel in a while loop
+        # convlayer = tf.contrib.bayesflow.layers.dense_flipout(
+        convlayer = tf.layers.dense(
             inputs=convlayer,
-            units=depth + self._num_units,
-            activation=tf.nn.elu
-            # kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
-            # bias_initializer=tf.constant_initializer(0.1),
+            units=depth,
+            activation=tf.nn.elu,
+            kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
+            bias_initializer=tf.constant_initializer(0.1),
+            reuse=tf.AUTO_REUSE
         )
         return convlayer

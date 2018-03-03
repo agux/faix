@@ -19,32 +19,31 @@ def testEmbedding():
     print(r.shape)
 
 
-def getIndices(x, batch, n):
+def getIndices(x, n):
     print("x:{}".format(x.get_shape()))
-    indices = tf.stack([tf.fill([batch], x[0]), [
+    indices = tf.stack([tf.fill([n], x[0]), [
         x[1]-n+i for i in range(n)]], axis=1)
     print(indices.get_shape())
     return indices
 
 
 def testGatherND():
-    # gather last 2 elements of (2, 3, 2), -> (2, 2, 2)
+    # gather last 2 elements of (2, 5, 2), -> (2, 2, 2)
     # indices = np.asarray([[[0, 1], [0, 2]], [[1, 0], [1, 1]]])
-    params = np.asarray([[['a0', 'b0'], ['c0', 'd0'], ['e0', 'f0']],
-                         [['a1', 'b1'], ['c1', 'd1'], ['0', '0']]])
+    params = np.asarray([[['a0', 'b0'], ['c0', 'd0'], ['e0', 'f0'], ['g0', 'h0'], ['i0', 'j0']],
+                         [['a1', 'b1'], ['c1', 'd1'], ['e1', 'f1'], ['g1', 'h1'], ['0', '0']]])
     batch = 2
-    step = 3
     n = 2
     length = tf.placeholder(tf.int32, shape=[None])
     mapinput = tf.stack([tf.range(batch), length], axis=1)
     print("mapinput: {}".format(mapinput.get_shape()))
     indices = tf.map_fn(lambda x: getIndices(
-        x, batch, n), mapinput)
+        x, n), mapinput)
     # [tf.stack([tf.constant(b, shape=[batch]), [
     #                 s-n+i for i in range(n)]], axis=1) for b, s in enumerate(length)]
     sess = tf.InteractiveSession()
     gnd = tf.gather_nd(params, indices)
-    i, r = sess.run([indices, gnd], feed_dict={length: [3, 2]})
+    i, r = sess.run([indices, gnd], feed_dict={length: [5, 4]})
     print(i)
     print(params.shape)
     print(r.shape)

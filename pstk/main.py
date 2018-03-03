@@ -18,7 +18,7 @@ if __name__ == '__main__':
         tf.gfile.DeleteRecursively(LOG_DIR)
     tf.gfile.MakeDirs(LOG_DIR)
 
-    # tf.logging.set_verbosity(tf.logging.INFO)
+    tf.logging.set_verbosity(tf.logging.INFO)
 
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     _, tdata, tlabels, tseqlen = data4.loadTestSet(MAX_STEP)

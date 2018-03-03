@@ -98,11 +98,10 @@ class ERnnPredictorV1:
         return tf.reduce_mean(tf.cast(accuracy, tf.float32))
 
 
-def getIndices(x, batch, n):
-    print("x:{}".format(x.get_shape()))
-    indices = tf.stack([tf.fill([batch], x[0]), [
+def getIndices(x, n):
+    # print("x0:{}  x1:{}  batch:{}  n:{}".format(x[0], x[1], batch,n))
+    indices = tf.stack([tf.fill([n], x[0]), [
         x[1]-n+i for i in range(n)]], axis=1)
-    print(indices.get_shape())
     return indices
 
 
@@ -117,6 +116,7 @@ class ERnnPredictorV2:
         self.dropout = dropout
         self._num_hidden = num_hidden
         self._num_layers = num_layers
+        self._num_class = int(target.get_shape()[1])
         self._learning_rate = learning_rate
         self.prediction
         self.accuracy
@@ -128,17 +128,17 @@ class ERnnPredictorV2:
         with tf.variable_scope("output"):
             dense = tf.contrib.bayesflow.layers.dense_flipout(
                 inputs=rnn,
-                units=rnn.get_shape()[1] * 2,
+                units=int(rnn.get_shape()[1]) * 2,
                 activation=tf.nn.elu)
             # dropout = tf.layers.dropout(
             #     inputs=dense, rate=0.5, training=self.training)
             output = tf.contrib.bayesflow.layers.dense_flipout(
                 inputs=dense,
-                units=self.target.get_shape()[1])
-                # kernel_initializer=tf.truncated_normal_initializer(
-                #     stddev=0.01),
-                # bias_initializer=tf.constant_initializer(0.1),
-                # activation=tf.nn.elu)
+                units=self._num_class)
+            # kernel_initializer=tf.truncated_normal_initializer(
+            #     stddev=0.01),
+            # bias_initializer=tf.constant_initializer(0.1),
+            # activation=tf.nn.elu)
             return output
 
     @staticmethod
@@ -159,7 +159,7 @@ class ERnnPredictorV2:
             dtype=tf.float32,
             sequence_length=self.seqlen
         )
-        output = self.last_n(output, 5, self.seqlen)
+        output = self.last_n(output, self.seqlen, 5)
         # TODO gather last n output and convolute over them
         # output = conv(output, 2)
         output = tf.layers.flatten(output)
@@ -174,7 +174,7 @@ class ERnnPredictorV2:
         '''
         with tf.variable_scope("last_n"):
             batch = tf.shape(output)[0]
-            indices = tf.map_fn(lambda x: getIndices(x, batch, n),
+            indices = tf.map_fn(lambda x: getIndices(x, n),
                                 tf.stack([tf.range(batch), length], axis=1))
             return tf.gather_nd(output, indices)
 
@@ -186,12 +186,25 @@ class ERnnPredictorV2:
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
 
+    # def reduce_sum(self, input):
+    #     print("reduce_sum:{}".format(input.get_shape()))
+    #     # input=tf.reshape(input, [None, self._num_class])
+    #     return
+
+    def merge(self, items):
+        with tf.variable_scope("merge"):
+            items = [tf.convert_to_tensor(i, dtype=tf.float32) for i in items]
+            items = [tf.reshape(i, shape=[-1]) for i in items]
+            items = tf.concat(items, axis=0)
+            return items
+
     @lazy_property
     def cost(self):
-        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
-            labels=self.target, logits=self.prediction))
-        kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-        loss = cross_entropy + kl
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
+            labels=self.target, logits=self.prediction)
+        regl_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        regl_loss = self.merge(regl_loss)
+        loss = tf.reduce_logsumexp(tf.concat([cross_entropy, regl_loss], axis=0))
         return loss
 
     @lazy_property
