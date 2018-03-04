@@ -21,7 +21,7 @@ def primes(n):
 def numLayers(d1, d2=None):
     n1 = 0
     while d1 > 1:
-        d1 = math.ceil(d1/2)
+        d1 = math.ceil(d1/2.0)
         n1 += 1
     n2 = 0
     if d2 is not None:

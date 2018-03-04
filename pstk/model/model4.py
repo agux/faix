@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import math
 
-from model import lazy_property
+from model import lazy_property, numLayers
 from cells import EGRUCell, EGRUCell_V1, EGRUCell_V2
 
 
@@ -125,21 +125,83 @@ class ERnnPredictorV2:
     @lazy_property
     def prediction(self):
         rnn = self.rnn(self, self.data)
+        cnn = self.cnn(self, rnn)
         with tf.variable_scope("output"):
-            dense = tf.contrib.bayesflow.layers.dense_flipout(
-                inputs=rnn,
-                units=int(rnn.get_shape()[1]) * 2,
+            # dense = tf.contrib.bayesflow.layers.dense_flipout(
+            #     inputs=cnn,
+            #     units=self._num_hidden * 4,
+            #     activation=tf.nn.elu)
+            # output = tf.contrib.bayesflow.layers.dense_flipout(
+            #     inputs=dense,
+            #     units=self._num_class,
+            #     activation=tf.nn.elu)
+            # return output
+            dense = tf.layers.dense(
+                inputs=cnn,
+                units=cnn.get_shape()[1]*2,
+                kernel_initializer=tf.truncated_normal_initializer(
+                    stddev=0.01),
+                bias_initializer=tf.constant_initializer(0.1),
+                activation=tf.nn.relu6)
+            dropout = tf.layers.dropout(
+                inputs=dense, rate=0.5, training=self.training)
+            output = tf.layers.dense(
+                inputs=dropout,
+                units=int(self.target.get_shape()[1]),
+                kernel_initializer=tf.truncated_normal_initializer(
+                    stddev=0.01),
+                bias_initializer=tf.constant_initializer(0.1),
                 activation=tf.nn.elu)
-            # dropout = tf.layers.dropout(
-            #     inputs=dense, rate=0.5, training=self.training)
-            output = tf.contrib.bayesflow.layers.dense_flipout(
-                inputs=dense,
-                units=self._num_class)
-            # kernel_initializer=tf.truncated_normal_initializer(
-            #     stddev=0.01),
-            # bias_initializer=tf.constant_initializer(0.1),
-            # activation=tf.nn.elu)
             return output
+
+    @staticmethod
+    def cnn(self, input):
+        with tf.variable_scope("cnn"):
+            # Transforms into 2D compatible format [batch, step, feature, channel]
+            convlayer = tf.expand_dims(input, 3)
+            height = int(input.get_shape()[1])
+            width = int(input.get_shape()[2])
+            nlayer = numLayers(height, width)
+            filters = max(
+                2, 2 ** (math.floor(math.log(self._num_hidden//nlayer, 2))))
+            for i in range(nlayer):
+                if i <= nlayer//2:
+                    filters *= 2
+                else:
+                    filters /= 2
+                convlayer = self.conv2d(convlayer, int(filters), i)
+            convlayer = tf.layers.flatten(convlayer)
+            # convlayer = tf.layers.dense(
+            #     inputs=convlayer,
+            #     units=math.ceil(
+            #         math.sqrt(float(int(convlayer.get_shape()[1])))),
+            #     kernel_initializer=tf.truncated_normal_initializer(
+            #         stddev=0.01),
+            #     bias_initializer=tf.constant_initializer(0.1)
+            # )
+            return convlayer
+
+    @staticmethod
+    def conv2d(input, filters, i):
+        with tf.variable_scope("conv{}".format(i)):
+            h = int(input.get_shape()[1])
+            w = int(input.get_shape()[2])
+            conv = tf.layers.conv2d(
+                inputs=input,
+                filters=filters,
+                kernel_size=3,
+                kernel_initializer=tf.truncated_normal_initializer(
+                    stddev=0.01),
+                bias_initializer=tf.constant_initializer(0.1),
+                padding="SAME")
+            h_stride = 2 if (h > 2 or w == 2) else 1
+            w_stride = 2 if (w > 2 or h == 2) else 1
+            pool = tf.layers.max_pooling2d(
+                inputs=conv, pool_size=2, strides=[h_stride, w_stride],
+                padding="SAME")
+            pool = tf.contrib.layers.layer_norm(inputs=pool)
+            print("conv{}: {}".format(i, pool.get_shape()))
+            return pool
 
     @staticmethod
     def rnn(self, input):
@@ -159,10 +221,8 @@ class ERnnPredictorV2:
             dtype=tf.float32,
             sequence_length=self.seqlen
         )
-        output = self.last_n(output, self.seqlen, 5)
-        # TODO gather last n output and convolute over them
-        # output = conv(output, 2)
-        output = tf.layers.flatten(output)
+        output = self.last_n(output, self.seqlen, 3)
+        # output = tf.layers.flatten(output)
         return output
 
     @staticmethod
@@ -198,13 +258,30 @@ class ERnnPredictorV2:
             items = tf.concat(items, axis=0)
             return items
 
+    # @lazy_property
+    # def kl_loss(self):
+    #     with tf.variable_scope("kl_loss"):
+    #         regl_loss=tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    #         losses=[tf.reduce_mean(x) for x in regl_loss]
+    #         return tf.reduce_mean(losses)
+
+    # @lazy_property
+    # def cost(self):
+    #     cross_entropy=tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
+    #         labels=self.target, logits=self.prediction))
+    #     loss=tf.reduce_mean([cross_entropy, self.kl_loss])
+    #     return loss
+
     @lazy_property
     def cost(self):
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
-            labels=self.target, logits=self.prediction)
-        regl_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-        regl_loss = self.merge(regl_loss)
-        loss = tf.reduce_logsumexp(tf.concat([cross_entropy, regl_loss], axis=0))
+            labels=self.target, logits=self.prediction, name="xentropy")
+        # regl_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        # regl_loss = self.merge(regl_loss)
+        # loss = tf.reduce_logsumexp(
+        #     tf.concat([cross_entropy, regl_loss], axis=0))
+        # loss = tf.reduce_sum(tf.concat([cross_entropy, regl_loss], axis=0))
+        loss = tf.reduce_mean(cross_entropy)
         return loss
 
     @lazy_property
@@ -218,4 +295,4 @@ class ERnnPredictorV2:
     def accuracy(self):
         accuracy = tf.equal(
             tf.argmax(self.target, 1), tf.argmax(self.prediction, 1))
-        return tf.reduce_mean(tf.cast(accuracy, tf.float32))
+        return tf.reduce_mean(tf.cast(accuracy, tf.float32), name="accuracy")

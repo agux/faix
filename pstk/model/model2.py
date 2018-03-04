@@ -3,6 +3,7 @@ import functools
 import tensorflow as tf
 import numpy as np
 import math
+from model import numLayers
 
 
 def primes(n):
@@ -16,17 +17,6 @@ def primes(n):
     if n > 1:
         primfac.append(n)
     return primfac
-
-
-def numLayers(d1, d2=None):
-    n1 = 0
-    while d1 > 1:
-        d1 = math.ceil(d1/2.0)
-        n1 += 1
-    n2 = 0
-    if d2 is not None:
-        n2 = numLayers(d2)
-    return max(n1, n2)
 
 
 def factorize(feature_size):

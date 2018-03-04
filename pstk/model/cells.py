@@ -49,26 +49,32 @@ def conv2d(input, kernel, filters, seq):
 def conv2dFlipOut(input, kernel, filters, seq):
     # can't use divergence_kernel in a while loop
     # conv = tf.contrib.bayesflow.layers.conv2d_flipout(
-    conv = tf.layers.conv2d(
-        inputs=input,
-        name="conv_lv{}".format(seq),
-        filters=filters,
-        kernel_size=kernel,
-        kernel_initializer=tf.truncated_normal_initializer(
-            stddev=0.01),
-        bias_initializer=tf.constant_initializer(0.1),
-        padding="SAME",
-        reuse=tf.AUTO_REUSE,
-        activation=tf.nn.elu)
-    h_stride = 2 if input.get_shape()[1] is not None and int(
-        input.get_shape()[1]) >= 2 else 1
-    w_stride = 2 if input.get_shape()[2] is not None and int(
-        input.get_shape()[2]) >= 2 else 1
-    pool = tf.layers.max_pooling2d(
-        name="pool_lv{}".format(seq),
-        inputs=conv, pool_size=2, strides=[h_stride, w_stride],
-        padding="SAME")
-    return pool
+    with tf.variable_scope("conv{}".format(seq)):
+        h = int(input.get_shape()[1])
+        w = int(input.get_shape()[2])
+        conv = tf.layers.conv2d(
+            inputs=input,
+            name="conv_lv{}".format(seq),
+            filters=filters,
+            kernel_size=kernel,
+            kernel_initializer=tf.truncated_normal_initializer(
+                stddev=0.01),
+            bias_initializer=tf.constant_initializer(0.1),
+            padding="SAME",
+            reuse=tf.AUTO_REUSE)
+        h_stride = 2 if (h > 2 or w == 2) else 1
+        w_stride = 2 if (w > 2 or h == 2) else 1
+        pool = tf.layers.max_pooling2d(
+            name="pool_lv{}".format(seq),
+            inputs=conv, pool_size=2, strides=[h_stride, w_stride],
+            padding="SAME")
+        ln = tf.contrib.layers.layer_norm(
+            scope="ln_{}".format(seq),
+            inputs=pool,
+            reuse=tf.AUTO_REUSE
+        )
+        print("rnn-conv{}: {}".format(seq, ln.get_shape()))
+        return ln
 
 
 class EGRUCell(_LayerRNNCell):
@@ -369,15 +375,25 @@ class EGRUCell_V2(_LayerRNNCell):
     def output_size(self):
         return self._num_units
 
+    @property
+    def depth(self):
+        height = self._shape[0]
+        width = self._shape[1]
+        nlayer = numLayers(height, width)
+        depth = max(
+            2, 2 ** (math.ceil(math.log(max(height, width), 2)))) * (2 ** nlayer)
+        return depth + self._num_units
+
     def build(self, inputs_shape):
         if inputs_shape[1].value is None:
             raise ValueError("Expected inputs.shape[-1] to be known, saw shape: %s"
                              % inputs_shape)
 
-        input_depth = inputs_shape[1].value
+        # input_depth = inputs_shape[1].value
         self._gate_kernel = self.add_variable(
             "gates/%s" % _WEIGHTS_VARIABLE_NAME,
-            shape=[input_depth + self._num_units, 2 * self._num_units],
+            # shape=[input_depth + self._num_units, 2 * self._num_units],
+            shape=[self.depth, 2 * self._num_units],
             initializer=self._kernel_initializer)
         self._gate_bias = self.add_variable(
             "gates/%s" % _BIAS_VARIABLE_NAME,
@@ -388,7 +404,8 @@ class EGRUCell_V2(_LayerRNNCell):
                 else init_ops.constant_initializer(1.0, dtype=self.dtype)))
         self._candidate_kernel = self.add_variable(
             "candidate/%s" % _WEIGHTS_VARIABLE_NAME,
-            shape=[input_depth + self._num_units, self._num_units],
+            # shape=[input_depth + self._num_units, self._num_units],
+            shape=[self.depth, self._num_units],
             initializer=self._kernel_initializer)
         self._candidate_bias = self.add_variable(
             "candidate/%s" % _BIAS_VARIABLE_NAME,
@@ -431,7 +448,7 @@ class EGRUCell_V2(_LayerRNNCell):
     def cnn2d(self, input):
         height = self._shape[0]
         width = self._shape[1]
-        depth = input.get_shape()[1]
+        # depth = input.get_shape()[1]
         # Transforms into 2D compatible format [batch(step), height, width, channel]
         input2d = tf.reshape(input, [-1, height, width, 1])
         nlayer = numLayers(height, width)
@@ -441,20 +458,5 @@ class EGRUCell_V2(_LayerRNNCell):
         for i in range(nlayer):
             filters *= 2
             convlayer = conv2dFlipOut(convlayer, self._kernel, int(filters), i)
-            convlayer = tf.contrib.layers.layer_norm(
-                scope="conv_ln_{}".format(i),
-                inputs=convlayer,
-                reuse=tf.AUTO_REUSE
-            )
-        convlayer = tf.squeeze(convlayer, [1, 2])
-        # can't use divergence_kernel in a while loop
-        # convlayer = tf.contrib.bayesflow.layers.dense_flipout(
-        convlayer = tf.layers.dense(
-            inputs=convlayer,
-            units=depth,
-            activation=tf.nn.elu,
-            kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1),
-            reuse=tf.AUTO_REUSE
-        )
+        convlayer = tf.layers.flatten(convlayer)
         return convlayer
