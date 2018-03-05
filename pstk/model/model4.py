@@ -124,8 +124,8 @@ class ERnnPredictorV2:
 
     @lazy_property
     def prediction(self):
-        rnn = self.rnn(self, self.data)
-        cnn = self.cnn(self, rnn)
+        nn = self.rnn(self, self.data)
+        # cnn = self.cnn(self, rnn)
         with tf.variable_scope("output"):
             # dense = tf.contrib.bayesflow.layers.dense_flipout(
             #     inputs=cnn,
@@ -137,16 +137,17 @@ class ERnnPredictorV2:
             #     activation=tf.nn.elu)
             # return output
             dense = tf.layers.dense(
-                inputs=cnn,
-                units=cnn.get_shape()[1]*2,
+                inputs=nn,
+                units=self._num_hidden*3,
                 kernel_initializer=tf.truncated_normal_initializer(
                     stddev=0.01),
                 bias_initializer=tf.constant_initializer(0.1),
                 activation=tf.nn.relu6)
-            dropout = tf.layers.dropout(
+            # dense = tf.contrib.layers.layer_norm(inputs=dense)
+            dense = tf.layers.dropout(
                 inputs=dense, rate=0.5, training=self.training)
             output = tf.layers.dense(
-                inputs=dropout,
+                inputs=dense,
                 units=int(self.target.get_shape()[1]),
                 kernel_initializer=tf.truncated_normal_initializer(
                     stddev=0.01),
@@ -161,16 +162,15 @@ class ERnnPredictorV2:
             convlayer = tf.expand_dims(input, 3)
             height = int(input.get_shape()[1])
             width = int(input.get_shape()[2])
-            nlayer = numLayers(height, width)
+            nlayer = min(5, numLayers(height, width))
             filters = max(
-                2, 2 ** (math.floor(math.log(self._num_hidden//nlayer, 2))))
+                16, 2 ** (math.floor(math.log(self._num_hidden//nlayer))))
             for i in range(nlayer):
-                if i <= nlayer//2:
-                    filters *= 2
-                else:
-                    filters /= 2
-                convlayer = self.conv2d(convlayer, int(filters), i)
+                filters = min(filters*2, self._num_hidden*2)
+                convlayer = self.conv2d(
+                    convlayer, int(filters), i, tf.nn.relu6)
             convlayer = tf.layers.flatten(convlayer)
+            # convlayer = tf.contrib.layers.layer_norm(inputs=convlayer)
             # convlayer = tf.layers.dense(
             #     inputs=convlayer,
             #     units=math.ceil(
@@ -182,17 +182,18 @@ class ERnnPredictorV2:
             return convlayer
 
     @staticmethod
-    def conv2d(input, filters, i):
+    def conv2d(input, filters, i, activation=None):
         with tf.variable_scope("conv{}".format(i)):
             h = int(input.get_shape()[1])
             w = int(input.get_shape()[2])
             conv = tf.layers.conv2d(
                 inputs=input,
                 filters=filters,
-                kernel_size=3,
+                kernel_size=2,
                 kernel_initializer=tf.truncated_normal_initializer(
                     stddev=0.01),
                 bias_initializer=tf.constant_initializer(0.1),
+                activation=activation,
                 padding="SAME")
             h_stride = 2 if (h > 2 or w == 2) else 1
             w_stride = 2 if (w > 2 or h == 2) else 1
@@ -212,7 +213,8 @@ class ERnnPredictorV2:
             kernel=[3, 3],
             kernel_initializer=tf.truncated_normal_initializer(
                 stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1)
+            bias_initializer=tf.constant_initializer(0.1),
+            training=self.training
         )
         cell = tf.nn.rnn_cell.MultiRNNCell([egru] * self._num_layers)
         output, _ = tf.nn.dynamic_rnn(
@@ -221,8 +223,9 @@ class ERnnPredictorV2:
             dtype=tf.float32,
             sequence_length=self.seqlen
         )
-        output = self.last_n(output, self.seqlen, 3)
-        # output = tf.layers.flatten(output)
+        # output = self.last_relevant(output, self.seqlen)
+        output = self.last_n(output, self.seqlen, 1)
+        output = tf.layers.flatten(output)
         return output
 
     @staticmethod

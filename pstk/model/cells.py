@@ -25,30 +25,6 @@ def numLayers(d1, d2=None):
 
 
 def conv2d(input, kernel, filters, seq):
-    conv = tf.layers.conv2d(
-        name="conv_lv{}".format(seq),
-        inputs=input,
-        filters=filters,
-        kernel_size=kernel,
-        kernel_initializer=tf.truncated_normal_initializer(
-            stddev=0.01),
-        bias_initializer=tf.constant_initializer(0.1),
-        padding="same",
-        reuse=tf.AUTO_REUSE)
-    # activation=tf.nn.elu)  # FIXME or perhaps relu6??
-    h_stride = 2 if int(conv.get_shape()[1]) >= 2 else 1
-    w_stride = 2 if int(conv.get_shape()[2]) >= 2 else 1
-    pool = tf.layers.max_pooling2d(
-        name="pool_lv{}".format(seq),
-        inputs=conv, pool_size=2, strides=[h_stride, w_stride],
-        padding="same")
-    # can't use tf.nn.batch_normalization in a mapped function
-    return pool
-
-
-def conv2dFlipOut(input, kernel, filters, seq):
-    # can't use divergence_kernel in a while loop
-    # conv = tf.contrib.bayesflow.layers.conv2d_flipout(
     with tf.variable_scope("conv{}".format(seq)):
         h = int(input.get_shape()[1])
         w = int(input.get_shape()[2])
@@ -355,6 +331,7 @@ class EGRUCell_V2(_LayerRNNCell):
                  reuse=None,
                  kernel_initializer=None,
                  bias_initializer=None,
+                 training=None,
                  name=None):
         super(EGRUCell_V2, self).__init__(_reuse=reuse, name=name)
 
@@ -366,6 +343,7 @@ class EGRUCell_V2(_LayerRNNCell):
         self._activation = activation or math_ops.tanh
         self._kernel_initializer = kernel_initializer
         self._bias_initializer = bias_initializer
+        self._training = training
 
     @property
     def state_size(self):
@@ -422,6 +400,9 @@ class EGRUCell_V2(_LayerRNNCell):
 
         inputs = self.cnn2d(inputs)
 
+        inputs = tf.layers.dropout(
+            inputs=inputs, rate=0.5, training=self._training)
+
         gate_inputs = math_ops.matmul(
             array_ops.concat([inputs, state], 1), self._gate_kernel)
         gate_inputs = nn_ops.bias_add(gate_inputs, self._gate_bias)
@@ -457,6 +438,6 @@ class EGRUCell_V2(_LayerRNNCell):
         convlayer = input2d
         for i in range(nlayer):
             filters *= 2
-            convlayer = conv2dFlipOut(convlayer, self._kernel, int(filters), i)
+            convlayer = conv2d(convlayer, self._kernel, int(filters), i)
         convlayer = tf.layers.flatten(convlayer)
         return convlayer

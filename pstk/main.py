@@ -7,7 +7,7 @@ import os
 import numpy as np
 
 EPOCH_SIZE = 705
-HIDDEN_SIZE = 128
+HIDDEN_SIZE = 256
 NUM_LAYERS = 1
 MAX_STEP = 50
 LEARNING_RATE = 1e-3
