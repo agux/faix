@@ -2,7 +2,7 @@ from __future__ import print_function
 import tensorflow as tf
 from model import model, model2, model3, model4
 from time import strftime
-from data import data2, data4
+from data import data2, data4, data5
 import os
 import numpy as np
 
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
 
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    _, tdata, tlabels, tseqlen = data4.loadTestSet(MAX_STEP)
+    _, tdata, tlabels, tseqlen = data5.loadTestSet(MAX_STEP)
     print(tdata.shape)
     print(tlabels.shape)
     featSize = tdata.shape[2]
@@ -32,8 +32,8 @@ if __name__ == '__main__':
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model4.ERnnPredictorV2(
-            data, target, seqlen, data4.TIME_SHIFT+1, training, dropout,
+        model = model4.ERnnPredictor(
+            data, target, seqlen, training, dropout,
             num_hidden=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             learning_rate=LEARNING_RATE)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                uuid, trdata, labels, trseqlen = data4.loadTrainingData(
+                uuid, trdata, labels, trseqlen = data5.loadTrainingData(
                     bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
@@ -66,8 +66,5 @@ if __name__ == '__main__':
                 test_writer.add_summary(test_summary_str, bno)
                 train_writer.flush()
                 test_writer.flush()
-                # print('{} tagging data as trained, batch no: {}'.format(
-                #     strftime("%H:%M:%S"), bno))
-                # dat.tagDataTrained(uuid, bno)
             checkpoint_file = os.path.join(LOG_DIR, 'model.ckpt')
             saver.save(sess, checkpoint_file, global_step=bno)

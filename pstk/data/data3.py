@@ -7,6 +7,7 @@ import pandas as pd
 import tensorflow as tf
 from pprint import pprint
 from time import strftime
+from data import connect
 
 TIME_SHIFT = 3
 
@@ -35,10 +36,6 @@ ftQuery = (
     "ORDER BY klid "
     "LIMIT %s "
 )
-
-def connect():
-    return mysql.connector.connect(
-        host='localhost', user='mysql', database='secu', password='123456')
 
 
 def loadTestSet(max_step):

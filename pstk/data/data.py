@@ -8,6 +8,11 @@ import tensorflow as tf
 from pprint import pprint
 from time import strftime
 
+
+def connect():
+    return mysql.connector.connect(
+        host='localhost', user='mysql', database='secu', password='123456')
+
 ftQuery = (
     "SELECT "
     "    SUBSTR(b.date, 1, 4) yyyy, "
@@ -81,8 +86,7 @@ ftQuery = (
 
 
 def tagDataTrained(uuids, batch_no):
-    cnx = mysql.connector.connect(
-        host='localhost', user='mysql', database='secu', password='123456')
+    cnx = connect()
     flag = "TRN_{}_{}".format(strftime("%Y%m%d_%H%M%S"), batch_no)
     uuidval = ','.join(["'{}'".format(u) for u in uuids])
     try:
@@ -103,8 +107,7 @@ def tagDataTrained(uuids, batch_no):
 
 
 def loadTestSet(max_step):
-    cnx = mysql.connector.connect(
-        host='localhost', user='mysql', database='secu', password='123456')
+    cnx = connect()
     try:
         cursor = cnx.cursor(buffered=True)
         pick = (
@@ -160,8 +163,7 @@ def loadTestSet(max_step):
 
 
 def loadPrepTrainingData(batch_no, max_step):
-    cnx = mysql.connector.connect(
-        host='localhost', user='mysql', database='secu', password='123456')
+    cnx = connect()
     try:
         cursor = cnx.cursor(buffered=True)
         query = (
@@ -208,8 +210,7 @@ def loadPrepTrainingData4D(batch_no, max_step):
     '''
     returned format: [batch_size, max_step, interleaved_dim, feature_size]
     '''
-    cnx = mysql.connector.connect(
-        host='localhost', user='mysql', database='secu', password='123456')
+    cnx = connect()
     try:
         cursor = cnx.cursor(buffered=True)
         query = (
@@ -327,8 +328,7 @@ def getNumRelatives(conn):
 
 
 def loadTrainingData(batch_size, max_step):
-    cnx = mysql.connector.connect(
-        host='localhost', user='mysql', database='secu', password='123456')
+    cnx = connect()
     try:
         cursor = cnx.cursor(buffered=True)
         query = (

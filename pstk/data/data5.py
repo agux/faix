@@ -10,6 +10,10 @@ from time import strftime
 
 from data import connect
 
+'''
+OHLCV LR + SH & SZ indices LR (5+5+5)
+'''
+
 TIME_SHIFT = 9
 
 nclsQry = (
@@ -23,17 +27,41 @@ nclsQry = (
 )
 
 ftQuery = (
-    "SELECT "
-    "    lr, "
-    "    lr_h,"
-    "    lr_o,"
-    "    lr_l,"
-    "    lr_vol "
+    "SELECT  "
+    "    d.lr, "
+    "    d.lr_h, "
+    "    d.lr_o, "
+    "    d.lr_l, "
+    "    d.lr_vol, "
+    "    COALESCE(sh.lr,0) sh_lr, "
+    "    COALESCE(sh.lr_h,0) sh_lr_h, "
+    "    COALESCE(sh.lr_o,0) sh_lr_o, "
+    "    COALESCE(sh.lr_l,0) sh_lr_l, "
+    "    COALESCE(sh.lr_vol,0) sh_lr_vol, "
+    "    COALESCE(sz.lr,0) sz_lr, "
+    "    COALESCE(sz.lr_h,0) sz_h, "
+    "    COALESCE(sz.lr_o,0) sz_o, "
+    "    COALESCE(sz.lr_l,0) sz_l, "
+    "    COALESCE(sz.lr_vol,0) sz_vol "
     "FROM "
-    "    kline_d "
+    "    kline_d d "
+    "        LEFT OUTER JOIN "
+    "    (SELECT  "
+    "        lr, lr_h, lr_o, lr_l, lr_vol, date "
+    "    FROM "
+    "        kline_d "
+    "    WHERE "
+    "        code = 'sh000001') sh USING (date) "
+    "        LEFT OUTER JOIN "
+    "    (SELECT  "
+    "        lr, lr_h, lr_o, lr_l, lr_vol, date "
+    "    FROM "
+    "        kline_d "
+    "    WHERE "
+    "        code = 'sz399001') sz USING (date) "
     "WHERE "
-    "    code = %s "
-    "        AND klid BETWEEN %s AND %s "
+    "    d.code = %s "
+    "        AND d.klid BETWEEN %s AND %s "
     "ORDER BY klid "
     "LIMIT %s "
 )
@@ -75,7 +103,7 @@ def loadTestSet(max_step):
         cursor.close()
         data = []   # [batch, max_step, feature*time_shift]
         labels = []  # [batch, label]  one-hot labels
-        seqlen = [] # [batch]
+        seqlen = []  # [batch]
         uuids = []
         for (uuid, code, klid, score) in kpts:
             uuids.append(uuid)
@@ -144,7 +172,7 @@ def loadTrainingData(batch_no, max_step):
         cursor.close()
         data = []   # [batch, max_step, feature*time_shift]
         labels = []  # [batch, label]  one-hot labels
-        seqlen = [] # [batch]
+        seqlen = []  # [batch]
         uuids = []
         for (uuid, code, klid, score) in kpts:
             uuids.append(uuid)
