@@ -2,7 +2,7 @@ from __future__ import print_function
 import tensorflow as tf
 from model import model, model2, model3, model4, model5
 from time import strftime
-from data import data2, data4, data5, data6
+from data import data2, data4, data5, data6, data7
 import os
 import numpy as np
 
@@ -21,19 +21,18 @@ if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
 
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    _, tdata, tlabels, tseqlen = data6.loadTestSet(MAX_STEP)
+    _, tdata, tlabels, tseqlen, nclass = data7.loadTestSet(MAX_STEP)
     print(tdata.shape)
     print(tlabels.shape)
     featSize = tdata.shape[2]
-    numClass = tlabels.shape[1]
     data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
-    target = tf.placeholder(tf.float32, [None, numClass], "labels")
+    target = tf.placeholder(tf.float32, [None], "labels")
     seqlen = tf.placeholder(tf.int32, [None], "seqlen")
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
         model = model5.MRnnPredictor(
-            data, target, seqlen, training, dropout,
+            data, target, seqlen, nclass, training, dropout,
             num_hidden=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             learning_rate=LEARNING_RATE)
@@ -57,7 +56,7 @@ if __name__ == '__main__':
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                uuid, trdata, labels, trseqlen = data6.loadTrainingData(
+                uuid, trdata, labels, trseqlen, _ = data7.loadTrainingData(
                     bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
