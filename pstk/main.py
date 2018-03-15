@@ -2,14 +2,15 @@ from __future__ import print_function
 import tensorflow as tf
 from model import model, model2, model3, model4, model5
 from time import strftime
-from data import data2, data4, data5, data6, data7
+from data import data2, data4, data5, data6, data7, data8
 import os
 import numpy as np
 
-EPOCH_SIZE = 705
-HIDDEN_SIZE = 256
+EPOCH_SIZE = 282
+HIDDEN_SIZE = 512
 NUM_LAYERS = 1
-MAX_STEP = 50
+MAX_STEP = 60
+DROP_OUT = 0.7
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -21,12 +22,13 @@ if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
 
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    _, tdata, tlabels, tseqlen, nclass = data7.loadTestSet(MAX_STEP)
+    _, tdata, tlabels, tseqlen = data8.loadTestSet(MAX_STEP)
     print(tdata.shape)
     print(tlabels.shape)
     featSize = tdata.shape[2]
+    nclass = tlabels.shape[1]
     data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
-    target = tf.placeholder(tf.float32, [None], "labels")
+    target = tf.placeholder(tf.float32, [None, nclass], "labels")
     seqlen = tf.placeholder(tf.int32, [None], "seqlen")
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
@@ -56,11 +58,11 @@ if __name__ == '__main__':
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                uuid, trdata, labels, trseqlen, _ = data7.loadTrainingData(
+                _, trdata, labels, trseqlen = data8.loadTrainingData(
                     bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
-                    data: trdata, target: labels, seqlen: trseqlen, training: True, dropout: 0.5})
+                    data: trdata, target: labels, seqlen: trseqlen, training: True, dropout: DROP_OUT})
                 train_writer.add_summary(summary_str, bno)
                 test_writer.add_summary(test_summary_str, bno)
                 train_writer.flush()

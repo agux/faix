@@ -8,7 +8,7 @@ from model import lazy_property, numLayers
 from cells import EGRUCell, EGRUCell_V1, EGRUCell_V2
 
 
-class MRnnPredictor:
+class MRnnPredictorV2:
 
     def __init__(self, data, target, seqlen, num_class, training, dropout, num_hidden=200, num_layers=1, learning_rate=1e-4):
         self.data = data
@@ -73,25 +73,30 @@ class MRnnPredictor:
     @staticmethod
     def rnn(self, input):
         # Recurrent network.
-        gru1 = tf.nn.rnn_cell.GRUCell(
-            num_units=self._num_hidden,
-            kernel_initializer=tf.truncated_normal_initializer(
-                stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1)
-        )
-        gru2 = tf.nn.rnn_cell.GRUCell(
+        c1 = tf.nn.rnn_cell.GRUCell(
             num_units=self._num_hidden*2,
             kernel_initializer=tf.truncated_normal_initializer(
                 stddev=0.01),
             bias_initializer=tf.constant_initializer(0.1)
         )
-        gru2 = tf.nn.rnn_cell.DropoutWrapper(
-            cell=gru2,
+        c1 = tf.nn.rnn_cell.DropoutWrapper(
+            cell=c1,
+            input_keep_prob=(1.0-self.dropout)
+        )
+        c2 = tf.nn.rnn_cell.GRUCell(
+            num_units=self._num_hidden,
+            kernel_initializer=tf.truncated_normal_initializer(
+                stddev=0.01),
+            bias_initializer=tf.constant_initializer(0.1)
+        )
+        
+        mc = tf.nn.rnn_cell.MultiRNNCell([c1, c2] * self._num_layers)
+        mc = tf.nn.rnn_cell.DropoutWrapper(
+            cell=mc,
             output_keep_prob=(1.0-self.dropout)
         )
-        cell = tf.nn.rnn_cell.MultiRNNCell([gru1, gru2] * self._num_layers)
         output, _ = tf.nn.dynamic_rnn(
-            cell,
+            mc,
             input,
             dtype=tf.float32,
             sequence_length=self.seqlen
