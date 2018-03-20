@@ -27,11 +27,11 @@ class MRnnPredictorV2:
 
     @lazy_property
     def prediction(self):
-        rnn = self.rnn(self, self.data)
+        layer = self.rnn(self, self.data)
         # ln = tf.contrib.layers.layer_norm(inputs=rnn)
-        # dnn = self.dnn(self, rnn)
+        layer = self.dnn(self, layer)
         output = tf.layers.dense(
-            inputs=rnn,
+            inputs=layer,
             units=self._num_class,
             kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
             bias_initializer=tf.constant_initializer(0.1),
@@ -44,18 +44,10 @@ class MRnnPredictorV2:
         with tf.variable_scope("dnn"):
             dense = tf.layers.dense(
                 inputs=input,
-                units=self._num_hidden*2,
-                kernel_initializer=tf.truncated_normal_initializer(
-                    stddev=0.01),
-                bias_initializer=tf.constant_initializer(0.1)
-                # activation=tf.nn.elu
-            )
-            dense = tf.layers.dense(
-                inputs=dense,
                 units=self._num_hidden,
                 kernel_initializer=tf.truncated_normal_initializer(
                     stddev=0.01),
-                bias_initializer=tf.constant_initializer(0.1),
+                bias_initializer=tf.constant_initializer(0.1)
                 # activation=tf.nn.elu
             )
             dense = tf.layers.dense(
@@ -64,17 +56,25 @@ class MRnnPredictorV2:
                 kernel_initializer=tf.truncated_normal_initializer(
                     stddev=0.01),
                 bias_initializer=tf.constant_initializer(0.1),
+                # activation=tf.nn.elu
+            )
+            dense = tf.layers.dense(
+                inputs=dense,
+                units=self._num_hidden//4,
+                kernel_initializer=tf.truncated_normal_initializer(
+                    stddev=0.01),
+                bias_initializer=tf.constant_initializer(0.1),
                 activation=tf.nn.relu6
             )
             dropout = tf.layers.dropout(
-                inputs=dense, rate=0.8, training=self.training)
+                inputs=dense, rate=0.5, training=self.training)
             return dropout
 
     @staticmethod
     def rnn(self, input):
         # Recurrent network.
         c1 = tf.nn.rnn_cell.GRUCell(
-            num_units=self._num_hidden*2,
+            num_units=self._num_hidden,
             kernel_initializer=tf.truncated_normal_initializer(
                 stddev=0.01),
             bias_initializer=tf.constant_initializer(0.1)
@@ -84,12 +84,12 @@ class MRnnPredictorV2:
             input_keep_prob=(1.0-self.dropout)
         )
         c2 = tf.nn.rnn_cell.GRUCell(
-            num_units=self._num_hidden,
+            num_units=self._num_hidden//2,
             kernel_initializer=tf.truncated_normal_initializer(
                 stddev=0.01),
             bias_initializer=tf.constant_initializer(0.1)
         )
-        
+
         mc = tf.nn.rnn_cell.MultiRNNCell([c1, c2] * self._num_layers)
         mc = tf.nn.rnn_cell.DropoutWrapper(
             cell=mc,
@@ -120,12 +120,8 @@ class MRnnPredictorV2:
 
     @lazy_property
     def optimize(self):
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        optimizer = None
-        with tf.control_dependencies(update_ops):
-            optimizer = tf.train.AdamOptimizer(self._learning_rate).minimize(
-                self.cost, global_step=tf.train.get_global_step())
-        return optimizer
+        return tf.train.AdamOptimizer(self._learning_rate).minimize(
+            self.cost, global_step=tf.train.get_global_step())
 
     @lazy_property
     def accuracy(self):

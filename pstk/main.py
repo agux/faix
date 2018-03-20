@@ -1,13 +1,13 @@
 from __future__ import print_function
 import tensorflow as tf
-from model import model, model2, model3, model4, model5
+from model import model, model2, model3, model4, model5, model6
 from time import strftime
-from data import data2, data4, data5, data6, data7, data8
+from data import data2, data4, data5, data6, data7, data8, data9
 import os
 import numpy as np
 
 EPOCH_SIZE = 282
-HIDDEN_SIZE = 512
+HIDDEN_SIZE = 256
 NUM_LAYERS = 1
 MAX_STEP = 60
 DROP_OUT = 0.5
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
 
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    _, tdata, tlabels, tseqlen = data8.loadTestSet(MAX_STEP)
+    _, tdata, tlabels, tseqlen = data9.loadTestSet(MAX_STEP)
     print(tdata.shape)
     print(tlabels.shape)
     featSize = tdata.shape[2]
@@ -33,8 +33,13 @@ if __name__ == '__main__':
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model5.MRnnPredictor(
-            data, target, seqlen, nclass, training, dropout,
+        model = model6.MRnnPredictorV2(
+            data=data, 
+            target=target, 
+            seqlen=seqlen, 
+            num_class=nclass, 
+            training=training, 
+            dropout=dropout,
             num_hidden=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             learning_rate=LEARNING_RATE)
@@ -58,7 +63,7 @@ if __name__ == '__main__':
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                _, trdata, labels, trseqlen = data8.loadTrainingData(
+                _, trdata, labels, trseqlen = data9.loadTrainingData(
                     bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 summary_str, _ = sess.run([summary, model.optimize], {
