@@ -11,7 +11,7 @@ from time import strftime
 from data import connect
 
 '''
-OHLCVAX-LR + SH & SZ indices-LR(6*2) (7+12=19)
+OHLCV-LR + SH & SZ indices-LR(6*2) (5+12=17)
 Read from backward reinstated klines.
 '''
 
@@ -24,7 +24,7 @@ nclsQry = (
     "    (SELECT DISTINCT "
     "        score "
     "    FROM "
-    "        kpts) t"
+    "        kpts30) t"
 )
 
 ftQuery = (
@@ -34,8 +34,6 @@ ftQuery = (
     "    d.lr_o, "
     "    d.lr_l, "
     "    d.lr_vol, "
-    "    d.lr_amt, "
-    "    d.lr_xr, "
     "    COALESCE(sh.lr,0) sh_lr, "
     "    COALESCE(sh.lr_h,0) sh_lr_h, "
     "    COALESCE(sh.lr_o,0) sh_lr_o, "
@@ -86,7 +84,7 @@ def loadTestSet(max_step):
             "SELECT  "
             "    distinct flag "
             "FROM "
-            "    kpts "
+            "    kpts30 "
             "WHERE "
             "    flag LIKE 'TEST\\_%' "
             "ORDER BY RAND() "
@@ -99,7 +97,7 @@ def loadTestSet(max_step):
             "SELECT "
             "   uuid, code, klid, score "
             "FROM "
-            "   kpts "
+            "   kpts30 "
             "WHERE "
             "   flag = '{}' "
         )
@@ -167,7 +165,7 @@ def loadTrainingData(batch_no, max_step):
             'SELECT '
             '   uuid, code, klid, score '
             'FROM'
-            '   kpts '
+            '   kpts30 '
             'WHERE '
             "   flag = 'TRN_{}'"
         )

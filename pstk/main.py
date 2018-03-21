@@ -6,7 +6,7 @@ from data import data2, data4, data5, data6, data7, data8, data9
 import os
 import numpy as np
 
-EPOCH_SIZE = 282
+EPOCH_SIZE = 444
 HIDDEN_SIZE = 256
 NUM_LAYERS = 1
 MAX_STEP = 60
