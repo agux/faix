@@ -10,7 +10,7 @@ seq = [
     [[3, 4, 5], [1, 0, 0]]
 ]
 
-print("{}".format(np.concatenate(seq,1)))
+print("{}".format(np.concatenate(seq, 1)))
 
 
 print(5//2)
@@ -26,7 +26,6 @@ def length(sequence):
     return length
 
 
-
 le = length(seq)
 
 ts = tf.zeros([2, 2], dtype=tf.float32)
@@ -35,9 +34,13 @@ t = tf.constant([[[1, 1, 1], [2, 2, 2], [7, 7, 7], [8, 8, 8]],
                  [[3, 3, 3], [4, 4, 4], [6, 6, 6], [0, 0, 0]],
                  [[5, 5, 5], [9, 9, 9], [0, 0, 0], [0, 0, 0]]])
 
-def f(p1,p2,p3,p4,ph):
+
+def f(p1, p2, p3, p4, ph):
+    print("p1: {}".format(p1))
+    print("p2: {}".format(p2))
     print("received p3:{}".format(p3))
     return "{}+{}".format(p1, p2), p2
+
 
 with tf.Session() as sess:
     # l = sess.run(le)
@@ -57,7 +60,7 @@ with tf.Session() as sess:
 
     # input = tf.Variable([[1.0, 2.0], [3.0, 4.0]])
     elems = (np.array([1, 2, 3]), np.array([-1, 1, -1]))
-    r = tf.map_fn(lambda x: f(x[0],x[1],'3','4',ph), (px1, x2))
+    r = tf.map_fn(lambda x: f(x[0], x[1], '3', '4', ph), (px1, x2))
     print(sess.run(r, feed_dict={px1: x1, ph: 0.5}))
     print("---------------------------")
     a = tf.constant([[1, 2, 3], [4, 5, 6]])
@@ -65,4 +68,3 @@ with tf.Session() as sess:
 
     c = tf.map_fn(lambda x: (x[0], x[1]), (a, b))
     print(c)
-
