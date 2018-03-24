@@ -195,7 +195,7 @@ class MRnnPredictorV3:
                 activation=tf.nn.relu6
             )
             dropout = tf.layers.dropout(
-                inputs=dense, rate=0.7, training=self.training)
+                inputs=dense, rate=0.6, training=self.training)
             return dropout
 
     @staticmethod
@@ -209,10 +209,10 @@ class MRnnPredictorV3:
                     stddev=0.01),
                 bias_initializer=tf.constant_initializer(0.1)
             )
-            if i < self._num_layers - 1:
+            if i > 0:
                 c = tf.nn.rnn_cell.DropoutWrapper(
                     cell=c,
-                    output_keep_prob=self.keep_prob
+                    input_keep_prob=self.keep_prob
                 )
             cells.append(c)
         mc = tf.nn.rnn_cell.MultiRNNCell(cells)
@@ -270,15 +270,6 @@ class MRnnPredictorV3:
             return tf.one_hot(
                 tf.argmax(prediction, 1), size, axis=-1)
 
-    # @lazy_property
-    # def precisions(self):
-    #     predictions = self.one_hot
-    #     size = len(self._classes)
-    #     with tf.name_scope("Precisions"):
-    #         return tf.map_fn(lambda x: _precisions(x[0], x[1], self.target, size, predictions),
-    #                          (tf.constant([i for i in range(size)]),
-    #                           tf.constant([c for c in self._classes])))
-
     @lazy_property
     def precisions(self):
         predictions = self.one_hot
@@ -296,15 +287,6 @@ class MRnnPredictorV3:
                 tf.summary.scalar("c_{}".format(c), p*100)
                 ops.append(op)
             return ops
-
-    # @lazy_property
-    # def recalls(self):
-    #     predictions = self.one_hot
-    #     size = len(self._classes)
-    #     with tf.name_scope("Recalls"):
-    #         return tf.map_fn(lambda x: _recalls(x[0], x[1], self.target, size, predictions),
-    #                          (tf.constant([i for i in range(size)]),
-    #                           tf.constant([c for c in self._classes])))
 
     @lazy_property
     def recalls(self):

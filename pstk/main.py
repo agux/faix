@@ -7,10 +7,10 @@ import os
 import numpy as np
 
 EPOCH_SIZE = 443
-HIDDEN_SIZE = 256
+HIDDEN_SIZE = 512
 NUM_LAYERS = 3
 MAX_STEP = 60
-DROP_OUT = 0.7
+DROP_OUT = 0.6
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -18,7 +18,7 @@ LOG_DIR = 'logdir'
 def collect_summary(sess, model):
     train_writer = tf.summary.FileWriter(LOG_DIR + "/train", sess.graph)
     test_writer = tf.summary.FileWriter(LOG_DIR + "/test", sess.graph)
-    with tf.name_scope("Summary"):
+    with tf.name_scope("a_Summary"):
         tf.summary.scalar("Loss", model.cost)
         tf.summary.scalar("Accuracy", model.accuracy*100)
     summary = tf.summary.merge_all()
