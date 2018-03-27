@@ -2,15 +2,15 @@ from __future__ import print_function
 import tensorflow as tf
 from model import model, model2, model3, model4, model5, model6
 from time import strftime
-from data import data2, data4, data5, data6, data7, data8, data9
+from data import data9, data10
 import os
 import numpy as np
 
-EPOCH_SIZE = 443
+EPOCH_SIZE = 444
 HIDDEN_SIZE = 512
 NUM_LAYERS = 3
 MAX_STEP = 60
-DROP_OUT = 0.6
+DROP_OUT = 0.4
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -18,7 +18,7 @@ LOG_DIR = 'logdir'
 def collect_summary(sess, model):
     train_writer = tf.summary.FileWriter(LOG_DIR + "/train", sess.graph)
     test_writer = tf.summary.FileWriter(LOG_DIR + "/test", sess.graph)
-    with tf.name_scope("a_Summary"):
+    with tf.name_scope("Basic"):
         tf.summary.scalar("Loss", model.cost)
         tf.summary.scalar("Accuracy", model.accuracy*100)
     summary = tf.summary.merge_all()
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
 
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    _, tdata, tlabels, tseqlen = data9.loadTestSet(MAX_STEP)
+    _, tdata, tlabels, tseqlen = data10.loadTestSet(MAX_STEP)
     print(tdata.shape)
     print(tlabels.shape)
     featSize = tdata.shape[2]
@@ -45,12 +45,11 @@ if __name__ == '__main__':
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model6.MRnnPredictorV3(
+        model = model6.MRnnPredictorV4(
             data=data,
             target=target,
             seqlen=seqlen,
             classes=classes,
-            training=training,
             dropout=dropout,
             num_hidden=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
@@ -72,7 +71,7 @@ if __name__ == '__main__':
             feeds = {data: tdata, target: tlabels,
                      seqlen: tseqlen, training: False, dropout: 0}
             accuracy, test_summary_str = sess.run(
-                [model.accuracy, summary, model.precisions, model.recalls], feeds)[:2]
+                [model.accuracy, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:2]
             print('{} Epoch {:4d} test accuracy {:3.3f}%'.format(
                 strftime("%H:%M:%S"), epoch + 1, 100 * accuracy))
             for i in range(50):
@@ -80,13 +79,13 @@ if __name__ == '__main__':
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                _, trdata, labels, trseqlen = data9.loadTrainingData(
+                _, trdata, labels, trseqlen = data10.loadTrainingData(
                     bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 feeds = {data: trdata, target: labels,
                          seqlen: trseqlen, training: True, dropout: DROP_OUT}
                 summary_str = sess.run(
-                    [summary, model.optimize, model.precisions, model.recalls], feeds)[0]
+                    [summary, model.optimize, model.precisions[1], model.recalls[1], model.f_score], feeds)[0]
                 train_writer.add_summary(summary_str, bno)
                 test_writer.add_summary(test_summary_str, bno)
                 train_writer.flush()
@@ -94,3 +93,11 @@ if __name__ == '__main__':
             checkpoint_file = os.path.join(LOG_DIR, 'model.ckpt')
             saver.save(sess, checkpoint_file, global_step=bno)
             sess.run(metric_vars_initializer)
+        # test last epoch
+        print('{} running on test set...'.format(strftime("%H:%M:%S")))
+        feeds = {data: tdata, target: tlabels,
+                 seqlen: tseqlen, training: False, dropout: 0}
+        accuracy, test_summary_str = sess.run(
+            [model.accuracy, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:2]
+        print('{} Epoch {:4d} test accuracy {:3.3f}%'.format(
+            strftime("%H:%M:%S"), EPOCH_SIZE, 100 * accuracy))
