@@ -8,7 +8,7 @@ import numpy as np
 
 EPOCH_SIZE = 444
 HIDDEN_SIZE = 512
-NUM_LAYERS = 3
+NUM_LAYERS = 5
 MAX_STEP = 60
 DROP_OUT = 0.4
 LEARNING_RATE = 1e-3
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model6.MRnnPredictorV4(
+        model = model6.MRnnPredictorV5(
             data=data,
             target=target,
             seqlen=seqlen,
