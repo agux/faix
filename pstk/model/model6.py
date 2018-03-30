@@ -699,6 +699,7 @@ class MRnnPredictorV6:
         self._num_layers = num_layers
         self._classes = classes
         self._learning_rate = learning_rate
+        self.keep_prob
         self.precisions
         self.recalls
         self.f_score
@@ -737,18 +738,16 @@ class MRnnPredictorV6:
                     stddev=0.01),
                 bias_initializer=tf.constant_initializer(0.1)
             )
-            if i > 0:
-                with tf.name_scope("dropout_{}".format(i)):
-                    keep_prob = 1-(self.dropout*(f**i))
-                    c = tf.nn.rnn_cell.DropoutWrapper(
-                        cell=c,
-                        input_keep_prob=keep_prob)
+            # if i % 2 != 0:
+            #     c = tf.nn.rnn_cell.DropoutWrapper(
+            #         cell=c,
+            #         input_keep_prob=self.keep_prob)
             cells.append(c)
         mc = tf.nn.rnn_cell.MultiRNNCell(cells)
-        # mc = tf.nn.rnn_cell.DropoutWrapper(
-        #     cell=mc,
-        #     output_keep_prob=self.keep_prob
-        # )
+        mc = tf.nn.rnn_cell.DropoutWrapper(
+            cell=mc,
+            output_keep_prob=self.keep_prob
+        )
         output, _ = tf.nn.dynamic_rnn(
             mc,
             input,
@@ -764,6 +763,11 @@ class MRnnPredictorV6:
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
+
+    @lazy_property
+    def keep_prob(self):
+        with tf.name_scope("keep_prob"):
+            return 1.0-self.dropout
 
     @lazy_property
     def cost(self):
