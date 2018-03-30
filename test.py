@@ -50,4 +50,5 @@ def testGatherND():
     print("{}".format(r))
 
 
+print((5-1.0)/5)
 testGatherND()

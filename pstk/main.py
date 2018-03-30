@@ -11,7 +11,7 @@ HIDDEN_SIZE = 512
 NUM_LAYERS = 5
 MAX_STEP = 60
 DROP_OUT = 0.4
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 3e-3
 LOG_DIR = 'logdir'
 
 
@@ -43,9 +43,9 @@ if __name__ == '__main__':
     target = tf.placeholder(tf.float32, [None, nclass], "labels")
     seqlen = tf.placeholder(tf.int32, [None], "seqlen")
     dropout = tf.placeholder(tf.float32, name="dropout")
-    training = tf.placeholder(tf.bool, name="training")
+    # training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model6.MRnnPredictorV5(
+        model = model6.MRnnPredictorV6(
             data=data,
             target=target,
             seqlen=seqlen,
@@ -69,7 +69,7 @@ if __name__ == '__main__':
             bno = epoch*50
             print('{} running on test set...'.format(strftime("%H:%M:%S")))
             feeds = {data: tdata, target: tlabels,
-                     seqlen: tseqlen, training: False, dropout: 0}
+                     seqlen: tseqlen, dropout: 0}
             accuracy, test_summary_str = sess.run(
                 [model.accuracy, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:2]
             print('{} Epoch {:4d} test accuracy {:3.3f}%'.format(
@@ -83,7 +83,7 @@ if __name__ == '__main__':
                     bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 feeds = {data: trdata, target: labels,
-                         seqlen: trseqlen, training: True, dropout: DROP_OUT}
+                         seqlen: trseqlen, dropout: DROP_OUT}
                 summary_str = sess.run(
                     [summary, model.optimize, model.precisions[1], model.recalls[1], model.f_score], feeds)[0]
                 train_writer.add_summary(summary_str, bno)
@@ -96,7 +96,7 @@ if __name__ == '__main__':
         # test last epoch
         print('{} running on test set...'.format(strftime("%H:%M:%S")))
         feeds = {data: tdata, target: tlabels,
-                 seqlen: tseqlen, training: False, dropout: 0}
+                 seqlen: tseqlen, dropout: 0}
         accuracy, test_summary_str = sess.run(
             [model.accuracy, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:2]
         print('{} Epoch {:4d} test accuracy {:3.3f}%'.format(
