@@ -8,7 +8,7 @@ import tensorflow as tf
 from tensorflow.python.ops import rnn_cell_impl, math_ops, init_ops, array_ops, nn_ops
 from tensorflow.python.layers import base as base_layer
 
-_LayerRNNCell = rnn_cell_impl._LayerRNNCell
+_LayerRNNCell = rnn_cell_impl.LayerRNNCell
 _BIAS_VARIABLE_NAME = rnn_cell_impl._BIAS_VARIABLE_NAME
 _WEIGHTS_VARIABLE_NAME = rnn_cell_impl._WEIGHTS_VARIABLE_NAME
 
