@@ -13,6 +13,7 @@ def connect():
     return mysql.connector.connect(
         host='localhost', user='mysql', database='secu', password='123456')
 
+
 ftQuery = (
     "SELECT "
     "    SUBSTR(b.date, 1, 4) yyyy, "
@@ -402,3 +403,20 @@ def loadTrainingData(batch_size, max_step):
         raise
     finally:
         cnx.close()
+
+
+def save_worst_rec(model, start_time, phase, step, uuid, xentropy, predict, truth):
+    # print('model {} start_time {} phase {} step {} uuid {} xentropy {} predict {} truth {}'.format(
+    #     model, start_time, phase, step, uuid, xentropy, predict, truth))
+    cnx = connect()
+    c = cnx.cursor()
+    isql = (
+        "insert into worst_rec "
+        "(model, start_time, phase, step, uuid, xentropy, predict, truth) "
+        "values (%s, %s, %s, %s, %s, %s, %s, %s) "
+    )
+    c.execute(isql, (model, start_time, phase,
+                     step, uuid, float(xentropy), int(predict), int(truth)))
+    cnx.commit()
+    c.close()
+    cnx.close()
