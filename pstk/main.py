@@ -1,6 +1,6 @@
 from __future__ import print_function
 import tensorflow as tf
-from model import model, model2, model3, model4, model5, model6
+from model import model, model2, model3, model4, model5, model6, model7
 from time import strftime
 from data import data as data0
 from data import data9, data10, data11
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model4.ERnnPredictorV3(
+        model = model7.SRnnPredictorV1(
             data=data,
             target=target,
             seqlen=seqlen,
@@ -68,7 +68,7 @@ if __name__ == '__main__':
         saver = tf.train.Saver()
         bno = 0
         stime = '{}'.format(strftime("%Y-%m-%d %H:%M:%S"))
-        model_name = type(model).__name__
+        model_name = model.getName()
         for epoch in range(EPOCH_SIZE):
             bno = epoch*50
             print('{} running on test set...'.format(strftime("%H:%M:%S")))
@@ -77,7 +77,7 @@ if __name__ == '__main__':
             accuracy, worst, test_summary_str = sess.run(
                 [model.accuracy, model.worst, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:3]
             bidx, max_entropy, predict, actual = worst[0], worst[1], worst[2], worst[3]
-            print('{} Epoch {:4d} test accuracy {:3.3f}% max_entropy {:3.4f} predict {} actual {}'.format(
+            print('{} Epoch {} test accuracy {:3.3f}% max_entropy {:3.4f} predict {} actual {}'.format(
                 strftime("%H:%M:%S"), epoch, 100. * accuracy, max_entropy, predict, actual))
             data0.save_worst_rec(model_name, stime, "test", epoch,
                                  tuuids[bidx], max_entropy, predict, actual)
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                 summary_str, worst = sess.run(
                     [summary, model.worst, model.optimize, model.precisions[1], model.recalls[1], model.f_score], feeds)[:2]
                 bidx, max_entropy, predict, actual = worst[0], worst[1], worst[2], worst[3]
-                print('{} bno {:4d} max_entropy {:3.4f} predict {} actual {}'.format(
+                print('{} bno {} max_entropy {:3.4f} predict {} actual {}'.format(
                     strftime("%H:%M:%S"), bno, max_entropy, predict, actual))
                 data0.save_worst_rec(model_name, stime, "train", bno,
                                      truuids[bidx], max_entropy, predict, actual)
@@ -112,7 +112,7 @@ if __name__ == '__main__':
         accuracy, worst, test_summary_str = sess.run(
             [model.accuracy, model.worst, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:3]
         bidx, max_entropy, predict, actual = worst[0], worst[1], worst[2], worst[3]
-        print('{} Epoch {:4d} test accuracy {:3.3f}% max_entropy {:3.4f} predict {} actual {}'.format(
+        print('{} Epoch {} test accuracy {:3.3f}% max_entropy {:3.4f} predict {} actual {}'.format(
             strftime("%H:%M:%S"), EPOCH_SIZE, 100. * accuracy, max_entropy, predict, actual))
         data0.save_worst_rec(model_name, stime, "test", EPOCH_SIZE,
                             tuuids[bidx], max_entropy, predict, actual)

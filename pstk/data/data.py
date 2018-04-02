@@ -5,7 +5,6 @@ import sqlalchemy as sqla
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from pprint import pprint
 from time import strftime
 
 
@@ -152,9 +151,6 @@ def loadTestSet(max_step):
             data.append(steps)
             fcursor.close()
         cursor.close()
-        # pprint(data)
-        # print("\n")
-        # pprint(len(labels))
         return uuids, data, labels
     except:
         print(sys.exc_info()[0])
@@ -196,9 +192,6 @@ def loadPrepTrainingData(batch_no, max_step):
             data.append(steps)
             fcursor.close()
         cursor.close()
-        # pprint(data)
-        # print("\n")
-        # pprint(len(labels))
         return uuids, data, labels
     except:
         print(sys.exc_info()[0])
@@ -276,9 +269,6 @@ def loadPrepTrainingData4D(batch_no, max_step):
             data.append(steps)
             fcursor.close()
         cursor.close()
-        # pprint(data)
-        # print("\n")
-        # pprint(len(labels))
         return uuids, data, labels
     except:
         print(sys.exc_info()[0])
@@ -394,9 +384,6 @@ def loadTrainingData(batch_size, max_step):
             data.append(steps)
             fcursor.close()
         cursor.close()
-        # pprint(data)
-        # print("\n")
-        # pprint(len(labels))
         return uuids, data, labels
     except:
         print(sys.exc_info()[0])
@@ -406,8 +393,6 @@ def loadTrainingData(batch_size, max_step):
 
 
 def save_worst_rec(model, start_time, phase, step, uuid, xentropy, predict, truth):
-    # print('model {} start_time {} phase {} step {} uuid {} xentropy {} predict {} truth {}'.format(
-    #     model, start_time, phase, step, uuid, xentropy, predict, truth))
     cnx = connect()
     c = cnx.cursor()
     isql = (
