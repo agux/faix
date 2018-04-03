@@ -1,6 +1,6 @@
 from __future__ import print_function
 import tensorflow as tf
-from model import model, model2, model3, model4, model5, model6, model7
+from model import model, model2, model3, model4, model5, model6, model7, model8
 from time import strftime
 from data import data as data0
 from data import data9, data10, data11
@@ -8,10 +8,10 @@ import os
 import numpy as np
 
 EPOCH_SIZE = 444
-HIDDEN_SIZE = 256
+HIDDEN_SIZE = 200
 NUM_LAYERS = 1
 MAX_STEP = 50
-DROP_OUT = 0.5
+DROP_OUT = 0.1
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     dropout = tf.placeholder(tf.float32, name="dropout")
     training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model7.SRnnPredictorV1(
+        model = model8.DRnnPredictorV1(
             data=data,
             target=target,
             seqlen=seqlen,
