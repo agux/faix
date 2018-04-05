@@ -5,6 +5,38 @@ import numpy as np
 import math
 
 
+def weight_bias(W_shape, b_shape, bias_init=0.1):
+    W = tf.Variable(tf.truncated_normal(W_shape, stddev=0.1), name='weight')
+    b = tf.Variable(tf.constant(bias_init, shape=b_shape), name='bias')
+    return W, b
+
+
+def highway(x, activation, carry_bias=-1.0):
+    """Highway Network (cf. http://arxiv.org/abs/1505.00387).
+
+    t = sigmoid(W_T*x + b_T)
+    y = t * g(Wx + b) + (1 - t) * x
+    where g is nonlinearity, t is transform gate, and (1 - t) is carry gate.
+
+    the weight(W_T,W) in highway layer must have same size,but you can use fully-connected layers to change dimensionality. 
+
+    """
+    with tf.name_scope("highway"):
+        size = int(x.get_shape()[1])
+        W, b = weight_bias([size, size], [size])
+
+        with tf.name_scope('transform_gate'):
+            W_T, b_T = weight_bias([size, size], [size], bias_init=carry_bias)
+
+        H = activation(tf.matmul(x, W) + b, name='activation')
+        T = tf.sigmoid(tf.matmul(x, W_T) + b_T, name='transform_gate')
+        C = tf.subtract(1.0, T, name="carry_gate")
+
+        # y = (H * T) + (x * C)
+        y = tf.add(tf.multiply(H, T), tf.multiply(x, C), name='y')
+        return y
+
+
 def primes(n):
     primfac = []
     d = 2

@@ -8,10 +8,11 @@ import os
 import numpy as np
 
 EPOCH_SIZE = 444
-HIDDEN_SIZE = 200
-NUM_LAYERS = 1
+LAYER_WIDTH = 128
+RNN_LAYERS = 8
+FCN_LAYERS = 16
 MAX_STEP = 50
-DROP_OUT = 0.1
+# DROP_OUT = 0.1
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -43,18 +44,17 @@ if __name__ == '__main__':
     data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
     target = tf.placeholder(tf.float32, [None, nclass], "labels")
     seqlen = tf.placeholder(tf.int32, [None], "seqlen")
-    dropout = tf.placeholder(tf.float32, name="dropout")
-    training = tf.placeholder(tf.bool, name="training")
+    # dropout = tf.placeholder(tf.float32, name="dropout")
+    # training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model8.DRnnPredictorV1(
+        model = model8.DRnnPredictorV2(
             data=data,
             target=target,
             seqlen=seqlen,
             classes=classes,
-            dropout=dropout,
-            training=training,
-            num_hidden=HIDDEN_SIZE,
-            num_layers=NUM_LAYERS,
+            layer_width=LAYER_WIDTH,
+            num_rnn_layers=RNN_LAYERS,
+            num_fcn_layers=FCN_LAYERS,
             learning_rate=LEARNING_RATE)
         # Isolate the variables stored behind the scenes by the metric operation
         metric_local_vars = tf.get_collection(
@@ -72,8 +72,7 @@ if __name__ == '__main__':
         for epoch in range(EPOCH_SIZE):
             bno = epoch*50
             print('{} running on test set...'.format(strftime("%H:%M:%S")))
-            feeds = {data: tdata, target: tlabels,
-                     seqlen: tseqlen, dropout: 0, training: False}
+            feeds = {data: tdata, target: tlabels, seqlen: tseqlen}
             accuracy, worst, test_summary_str = sess.run(
                 [model.accuracy, model.worst, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:3]
             bidx, max_entropy, predict, actual = worst[0], worst[1], worst[2], worst[3]
@@ -81,6 +80,7 @@ if __name__ == '__main__':
                 strftime("%H:%M:%S"), epoch, 100. * accuracy, max_entropy, predict, actual))
             data0.save_worst_rec(model_name, stime, "test", epoch,
                                  tuuids[bidx], max_entropy, predict, actual)
+            summary_str = None
             for i in range(50):
                 sess.run(metric_vars_initializer)
                 bno = bno+1
@@ -89,8 +89,7 @@ if __name__ == '__main__':
                 truuids, trdata, labels, trseqlen = data11.loadTrainingData(
                     bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
-                feeds = {data: trdata, target: labels,
-                         seqlen: trseqlen, dropout: DROP_OUT, training: True}
+                feeds = {data: trdata, target: labels, seqlen: trseqlen}
                 summary_str, worst = sess.run(
                     [summary, model.worst, model.optimize, model.precisions[1], model.recalls[1], model.f_score], feeds)[:2]
                 bidx, max_entropy, predict, actual = worst[0], worst[1], worst[2], worst[3]
@@ -107,12 +106,15 @@ if __name__ == '__main__':
             sess.run(metric_vars_initializer)
         # test last epoch
         print('{} running on test set...'.format(strftime("%H:%M:%S")))
-        feeds = {data: tdata, target: tlabels,
-                 seqlen: tseqlen, dropout: 0, training: False}
+        feeds = {data: tdata, target: tlabels, seqlen: tseqlen}
         accuracy, worst, test_summary_str = sess.run(
             [model.accuracy, model.worst, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:3]
         bidx, max_entropy, predict, actual = worst[0], worst[1], worst[2], worst[3]
         print('{} Epoch {} test accuracy {:3.3f}% max_entropy {:3.4f} predict {} actual {}'.format(
             strftime("%H:%M:%S"), EPOCH_SIZE, 100. * accuracy, max_entropy, predict, actual))
         data0.save_worst_rec(model_name, stime, "test", EPOCH_SIZE,
-                            tuuids[bidx], max_entropy, predict, actual)
+                             tuuids[bidx], max_entropy, predict, actual)
+        train_writer.add_summary(summary_str, bno)
+        test_writer.add_summary(test_summary_str, bno)
+        train_writer.flush()
+        test_writer.flush()
