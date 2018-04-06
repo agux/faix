@@ -11,7 +11,7 @@ def weight_bias(W_shape, b_shape, bias_init=0.1):
     return W, b
 
 
-def highway(x, activation, carry_bias=-1.0):
+def highway(x, activation=None, carry_bias=-1.0):
     """Highway Network (cf. http://arxiv.org/abs/1505.00387).
 
     t = sigmoid(W_T*x + b_T)
@@ -19,6 +19,8 @@ def highway(x, activation, carry_bias=-1.0):
     where g is nonlinearity, t is transform gate, and (1 - t) is carry gate.
 
     the weight(W_T,W) in highway layer must have same size,but you can use fully-connected layers to change dimensionality. 
+
+    with larger negative carry_bias, more input (x) will be kept in the final output of highway layer.
 
     """
     with tf.name_scope("highway"):
@@ -28,7 +30,9 @@ def highway(x, activation, carry_bias=-1.0):
         with tf.name_scope('transform_gate'):
             W_T, b_T = weight_bias([size, size], [size], bias_init=carry_bias)
 
-        H = activation(tf.matmul(x, W) + b, name='activation')
+        H = tf.matmul(x, W) + b
+        if activation is not None:
+            H = activation(H, name='activation')
         T = tf.sigmoid(tf.matmul(x, W_T) + b_T, name='transform_gate')
         C = tf.subtract(1.0, T, name="carry_gate")
 
