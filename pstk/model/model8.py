@@ -452,7 +452,7 @@ class DRnnPredictorV3:
     Deep RNN + FCN predictor, with highway connection
     '''
 
-    def __init__(self, data, target, seqlen, classes, layer_width=200, num_rnn_layers=10, num_fcn_layers=10, learning_rate=1e-3):
+    def __init__(self, data, target, seqlen, classes, layer_width=200, num_rnn_layers=10, num_fcn_layers=10, carry_bias=1.0, learning_rate=1e-3):
         self.data = data
         self.target = target
         self.seqlen = seqlen
@@ -461,6 +461,7 @@ class DRnnPredictorV3:
         self._num_fcn_layers = num_fcn_layers
         self._classes = classes
         self._learning_rate = learning_rate
+        self._carry_bias = carry_bias
         self.precisions
         self.recalls
         self.f_score
@@ -470,7 +471,6 @@ class DRnnPredictorV3:
         self.cost
         self.one_hot
         self.worst
-        self._carry_bias = math.sqrt(math.e)
 
     def getName(self):
         return self.__class__.__name__
@@ -494,18 +494,23 @@ class DRnnPredictorV3:
     def fcn(self, input):
         with tf.variable_scope("dnn"):
             # Dimensionality Abstraction
-            fc = tf.layers.dense(
-                inputs=input,
-                units=self._layer_width//2,
-                kernel_initializer=tf.truncated_normal_initializer(
-                    stddev=0.01),
-                bias_initializer=tf.constant_initializer(0.1),
-                name="abstraction"
-            )
-            for _ in range(self._num_fcn_layers-1):
+            # fc = tf.layers.dense(
+            #     inputs=input,
+            #     units=self._layer_width,
+            #     kernel_initializer=tf.truncated_normal_initializer(
+            #         stddev=0.01),
+            #     bias_initializer=tf.constant_initializer(0.1),
+            #     name="abstraction"
+            # )
+            fc = input
+            p = round(math.sqrt(self._num_fcn_layers))
+            for i in range(self._num_fcn_layers):
+                activation = None
+                if i > 0 and i % p == 0:
+                    activation = tf.nn.elu
                 fc = highway(
                     x=fc,
-                    activation=tf.nn.elu,
+                    activation=activation,
                     carry_bias=-self._carry_bias
                 )
             return fc
@@ -540,7 +545,7 @@ class DRnnPredictorV3:
                 kernel_initializer=tf.truncated_normal_initializer(
                     stddev=0.01),
                 bias_initializer=tf.constant_initializer(0.1)
-            ))
+            ), carry_bias_init=carry_bias)
             cells.append(c)
             # Sub-Layer 2
             c = tf.contrib.rnn.HighwayWrapper(tf.contrib.rnn.LayerNormBasicLSTMCell(

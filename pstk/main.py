@@ -6,20 +6,22 @@ from data import data as data0
 from data import data9, data10, data11
 import os
 import numpy as np
+import math
 
 EPOCH_SIZE = 444
 LAYER_WIDTH = 128
 RNN_LAYERS = 8
 FCN_LAYERS = 16
 MAX_STEP = 50
+CARRY_BIAS = math.pi * math.e
 # DROP_OUT = 0.1
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
 
-def collect_summary(sess, model):
-    train_writer = tf.summary.FileWriter(LOG_DIR + "/train", sess.graph)
-    test_writer = tf.summary.FileWriter(LOG_DIR + "/test", sess.graph)
+def collect_summary(sess, model, base_dir):
+    train_writer = tf.summary.FileWriter(base_dir + "/train", sess.graph)
+    test_writer = tf.summary.FileWriter(base_dir + "/test", sess.graph)
     with tf.name_scope("Basic"):
         tf.summary.scalar("Loss", model.cost)
         tf.summary.scalar("Accuracy", model.accuracy*100)
@@ -28,10 +30,6 @@ def collect_summary(sess, model):
 
 
 if __name__ == '__main__':
-    if tf.gfile.Exists(LOG_DIR):
-        tf.gfile.DeleteRecursively(LOG_DIR)
-    tf.gfile.MakeDirs(LOG_DIR)
-
     tf.logging.set_verbosity(tf.logging.INFO)
 
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
@@ -47,7 +45,7 @@ if __name__ == '__main__':
     # dropout = tf.placeholder(tf.float32, name="dropout")
     # training = tf.placeholder(tf.bool, name="training")
     with tf.Session() as sess:
-        model = model8.DRnnPredictorV2(
+        model = model8.DRnnPredictorV3(
             data=data,
             target=target,
             seqlen=seqlen,
@@ -55,7 +53,16 @@ if __name__ == '__main__':
             layer_width=LAYER_WIDTH,
             num_rnn_layers=RNN_LAYERS,
             num_fcn_layers=FCN_LAYERS,
+            carry_bias=CARRY_BIAS,
             learning_rate=LEARNING_RATE)
+        stime = '{}'.format(strftime("%Y-%m-%d %H:%M:%S"))
+        model_name = model.getName()
+        base_dir = '{}/{}/{}'.format(LOG_DIR,
+                                     model_name, strftime("%Y%m%d_%H%M%S"))
+        print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
+        if tf.gfile.Exists(base_dir):
+            tf.gfile.DeleteRecursively(base_dir)
+        tf.gfile.MakeDirs(base_dir)
         # Isolate the variables stored behind the scenes by the metric operation
         metric_local_vars = tf.get_collection(
             tf.GraphKeys.LOCAL_VARIABLES, scope="Precisions") + tf.get_collection(
@@ -64,11 +71,10 @@ if __name__ == '__main__':
             var_list=metric_local_vars)
         sess.run(tf.group(tf.global_variables_initializer(),
                           metric_vars_initializer))
-        summary, train_writer, test_writer = collect_summary(sess, model)
+        summary, train_writer, test_writer = collect_summary(
+            sess, model, base_dir)
         saver = tf.train.Saver()
         bno = 0
-        stime = '{}'.format(strftime("%Y-%m-%d %H:%M:%S"))
-        model_name = model.getName()
         for epoch in range(EPOCH_SIZE):
             bno = epoch*50
             print('{} running on test set...'.format(strftime("%H:%M:%S")))
@@ -101,7 +107,7 @@ if __name__ == '__main__':
                 test_writer.add_summary(test_summary_str, bno)
                 train_writer.flush()
                 test_writer.flush()
-            checkpoint_file = os.path.join(LOG_DIR, 'model.ckpt')
+            checkpoint_file = os.path.join(base_dir, 'model.ckpt')
             saver.save(sess, checkpoint_file, global_step=bno)
             sess.run(metric_vars_initializer)
         # test last epoch
