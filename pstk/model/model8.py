@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import math
 from metrics import precision, recall
-from model import lazy_property, numLayers, highway, dense_block
+from model import lazy_property, numLayers, highway, dense_block, stddev
 from cells import EGRUCell, EGRUCell_V1, EGRUCell_V2, DenseCellWrapper
 
 
@@ -689,7 +689,7 @@ class DRnnPredictorV3:
 
 class DRnnPredictorV4:
     '''
-    Deep RNN + FCN predictor, with densenet connection.
+    Deep RNN + FCN predictor, with densenet connection, self-normalization
     '''
 
     def __init__(self, data, target, seqlen, classes, training, dropout, layer_width=200, num_rnn_layers=10, num_fcn_layers=10, learning_rate=1e-3):
@@ -724,9 +724,9 @@ class DRnnPredictorV4:
             inputs=layer,
             units=len(self._classes),
             kernel_initializer=tf.truncated_normal_initializer(
-                stddev=0.01),
+                stddev=stddev(1.0, int(layer.get_shape()[-1]))),
             bias_initializer=tf.constant_initializer(0.1),
-            activation=tf.nn.relu6,
+            activation=tf.nn.selu,
             name="output"
         )
         return output
@@ -744,19 +744,20 @@ class DRnnPredictorV4:
                             is_training=self.training,
                             updates_collections=None
                         )
-                        block = tf.nn.elu(block)
+                        block = tf.nn.selu(block)
                     block = dense_block(
                         input=block,
                         width=self._layer_width
                     )
                 with tf.name_scope("transition"):
                     if i > 0 and i % p == 0:
-                        block = tf.nn.dropout(block, 1.0 - self.dropout)
+                        block = tf.contrib.nn.alpha_dropout(
+                            block, 1.0 - self.dropout)
                         block = tf.layers.dense(
                             inputs=block,
                             units=self._layer_width,
                             kernel_initializer=tf.truncated_normal_initializer(
-                                stddev=0.01),
+                                stddev=stddev(1.0, int(block.get_shape()[-1]))),
                             bias_initializer=tf.constant_initializer(0.1)
                         )
             return block
@@ -765,11 +766,12 @@ class DRnnPredictorV4:
     def rnn(self, input):
         # Deep Recurrent network.
         cells = []
+        feat_size = int(input.get_shape()[-1])
         for _ in range(self._num_rnn_layers):
             c = DenseCellWrapper(tf.nn.rnn_cell.GRUCell(
                 num_units=self._layer_width,
                 kernel_initializer=tf.truncated_normal_initializer(
-                    stddev=0.01),
+                    stddev=stddev(1.0,feat_size)),
                 bias_initializer=tf.constant_initializer(0.1)
             ))
             cells.append(c)
@@ -780,7 +782,7 @@ class DRnnPredictorV4:
             cells.append(c)
             c = tf.nn.rnn_cell.DropoutWrapper(tf.contrib.rnn.LayerNormBasicLSTMCell(
                 num_units=self._layer_width
-            ),input_keep_prob=1.0-self.dropout)
+            ), input_keep_prob=1.0-self.dropout)
             cells.append(c)
         # Stack layers of cell
         mc = tf.nn.rnn_cell.MultiRNNCell(cells)

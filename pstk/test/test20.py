@@ -16,7 +16,7 @@ RNN_LAYERS = 16
 FCN_LAYERS = 16
 MAX_STEP = 50
 TIME_SHIFT = 4
-DROP_OUT = 0.2
+DROP_OUT = (math.e / 10.0)**2.0
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -120,3 +120,7 @@ def run():
         test_writer.add_summary(test_summary_str, bno)
         train_writer.flush()
         test_writer.flush()
+
+
+if __name__ == '__main__':
+    run()

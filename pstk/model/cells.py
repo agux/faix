@@ -554,13 +554,15 @@ class EGRUCell_V2(_LayerRNNCell):
 class DenseCellWrapper(tf.nn.rnn_cell.RNNCell):
     """DenseCell wrapper that ensures cell inputs are concatenated to the outputs."""
 
-    def __init__(self, cell):
+    def __init__(self, cell, activation=None):
         """Constructs a `DenseCellWrapper` for `cell`.
 
         Args:
           cell: An instance of `RNNCell`.
+          activation: Activation function that will be applied to the concatenated output.
         """
         self._cell = cell
+        self._activation_fn = activation
 
     @property
     def state_size(self):
@@ -584,11 +586,9 @@ class DenseCellWrapper(tf.nn.rnn_cell.RNNCell):
 
         Returns:
           Tuple of cell outputs and new state.
-
-        Raises:
-          TypeError: If cell inputs and outputs have different structure (type).
-          ValueError: If cell inputs and outputs have different structure (value).
         """
         outputs, new_state = self._cell(inputs, state, scope=scope)
         concat_outputs = tf.concat([inputs, outputs], -1)
+        if self._activation_fn is not None:
+            concat_outputs = self._activation_fn(concat_outputs)
         return (concat_outputs, new_state)

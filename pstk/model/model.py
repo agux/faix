@@ -5,6 +5,10 @@ import numpy as np
 import math
 
 
+def stddev(init_scale, feature_size):
+    return np.sqrt(init_scale/feature_size)
+
+
 def weight_bias(W_shape, b_shape, bias_init=0.1):
     W = tf.Variable(tf.truncated_normal(W_shape, stddev=0.1), name='weight')
     b = tf.Variable(tf.constant(bias_init, shape=b_shape), name='bias')
@@ -46,7 +50,7 @@ def dense_block(input, width):
         inputs=input,
         units=width,
         kernel_initializer=tf.truncated_normal_initializer(
-            stddev=0.01),
+            stddev=stddev(1.0,int(input.get_shape()[-1]))),
         bias_initializer=tf.constant_initializer(0.1)
     )
     output = tf.concat([input, output], -1)

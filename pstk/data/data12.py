@@ -13,6 +13,7 @@ from data import connect
 '''
 OHLCV-LR + SH & SZ indices-LR(5*2) (5+10=15)
 Read from backward reinstated klines.
+Feature-wise standardization is adopted.
 '''
 
 
@@ -66,12 +67,31 @@ ftQuery = (
     "LIMIT %s "
 )
 
+mean = None
+std = None
+
+
+def getStats(cnx):
+    global mean, std
+    if mean is not None and std is not None:
+        return mean, std
+    mean = {}
+    std = {}
+    c = cnx.cursor(buffered=True)
+    c.execute(
+        "select fields, mean, `std` from fs_stats where method = 'standardization'")
+    rows = c.fetchall()
+    for (field, m, s) in rows:
+        mean["sz_"+field] = mean["sh_"+field] = mean[field] = m
+        std["sz_"+field] = std["sh_"+field] = std[field] = s
+        print("{} mean: {}, std: {}".format(field, m, s))
+    return mean, std
 
 def getBatch(cnx, code, s, e, max_step, time_shift):
     '''
     [max_step, feature*time_shift], length
     '''
-    fcursor = cnx.cursor(buffered=True)
+    fcursor = cnx.cursor(buffered=True, dictionary=True)
     try:
         fcursor.execute(ftQuery, (code, s, e, max_step+time_shift))
         col_names = fcursor.column_names
@@ -79,13 +99,16 @@ def getBatch(cnx, code, s, e, max_step, time_shift):
         total = fcursor.rowcount
         rows = fcursor.fetchall()
         batch = []
+        mean, std = getStats(cnx)
         for t in range(time_shift+1):
             steps = np.zeros((max_step, featSize), dtype='f')
             offset = max_step + time_shift - total
             s = max(0, t - offset)
             e = total - time_shift + t
             for i, row in enumerate(rows[s:e]):
-                steps[i+offset] = [col for col in row]
+                # steps[i+offset] = [col for col in row]
+                steps[i+offset] = [(val-mean[col])/std[col]
+                                   for col, val in row.items()]
             batch.append(steps)
         return np.concatenate(batch, 1), total - time_shift
     except:
@@ -93,7 +116,6 @@ def getBatch(cnx, code, s, e, max_step, time_shift):
         raise
     finally:
         fcursor.close()
-
 
 class DataLoader:
     def __init__(self, time_shift):
