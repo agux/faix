@@ -41,6 +41,18 @@ def highway(x, activation=None, carry_bias=-1.0):
         return y
 
 
+def dense_block(input, width):
+    output = tf.layers.dense(
+        inputs=input,
+        units=width,
+        kernel_initializer=tf.truncated_normal_initializer(
+            stddev=0.01),
+        bias_initializer=tf.constant_initializer(0.1)
+    )
+    output = tf.concat([input, output], -1)
+    return output
+
+
 def primes(n):
     primfac = []
     d = 2

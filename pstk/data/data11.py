@@ -15,7 +15,7 @@ OHLCV-LR + SH & SZ indices-LR(5*2) (5+10=15)
 Read from backward reinstated klines.
 '''
 
-TIME_SHIFT = 4
+TIME_SHIFT = 9
 
 nclsQry = (
     "SELECT  "

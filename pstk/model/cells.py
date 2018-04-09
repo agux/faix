@@ -6,6 +6,7 @@ import math
 import tensorflow as tf
 # pylint: disable-msg=E0611
 from tensorflow.python.ops import rnn_cell_impl, math_ops, init_ops, array_ops, nn_ops
+from tensorflow.python.framework import ops
 from tensorflow.python.layers import base as base_layer
 
 _LayerRNNCell = rnn_cell_impl.LayerRNNCell
@@ -147,6 +148,7 @@ class EGRUCell(_LayerRNNCell):
         new_h = u * state + (1 - u) * c
         return new_h, new_h
 
+
 class GRUCellv2(_LayerRNNCell):
     """ GRUCell with layer normalization, based on:
     Gated Recurrent Unit cell (cf. http://arxiv.org/abs/1406.1078).
@@ -252,6 +254,7 @@ class GRUCellv2(_LayerRNNCell):
         c = self._activation(candidate)
         new_h = u * state + (1 - u) * c
         return new_h, new_h
+
 
 class EGRUCell_V1(_LayerRNNCell):
     """ Enhanced GRUCell, based on
@@ -546,3 +549,46 @@ class EGRUCell_V2(_LayerRNNCell):
             convlayer = conv2d(convlayer, self._kernel, int(filters), i)
         convlayer = tf.layers.flatten(convlayer)
         return convlayer
+
+
+class DenseCellWrapper(tf.nn.rnn_cell.RNNCell):
+    """DenseCell wrapper that ensures cell inputs are concatenated to the outputs."""
+
+    def __init__(self, cell):
+        """Constructs a `DenseCellWrapper` for `cell`.
+
+        Args:
+          cell: An instance of `RNNCell`.
+        """
+        self._cell = cell
+
+    @property
+    def state_size(self):
+        return self._cell.state_size
+
+    @property
+    def output_size(self):
+        return self._cell.output_size + self._cell.input.get_shape()[-1]
+
+    def zero_state(self, batch_size, dtype):
+        with ops.name_scope(type(self).__name__ + "ZeroState", values=[batch_size]):
+            return self._cell.zero_state(batch_size, dtype)
+
+    def __call__(self, inputs, state, scope=None):
+        """Run the cell and then apply the concatenation on its inputs to its outputs.
+
+        Args:
+          inputs: cell inputs.
+          state: cell state.
+          scope: optional cell scope.
+
+        Returns:
+          Tuple of cell outputs and new state.
+
+        Raises:
+          TypeError: If cell inputs and outputs have different structure (type).
+          ValueError: If cell inputs and outputs have different structure (value).
+        """
+        outputs, new_state = self._cell(inputs, state, scope=scope)
+        concat_outputs = tf.concat([inputs, outputs], -1)
+        return (concat_outputs, new_state)
