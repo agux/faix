@@ -4,7 +4,7 @@ import tensorflow as tf
 from pstk.model import model8
 from time import strftime
 from pstk.data import data as data0
-from pstk.data import data11
+from pstk.data import data12
 from test import collect_summary
 import os
 import numpy as np
@@ -15,6 +15,7 @@ LAYER_WIDTH = 128
 RNN_LAYERS = 16
 FCN_LAYERS = 16
 MAX_STEP = 50
+TIME_SHIFT = 4
 DROP_OUT = 0.2
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
@@ -22,9 +23,9 @@ LOG_DIR = 'logdir'
 
 def run():
     tf.logging.set_verbosity(tf.logging.INFO)
-
+    loader = data12.DataLoader(TIME_SHIFT)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    tuuids, tdata, tlabels, tseqlen = data11.loadTestSet(MAX_STEP)
+    tuuids, tdata, tlabels, tseqlen = loader.loadTestSet(MAX_STEP)
     print(tdata.shape)
     print(tlabels.shape)
     featSize = tdata.shape[2]
@@ -85,7 +86,7 @@ def run():
                 bno = bno+1
                 print('{} loading training data for batch {}...'.format(
                     strftime("%H:%M:%S"), bno))
-                truuids, trdata, labels, trseqlen = data11.loadTrainingData(
+                truuids, trdata, labels, trseqlen = loader.loadTrainingData(
                     bno, MAX_STEP)
                 print('{} training...'.format(strftime("%H:%M:%S")))
                 feeds = {data: trdata, target: labels,
