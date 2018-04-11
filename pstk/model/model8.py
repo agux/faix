@@ -744,13 +744,13 @@ class DRnnPredictorV4:
                             is_training=self.training,
                             updates_collections=None
                         )
-                        block = tf.nn.selu(block)
+                        block = tf.nn.selu(block, name="selu")
                     block = dense_block(
                         input=block,
                         width=self._layer_width
                     )
-                with tf.name_scope("transition"):
-                    if i > 0 and i % p == 0:
+                if i > 0 and i % p == 0:
+                    with tf.name_scope("transition"):
                         block = tf.contrib.nn.alpha_dropout(
                             block, 1.0 - self.dropout)
                         block = tf.layers.dense(
@@ -771,7 +771,7 @@ class DRnnPredictorV4:
             c = DenseCellWrapper(tf.nn.rnn_cell.GRUCell(
                 num_units=self._layer_width,
                 kernel_initializer=tf.truncated_normal_initializer(
-                    stddev=stddev(1.0,feat_size)),
+                    stddev=stddev(1.0, feat_size)),
                 bias_initializer=tf.constant_initializer(0.1)
             ))
             cells.append(c)

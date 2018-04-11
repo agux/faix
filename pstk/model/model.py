@@ -3,6 +3,7 @@ import functools
 import tensorflow as tf
 import numpy as np
 import math
+import numbers
 
 
 def stddev(init_scale, feature_size):
@@ -50,7 +51,7 @@ def dense_block(input, width):
         inputs=input,
         units=width,
         kernel_initializer=tf.truncated_normal_initializer(
-            stddev=stddev(1.0,int(input.get_shape()[-1]))),
+            stddev=stddev(1.0, int(input.get_shape()[-1]))),
         bias_initializer=tf.constant_initializer(0.1)
     )
     output = tf.concat([input, output], -1)

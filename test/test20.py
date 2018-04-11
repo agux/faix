@@ -1,4 +1,8 @@
 from __future__ import print_function
+# Path hack.
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 import tensorflow as tf
 from pstk.model import model8
@@ -16,7 +20,7 @@ RNN_LAYERS = 16
 FCN_LAYERS = 16
 MAX_STEP = 50
 TIME_SHIFT = 4
-DROP_OUT = (math.e / 10.0)**2.0
+DROP_OUT = (math.e / 10.0)**1.8  # ~0.096
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -34,8 +38,8 @@ def run():
     data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
     target = tf.placeholder(tf.float32, [None, nclass], "labels")
     seqlen = tf.placeholder(tf.int32, [None], "seqlen")
-    dropout = tf.placeholder(tf.float32, name="dropout")
-    training = tf.placeholder(tf.bool, name="training")
+    dropout = tf.placeholder(tf.float32, [], name="dropout")
+    training = tf.placeholder(tf.bool, [], name="training")
     with tf.Session() as sess:
         model = model8.DRnnPredictorV4(
             data=data,
@@ -50,8 +54,10 @@ def run():
             learning_rate=LEARNING_RATE)
         stime = '{}'.format(strftime("%Y-%m-%d %H:%M:%S"))
         model_name = model.getName()
-        base_dir = '{}/{}/{}'.format(LOG_DIR,
-                                     model_name, strftime("%Y%m%d_%H%M%S"))
+        f = __file__
+        fbase = f[f.rfind('/')+1:f.rindex('.py')]
+        base_dir = '{}/{}_{}/{}'.format(LOG_DIR, fbase,
+                                        model_name, strftime("%Y%m%d_%H%M%S"))
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
         if tf.gfile.Exists(base_dir):
             tf.gfile.DeleteRecursively(base_dir)

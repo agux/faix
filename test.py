@@ -1,10 +1,15 @@
 from __future__ import print_function
+import __main__ as main
 import pandas as pd
 import mysql.connector
 import numpy as np
 import tensorflow as tf
 from pstk import data as dat
 from sqlalchemy import create_engine
+
+
+def testGetFileName():
+    print(main.__file__)
 
 
 def testEmbedding():
@@ -50,5 +55,19 @@ def testGatherND():
     print("{}".format(r))
 
 
-print((5-1.0)/5)
-testGatherND()
+def testTensorShape():
+    x = tf.placeholder(shape=[None, 16], dtype=tf.float32)
+    d = tf.placeholder(shape=[], dtype=tf.float32)
+    random_tensor = tf.random_uniform(tf.shape(x), dtype=tf.float32)
+    print("random_tensor: {}".format(random_tensor.get_shape()))
+    kept_idx = tf.greater_equal(random_tensor, 1.0 - d)
+    print("kept_idx: {}".format(kept_idx.get_shape()))
+
+# testGatherND()
+# testGetFileName()
+# print(__file__)
+# f = __file__
+# print(f[f.rindex('/')+1:f.rindex('.py')])
+
+
+testTensorShape()
