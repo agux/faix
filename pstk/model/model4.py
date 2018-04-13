@@ -408,6 +408,9 @@ class ERnnPredictorV3:
         self.f_score
         self.worst
 
+    def getName(self):
+        return self.__class__.__name__
+
     @lazy_property
     def prediction(self):
         rnn = self.rnn(self, self.data)
