@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from pstk import data as dat
 from sqlalchemy import create_engine
+from joblib import Parallel, delayed
 
 
 def testGetFileName():
@@ -63,11 +64,26 @@ def testTensorShape():
     kept_idx = tf.greater_equal(random_tensor, 1.0 - d)
     print("kept_idx: {}".format(kept_idx.get_shape()))
 
+
+def delayedFunc(i):
+    return i+1, i*2, i**2
+
+
+def testJoblib():
+    r = Parallel(n_jobs=5)(delayed(delayedFunc)(i) for i in range(30))
+    r1, r2, r3 = zip(*r)
+    print("r1 ({}):{}".format(type(list(r1)), r1))
+    print("r2:{}".format(r2))
+    print("r3:{}".format(r3))
+
+
 # testGatherND()
 # testGetFileName()
 # print(__file__)
 # f = __file__
 # print(f[f.rindex('/')+1:f.rindex('.py')])
 
+# testTensorShape()
 
-testTensorShape()
+
+testJoblib()

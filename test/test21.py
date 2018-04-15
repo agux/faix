@@ -8,7 +8,7 @@ import tensorflow as tf
 from pstk.model import model4
 from time import strftime
 from pstk.data import data as data0
-from pstk.data import data13
+from pstk.data import data14
 from test import collect_summary
 import os
 import numpy as np
@@ -26,7 +26,7 @@ LOG_DIR = 'logdir'
 
 def run():
     tf.logging.set_verbosity(tf.logging.INFO)
-    loader = data13.DataLoader(TIME_SHIFT)
+    loader = data14.DataLoader(TIME_SHIFT)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     tuuids, tdata, tlabels, tseqlen = loader.loadTestSet(MAX_STEP)
     print(tdata.shape)
@@ -80,8 +80,8 @@ def run():
             accuracy, worst, test_summary_str = sess.run(
                 [model.accuracy, model.worst, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:3]
             bidx, max_entropy, predict, actual = worst[0], worst[1], worst[2], worst[3]
-            print('{} Epoch {} test accuracy {:3.3f}% max_entropy {:3.4f} predict {} actual {}'.format(
-                strftime("%H:%M:%S"), epoch, 100. * accuracy, max_entropy, predict, actual))
+            print('{} Epoch {} test accuracy {:3.3f}% max_entropy {:3.4f} predict {} actual {} uuid {}'.format(
+                strftime("%H:%M:%S"), epoch, 100. * accuracy, max_entropy, predict, actual, tuuids[bidx]))
             data0.save_worst_rec(model_name, stime, "test", epoch,
                                  tuuids[bidx], max_entropy, predict, actual)
             summary_str = None

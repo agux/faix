@@ -47,7 +47,7 @@ ftQuery = (
     "    idc.MACD, idc.MACD_diff, idc.MACD_dea, "
     "    idc.RSI1, idc.RSI2, idc.RSI3,  "
     "    idc.BIAS1, idc.BIAS2, idc.BIAS3,  "
-    "    idc.BOLL_lower_o, idc.BOLL_lower_h, idc.BOLL_lower_l,     idc.BOLL_lower_c,  "
+    "    idc.BOLL_lower_o, idc.BOLL_lower_h, idc.BOLL_lower_l, idc.BOLL_lower_c,  "
     "    idc.BOLL_mid_o, idc.BOLL_mid_h, idc.BOLL_mid_l, idc.BOLL_mid_c, "
     "    idc.BOLL_upper_o, idc.BOLL_upper_h, idc.BOLL_upper_l, idc.BOLL_upper_c, "
     "    COALESCE(sh.lr, 0) sh_lr, COALESCE(sh.lr_h, 0) sh_lr_h, COALESCE(sh.lr_o, 0) sh_lr_o, COALESCE(sh.lr_l, 0) sh_lr_l, COALESCE(sh.lr_vol, 0) sh_lr_vol, "

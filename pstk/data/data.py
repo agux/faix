@@ -400,8 +400,8 @@ def save_worst_rec(model, start_time, phase, step, uuid, xentropy, predict, trut
         "(model, start_time, phase, step, uuid, xentropy, predict, truth) "
         "values (%s, %s, %s, %s, %s, %s, %s, %s) "
     )
-    c.execute(isql, (model, start_time, phase,
-                     step, uuid, float(xentropy), int(predict), int(truth)))
+    c.execute(isql, (str(model), str(start_time), str(phase),
+                     step, str(uuid), float(xentropy), int(predict), int(truth)))
     cnx.commit()
     c.close()
     cnx.close()
