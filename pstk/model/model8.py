@@ -5,7 +5,7 @@ import numpy as np
 import math
 from metrics import precision, recall
 from model import lazy_property, numLayers, highway, dense_block, stddev
-from cells import EGRUCell, EGRUCell_V1, EGRUCell_V2, DenseCellWrapper
+from cells import EGRUCell, EGRUCell_V1, EGRUCell_V2, LayerNormGRUCell, LayerNormNASCell, DenseCellWrapper, AlphaDropoutWrapper
 
 
 class DRnnPredictorV1:
@@ -692,12 +692,14 @@ class DRnnPredictorV4:
     Deep RNN + FCN predictor, with densenet connection, self-normalization
     '''
 
-    def __init__(self, data, target, seqlen, classes, training, dropout, layer_width=200, num_rnn_layers=10, num_fcn_layers=10, learning_rate=1e-3):
+    def __init__(self, data, target, seqlen, classes, training, dropout,
+         layer_width=200, num_rnn_layers=10, rnn_layer_size=2,num_fcn_layers=10, learning_rate=1e-3):
         self.data = data
         self.target = target
         self.seqlen = seqlen
         self._layer_width = layer_width
         self._num_rnn_layers = num_rnn_layers
+        self._rnn_layer_size = rnn_layer_size
         self._num_fcn_layers = num_fcn_layers
         self._classes = classes
         self._learning_rate = learning_rate
@@ -750,16 +752,15 @@ class DRnnPredictorV4:
                         width=self._layer_width
                     )
                 if i > 0 and i % p == 0:
-                    with tf.name_scope("transition"):
-                        block = tf.contrib.nn.alpha_dropout(
-                            block, 1.0 - self.dropout)
-                        block = tf.layers.dense(
-                            inputs=block,
-                            units=self._layer_width,
-                            kernel_initializer=tf.truncated_normal_initializer(
-                                stddev=stddev(1.0, int(block.get_shape()[-1]))),
-                            bias_initializer=tf.constant_initializer(0.1)
-                        )
+                    block = tf.contrib.nn.alpha_dropout(
+                        block, 1.0 - self.dropout)
+                    block = tf.layers.dense(
+                        inputs=block,
+                        units=self._layer_width,
+                        kernel_initializer=tf.truncated_normal_initializer(
+                            stddev=stddev(1.0, int(block.get_shape()[-1]))),
+                        bias_initializer=tf.constant_initializer(0.1)
+                    )
             return block
 
     @staticmethod
@@ -767,22 +768,23 @@ class DRnnPredictorV4:
         # Deep Recurrent network.
         cells = []
         feat_size = int(input.get_shape()[-1])
-        for _ in range(self._num_rnn_layers):
-            c = DenseCellWrapper(tf.nn.rnn_cell.GRUCell(
-                num_units=self._layer_width,
-                kernel_initializer=tf.truncated_normal_initializer(
-                    stddev=stddev(1.0, feat_size)),
-                bias_initializer=tf.constant_initializer(0.1)
-            ))
-            cells.append(c)
-            c = DenseCellWrapper(tf.contrib.rnn.NASCell(
+        p = round(self._num_rnn_layers ** 0.7)
+        for i in range(self._num_rnn_layers):
+            for _ in range(self._rnn_layer_size):
+                c = DenseCellWrapper(LayerNormGRUCell(
+                    num_units=self._layer_width,
+                    kernel_initializer=tf.truncated_normal_initializer(
+                        stddev=stddev(1.0, feat_size)),
+                    bias_initializer=tf.constant_initializer(0.1),
+                    layer_norm=True
+                ))
+                cells.append(c)
+            c = AlphaDropoutWrapper(LayerNormNASCell(
                 num_units=self._layer_width,
                 use_biases=True
-            ))
-            cells.append(c)
-            c = tf.nn.rnn_cell.DropoutWrapper(tf.contrib.rnn.LayerNormBasicLSTMCell(
-                num_units=self._layer_width
             ), input_keep_prob=1.0-self.dropout)
+            if i == 0 or i % p != 0:
+                c = DenseCellWrapper(c)
             cells.append(c)
         # Stack layers of cell
         mc = tf.nn.rnn_cell.MultiRNNCell(cells)
