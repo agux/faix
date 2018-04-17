@@ -659,7 +659,7 @@ class LayerNormGRUCell(_LayerRNNCell):
         return new_h, new_h
 
 
-class LayerNormNASCell(tf.nn.rnn_cell.RNNCell):
+class LayerNormNASCell(rnn_cell_impl.RNNCell):
     """Neural Architecture Search (NAS) recurrent network cell, with Layer Normalization.
 
     This implements the recurrent cell from the paper:
@@ -747,16 +747,16 @@ class LayerNormNASCell(tf.nn.rnn_cell.RNNCell):
                 "Could not infer input size from inputs.get_shape()[-1]")
         # Variables for the NAS cell. W_m is all matrices multiplying the
         # hidden state and W_inputs is all matrices multiplying the inputs.
-        concat_w_m = tf.variable_scope.get_variable("recurrent_kernel",
-                                                    [num_proj, 8 * self._num_units], dtype)
-        concat_w_inputs = tf.variable_scope.get_variable(
+        concat_w_m = tf.get_variable("recurrent_kernel",
+                                     [num_proj, 8 * self._num_units], dtype)
+        concat_w_inputs = tf.get_variable(
             "kernel", [input_size.value, 8 * self._num_units], dtype)
 
         m_matrix = math_ops.matmul(m_prev, concat_w_m)
         inputs_matrix = math_ops.matmul(inputs, concat_w_inputs)
 
         if self._use_biases:
-            b = tf.variable_scope.get_variable(
+            b = tf.get_variable(
                 "bias",
                 shape=[8 * self._num_units],
                 initializer=init_ops.zeros_initializer(),
@@ -812,26 +812,28 @@ class LayerNormNASCell(tf.nn.rnn_cell.RNNCell):
 
         # Projection layer if specified
         if self._num_proj is not None:
-            concat_w_proj = tf.variable_scope.get_variable("projection_weights",
-                                                           [self._num_units, self._num_proj], dtype)
+            concat_w_proj = tf.get_variable("projection_weights",
+                                            [self._num_units, self._num_proj], dtype)
             new_m = math_ops.matmul(new_m, concat_w_proj)
 
         new_state = rnn_cell_impl.LSTMStateTuple(new_c, new_m)
         return new_m, new_state
 
 
-class DenseCellWrapper(tf.nn.rnn_cell.RNNCell):
+class DenseCellWrapper(rnn_cell_impl.RNNCell):
     """DenseCell wrapper that ensures cell inputs are concatenated to the outputs."""
 
-    def __init__(self, cell, activation=None):
+    def __init__(self, cell, output_size, activation=None):
         """Constructs a `DenseCellWrapper` for `cell`.
 
         Args:
           cell: An instance of `RNNCell`.
+          output_size: output size of the cell.
           activation: Activation function that will be applied to the concatenated output.
         """
         self._cell = cell
         self._activation_fn = activation
+        self._output_size = output_size
 
     @property
     def state_size(self):
@@ -839,7 +841,7 @@ class DenseCellWrapper(tf.nn.rnn_cell.RNNCell):
 
     @property
     def output_size(self):
-        return self._cell.output_size + self._cell.input.get_shape()[-1]
+        return self._output_size
 
     def zero_state(self, batch_size, dtype):
         with ops.name_scope(type(self).__name__ + "ZeroState", values=[batch_size]):
@@ -862,8 +864,9 @@ class DenseCellWrapper(tf.nn.rnn_cell.RNNCell):
             concat_outputs = self._activation_fn(concat_outputs)
         return (concat_outputs, new_state)
 
+
 # pylint: disable-msg=E1101
-class AlphaDropoutWrapper(tf.nn.rnn_cell.RNNCell):
+class AlphaDropoutWrapper(rnn_cell_impl.RNNCell):
     """Operator adding alpha dropout to inputs/states/outputs of the given cell."""
 
     def __init__(self, cell, input_keep_prob=1.0, output_keep_prob=1.0,

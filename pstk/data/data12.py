@@ -58,7 +58,7 @@ ftQueryTpl = (
     "    (SELECT  "
     "        %s code, "
     "        t.method, "
-    "        {5} "  # mean & std fields
+    "        {4} "  # mean & std fields
     "    FROM "
     "        fs_stats t "
     "    WHERE "

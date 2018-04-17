@@ -693,7 +693,7 @@ class DRnnPredictorV4:
     '''
 
     def __init__(self, data, target, seqlen, classes, training, dropout,
-         layer_width=200, num_rnn_layers=10, rnn_layer_size=2,num_fcn_layers=10, learning_rate=1e-3):
+                 layer_width=200, num_rnn_layers=10, rnn_layer_size=2, num_fcn_layers=10, learning_rate=1e-3):
         self.data = data
         self.target = target
         self.seqlen = seqlen
@@ -769,6 +769,7 @@ class DRnnPredictorV4:
         cells = []
         feat_size = int(input.get_shape()[-1])
         p = round(self._num_rnn_layers ** 0.7)
+        output_size = self._layer_width + feat_size
         for i in range(self._num_rnn_layers):
             for _ in range(self._rnn_layer_size):
                 c = DenseCellWrapper(LayerNormGRUCell(
@@ -777,14 +778,21 @@ class DRnnPredictorV4:
                         stddev=stddev(1.0, feat_size)),
                     bias_initializer=tf.constant_initializer(0.1),
                     layer_norm=True
-                ))
+                ), output_size=output_size)
+                output_size += self._layer_width
                 cells.append(c)
-            c = AlphaDropoutWrapper(LayerNormNASCell(
-                num_units=self._layer_width,
-                use_biases=True
-            ), input_keep_prob=1.0-self.dropout)
             if i == 0 or i % p != 0:
-                c = DenseCellWrapper(c)
+                c = DenseCellWrapper(LayerNormNASCell(
+                    num_units=self._layer_width,
+                    use_biases=True
+                ), output_size=output_size)
+                output_size += self._layer_width
+            else:
+                c = AlphaDropoutWrapper(LayerNormNASCell(
+                    num_units=self._layer_width * 2,
+                    use_biases=True
+                ), input_keep_prob=1.0-self.dropout)
+                output_size = self._layer_width * 3
             cells.append(c)
         # Stack layers of cell
         mc = tf.nn.rnn_cell.MultiRNNCell(cells)
