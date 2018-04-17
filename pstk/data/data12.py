@@ -5,9 +5,10 @@ import sqlalchemy as sqla
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import multiprocessing
 from pprint import pprint
 from time import strftime
-
+from joblib import Parallel, delayed
 from data import connect
 
 '''
@@ -16,6 +17,9 @@ Read from backward reinstated klines.
 Feature-wise standardization is adopted.
 '''
 
+k_cols = [
+    "lr", "lr_h", "lr_o", "lr_l", "lr_vol",
+]
 
 nclsQry = (
     "SELECT  "
@@ -27,39 +31,39 @@ nclsQry = (
     "        kpts30) t"
 )
 
-ftQuery = (
+ftQueryTpl = (
     "SELECT  "
-    "    d.lr, "
-    "    d.lr_h, "
-    "    d.lr_o, "
-    "    d.lr_l, "
-    "    d.lr_vol, "
-    "    COALESCE(sh.lr,0) sh_lr, "
-    "    COALESCE(sh.lr_h,0) sh_lr_h, "
-    "    COALESCE(sh.lr_o,0) sh_lr_o, "
-    "    COALESCE(sh.lr_l,0) sh_lr_l, "
-    "    COALESCE(sh.lr_vol,0) sh_lr_vol, "
-    "    COALESCE(sz.lr,0) sz_lr, "
-    "    COALESCE(sz.lr_h,0) sz_lr_h, "
-    "    COALESCE(sz.lr_o,0) sz_lr_o, "
-    "    COALESCE(sz.lr_l,0) sz_lr_l, "
-    "    COALESCE(sz.lr_vol,0) sz_lr_vol "
+    "    {0} "  # (d.COLS - mean) / std
+    "    {1} "  # COALESCE((sh.COLS - mean) / std, 0) sh_COLS
+    "    {2} "  # COALESCE((sz.COLS - mean) / std, 0) sz_COLS
     "FROM "
     "    kline_d_b d "
     "        LEFT OUTER JOIN "
     "    (SELECT  "
-    "        lr, lr_h, lr_o, lr_l, lr_vol, date "
+    "        kline_d.date, "
+    "        {3} "  # k_cols
     "    FROM "
     "        kline_d "
     "    WHERE "
     "        code = 'sh000001') sh USING (date) "
     "        LEFT OUTER JOIN "
     "    (SELECT  "
-    "        lr, lr_h, lr_o, lr_l, lr_vol, date "
+    "        kline_d.date, "
+    "        {3} "  # k_cols
     "    FROM "
     "        kline_d "
     "    WHERE "
     "        code = 'sz399001') sz USING (date) "
+    "        LEFT OUTER JOIN "
+    "    (SELECT  "
+    "        %s code, "
+    "        t.method, "
+    "        {5} "  # mean & std fields
+    "    FROM "
+    "        fs_stats t "
+    "    WHERE "
+    "        t.method = 'standardization' "
+    "    GROUP BY code , t.method) s USING (code) "
     "WHERE "
     "    d.code = %s "
     "        AND d.klid BETWEEN %s AND %s "
@@ -67,48 +71,61 @@ ftQuery = (
     "LIMIT %s "
 )
 
-mean = None
-std = None
+num_cores = multiprocessing.cpu_count()
+
+def getFtQuery():
+    sep = " "
+    p_kline = sep.join(
+        ["(d.{0}-s.{0}_mean)/s.{0}_std {0},".format(c) for c in k_cols])
+    sh_cols = sep.join(["COALESCE((sh.{0}-s.{0}_mean)/s.{0}_std, 0) sh_{0},".format(c)
+                        for c in k_cols])
+    sz_cols = sep.join(["COALESCE((sz.{0}-s.{0}_mean)/s.{0}_std, 0) sz_{0},".format(c)
+                        for c in k_cols])
+    sz_cols = sz_cols[:-1]  # strip last comma
+    all_cols = sep.join(["{},".format(c) for c in k_cols])
+    all_cols = all_cols[:-1]  # strip last comma
+    stats_tpl = (
+        " MAX(CASE "
+        "     WHEN t.fields = '{0}' THEN t.mean "
+        "     ELSE NULL "
+        " END) AS {0}_mean, "
+        " MAX(CASE "
+        "     WHEN t.fields = '{0}' THEN t.std "
+        "     ELSE NULL "
+        " END) AS {0}_std,"
+    )
+    stats = sep.join([stats_tpl.format(c) for c in k_cols])
+    stats = stats[:-1]  # strip last comma
+
+    ftQuery = ftQueryTpl.format(
+        p_kline, sh_cols, sz_cols, all_cols, stats)
+    return ftQuery
 
 
-def getStats(cnx):
-    global mean, std
-    if mean is not None and std is not None:
-        return mean, std
-    mean = {}
-    std = {}
-    c = cnx.cursor(buffered=True)
-    c.execute(
-        "select fields, mean, `std` from fs_stats where method = 'standardization'")
-    rows = c.fetchall()
-    for (field, m, s) in rows:
-        mean["sz_"+field] = mean["sh_"+field] = mean[field] = m
-        std["sz_"+field] = std["sh_"+field] = std[field] = s
-        print("{} mean: {}, std: {}".format(field, m, s))
-    return mean, std
+ftQuery = getFtQuery()
 
-def getBatch(cnx, code, s, e, max_step, time_shift):
+
+def getBatch(code, s, e, max_step, time_shift):
     '''
     [max_step, feature*time_shift], length
     '''
-    fcursor = cnx.cursor(buffered=True, dictionary=True)
+    cnx = connect()
+    fcursor = cnx.cursor(buffered=True)
+    global ftQuery
     try:
-        fcursor.execute(ftQuery, (code, s, e, max_step+time_shift))
+        fcursor.execute(ftQuery, (code, code, s, e, max_step+time_shift))
         col_names = fcursor.column_names
         featSize = len(col_names)
         total = fcursor.rowcount
         rows = fcursor.fetchall()
         batch = []
-        mean, std = getStats(cnx)
         for t in range(time_shift+1):
             steps = np.zeros((max_step, featSize), dtype='f')
             offset = max_step + time_shift - total
             s = max(0, t - offset)
             e = total - time_shift + t
             for i, row in enumerate(rows[s:e]):
-                # steps[i+offset] = [col for col in row]
-                steps[i+offset] = [(val-mean[col])/std[col]
-                                   for col, val in row.items()]
+                steps[i+offset] = [col for col in row]
             batch.append(steps)
         return np.concatenate(batch, 1), total - time_shift
     except:
@@ -116,12 +133,22 @@ def getBatch(cnx, code, s, e, max_step, time_shift):
         raise
     finally:
         fcursor.close()
+        cnx.close()
+
+
+def getSeries(uuid, code, klid, score, nclass, max_step, time_shift):
+    label = np.zeros(nclass, dtype=np.int8)
+    label[int(score)+nclass//2] = 1
+    s = max(0, klid-max_step+1-time_shift)
+    batch, total = getBatch(code, s, klid, max_step, time_shift)
+    return uuid, batch, label, total
 
 class DataLoader:
     def __init__(self, time_shift):
         self.time_shift = time_shift
 
     def loadTestSet(self, max_step):
+        global num_cores
         cnx = connect()
         try:
             nc_cursor = cnx.cursor(buffered=True)
@@ -156,21 +183,13 @@ class DataLoader:
             cursor.execute(query.format(row[0]))
             kpts = cursor.fetchall()
             cursor.close()
-            data = []   # [batch, max_step, feature*time_shift]
-            labels = []  # [batch, label]  one-hot labels
-            seqlen = []  # [batch]
-            uuids = []
-            for (uuid, code, klid, score) in kpts:
-                uuids.append(uuid)
-                label = np.zeros(nclass, dtype=np.int8)
-                label[int(score)+nclass//2] = 1
-                labels.append(label)
-                s = max(0, klid-max_step+1-self.time_shift)
-                batch, total = getBatch(
-                    cnx, code, s, klid, max_step, self.time_shift)
-                data.append(batch)
-                seqlen.append(total)
-            return uuids, np.array(data), np.array(labels), np.array(seqlen)
+            r = Parallel(n_jobs=num_cores)(delayed(getSeries)(
+                uuid, code, klid, score, nclass, max_step, self.time_shift) for uuid, code, klid, score in kpts)
+            uuids, data, labels, seqlen = zip(*r)
+            # data = [batch, max_step, feature*time_shift]
+            # labels = [batch, label]  one-hot labels
+            # seqlen = [batch]
+            return np.array(uuids), np.array(data), np.array(labels), np.array(seqlen)
         except:
             print(sys.exc_info()[0])
             raise
@@ -197,21 +216,13 @@ class DataLoader:
             cursor.execute(query.format(batch_no))
             kpts = cursor.fetchall()
             cursor.close()
-            data = []   # [batch, max_step, feature*time_shift]
-            labels = []  # [batch, label]  one-hot labels
-            seqlen = []  # [batch]
-            uuids = []
-            for (uuid, code, klid, score) in kpts:
-                uuids.append(uuid)
-                label = np.zeros((nclass), dtype=np.int8)
-                label[int(score)+nclass//2] = 1
-                labels.append(label)
-                s = max(0, klid-max_step+1-self.time_shift)
-                batch, total = getBatch(
-                    cnx, code, s, klid, max_step, self.time_shift)
-                data.append(batch)
-                seqlen.append(total)
-            return uuids, np.array(data), np.array(labels), np.array(seqlen)
+            r = Parallel(n_jobs=num_cores)(delayed(getSeries)(
+                uuid, code, klid, score, nclass, max_step, self.time_shift) for uuid, code, klid, score in kpts)
+            uuids, data, labels, seqlen = zip(*r)
+            # data = [batch, max_step, feature*time_shift]
+            # labels = [batch, label]  one-hot labels
+            # seqlen = [batch]
+            return np.array(uuids), np.array(data), np.array(labels), np.array(seqlen)
         except:
             print(sys.exc_info()[0])
             raise

@@ -9,8 +9,6 @@ import multiprocessing
 from pprint import pprint
 from time import strftime
 from joblib import Parallel, delayed
-
-
 from data import connect
 
 '''
