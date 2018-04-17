@@ -693,7 +693,7 @@ class DRnnPredictorV4:
     '''
 
     def __init__(self, data, target, seqlen, classes, training, dropout,
-                 layer_width=200, num_rnn_layers=10, rnn_layer_size=2, num_fcn_layers=10, learning_rate=1e-3):
+                 layer_width=200, num_rnn_layers=10, rnn_layer_size=2, num_fcn_layers=10, size_decay=0.3, learning_rate=1e-3):
         self.data = data
         self.target = target
         self.seqlen = seqlen
@@ -703,6 +703,7 @@ class DRnnPredictorV4:
         self._num_fcn_layers = num_fcn_layers
         self._classes = classes
         self._learning_rate = learning_rate
+        self._size_decay = size_decay
         self.training = training
         self.dropout = dropout
         self.precisions
@@ -735,32 +736,34 @@ class DRnnPredictorV4:
 
     @staticmethod
     def fcn(self, input):
+        block = input
         with tf.variable_scope("fcn"):
-            block = input
-            p = round(self._num_fcn_layers ** 0.7)
+            p = int(round(self._num_fcn_layers ** 0.5))
             for i in range(self._num_fcn_layers):
-                with tf.name_scope("dense_block"):
-                    if i % p == 0:
-                        block = tf.contrib.layers.batch_norm(
+                with tf.variable_scope("dense_block_{}".format(i+1)):
+                    block = dense_block(block, self._layer_width)
+                    if i > 0 and i % p == 0:
+                        bn = tf.contrib.layers.batch_norm(
                             inputs=block,
                             is_training=self.training,
                             updates_collections=None
                         )
-                        block = tf.nn.selu(block, name="selu")
-                    block = dense_block(
-                        input=block,
-                        width=self._layer_width
-                    )
-                if i > 0 and i % p == 0:
-                    block = tf.contrib.nn.alpha_dropout(
-                        block, 1.0 - self.dropout)
-                    block = tf.layers.dense(
-                        inputs=block,
-                        units=self._layer_width,
-                        kernel_initializer=tf.truncated_normal_initializer(
-                            stddev=stddev(1.0, int(block.get_shape()[-1]))),
-                        bias_initializer=tf.constant_initializer(0.1)
-                    )
+                        block = tf.nn.selu(bn, name="selu")
+                        block = tf.contrib.nn.alpha_dropout(
+                            block, 1.0 - self.dropout)
+                        size = int(block.get_shape()[-1])
+                        new_size = int(round(size*self._size_decay))
+                        block = tf.layers.dense(
+                            inputs=block,
+                            units=new_size,
+                            kernel_initializer=tf.truncated_normal_initializer(
+                                stddev=stddev(1.0, size)),
+                            bias_initializer=tf.constant_initializer(0.1)
+                        )
+                        print("fcn layer_{} decayed size:{}".format(i, new_size))
+                    else:
+                        print("fcn layer_{} size:{}".format(
+                            i, block.get_shape()[-1]))
             return block
 
     @staticmethod
@@ -768,7 +771,7 @@ class DRnnPredictorV4:
         # Deep Recurrent network.
         cells = []
         feat_size = int(input.get_shape()[-1])
-        p = round(self._num_rnn_layers ** 0.7)
+        p = int(round(self._num_rnn_layers ** 0.35))
         output_size = self._layer_width + feat_size
         for i in range(self._num_rnn_layers):
             for _ in range(self._rnn_layer_size):
@@ -779,21 +782,31 @@ class DRnnPredictorV4:
                     bias_initializer=tf.constant_initializer(0.1),
                     layer_norm=True
                 ), output_size=output_size)
+                # if i > 0:
+                #     c = AlphaDropoutWrapper(
+                #         c, input_keep_prob=1.0-self.dropout)
                 output_size += self._layer_width
                 cells.append(c)
             if i == 0 or i % p != 0:
                 c = DenseCellWrapper(LayerNormNASCell(
                     num_units=self._layer_width,
-                    use_biases=True
+                    use_biases=True,
+                    layer_norm=True
                 ), output_size=output_size)
+                # c = AlphaDropoutWrapper(c, input_keep_prob=1.0-self.dropout)
                 output_size += self._layer_width
+                print("rnn layer_{} size:{}".format(i, output_size))
+                cells.append(c)
             else:
+                size = int(round(output_size * self._size_decay))
                 c = AlphaDropoutWrapper(LayerNormNASCell(
-                    num_units=self._layer_width * 2,
-                    use_biases=True
+                    num_units=size,
+                    use_biases=True,
+                    layer_norm=True
                 ), input_keep_prob=1.0-self.dropout)
-                output_size = self._layer_width * 3
-            cells.append(c)
+                output_size = size
+                print("rnn layer_{} decayed size:{}".format(i, output_size))
+                cells.append(c)
         # Stack layers of cell
         mc = tf.nn.rnn_cell.MultiRNNCell(cells)
         output, _ = tf.nn.dynamic_rnn(

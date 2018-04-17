@@ -17,8 +17,9 @@ import math
 EPOCH_SIZE = 444
 LAYER_WIDTH = 128
 RNN_LAYERS = 16
-RNN_LAYER_SIZE = 2
+RNN_LAYER_SIZE = 1
 FCN_LAYERS = 16
+SIZE_DECAY = math.pi / 9.0  # ~0.35
 MAX_STEP = 50
 TIME_SHIFT = 4
 DROP_OUT = (math.e / 10.0)**1.8  # ~0.096
@@ -51,6 +52,7 @@ def run():
             num_rnn_layers=RNN_LAYERS,
             rnn_layer_size=RNN_LAYER_SIZE,
             num_fcn_layers=FCN_LAYERS,
+            size_decay=SIZE_DECAY,
             dropout=dropout,
             training=training,
             learning_rate=LEARNING_RATE)

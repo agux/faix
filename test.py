@@ -77,6 +77,14 @@ def testJoblib():
     print("r3:{}".format(r3))
 
 
+def testVariableScope():
+    a = 3
+    if 1 < 3:
+        a = a+1
+    else:
+        a = a-1
+    print(a)
+
 # testGatherND()
 # testGetFileName()
 # print(__file__)
@@ -86,4 +94,6 @@ def testJoblib():
 # testTensorShape()
 
 
-testJoblib()
+# testJoblib()
+
+testVariableScope()
