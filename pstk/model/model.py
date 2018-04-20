@@ -16,6 +16,22 @@ def weight_bias(W_shape, b_shape, bias_init=0.1):
     return W, b
 
 
+def residual(x, activation):
+    """
+    Residual Fully Connected Network
+    """
+    size = int(x.get_shape()[-1])
+    out = tf.layers.dense(
+        inputs=x,
+        units=size,
+        kernel_initializer=tf.truncated_normal_initializer(
+            stddev=stddev(1.0, size)),
+        bias_initializer=tf.constant_initializer(0.1),
+        activation=activation
+    )
+    return x + out
+
+
 def highway(x, activation=None, carry_bias=-1.0):
     """Highway Network (cf. http://arxiv.org/abs/1505.00387).
 
@@ -28,7 +44,7 @@ def highway(x, activation=None, carry_bias=-1.0):
     with larger negative carry_bias, more input (x) will be kept in the final output of highway layer.
 
     """
-    with tf.name_scope("highway"):
+    with tf.variable_scope("highway"):
         size = int(x.get_shape()[1])
         W, b = weight_bias([size, size], [size])
 

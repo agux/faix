@@ -5,7 +5,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 import tensorflow as tf
-from pstk.model import model9
+from pstk.model import model11
 from time import strftime
 from pstk.data import data as data0
 from pstk.data import data12
@@ -15,13 +15,11 @@ import numpy as np
 import math
 
 EPOCH_SIZE = 444
-LAYER_WIDTH = 128
-RNN_LAYERS = 16
-RNN_LAYER_SIZE = 1
-FCN_LAYERS = 16
-SIZE_DECAY = math.pi / 10.0
+RNN_LAYERS = 1
+FCN_LAYERS = 3
+LAYER_WIDTH = 256
 MAX_STEP = 50
-TIME_SHIFT = 4
+TIME_SHIFT = 9
 DROP_OUT = math.e / 10.0
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
@@ -43,16 +41,14 @@ def run():
     dropout = tf.placeholder(tf.float32, [], name="dropout")
     training = tf.placeholder(tf.bool, [], name="training")
     with tf.Session() as sess:
-        model = model9.DRnnPredictorV5(
+        model = model11.DRnnPredictorV6(
             data=data,
             target=target,
             seqlen=seqlen,
             classes=classes,
+            rnn_layers=RNN_LAYERS,
+            fcn_layers=FCN_LAYERS,
             layer_width=LAYER_WIDTH,
-            num_rnn_layers=RNN_LAYERS,
-            rnn_layer_size=RNN_LAYER_SIZE,
-            num_fcn_layers=FCN_LAYERS,
-            size_decay=SIZE_DECAY,
             dropout=dropout,
             training=training,
             learning_rate=LEARNING_RATE)
@@ -86,8 +82,8 @@ def run():
             accuracy, worst, test_summary_str = sess.run(
                 [model.accuracy, model.worst, summary, model.precisions[1], model.recalls[1], model.f_score], feeds)[:3]
             bidx, max_entropy, predict, actual = worst[0], worst[1], worst[2], worst[3]
-            print('{} Epoch {} test accuracy {:3.3f}% max_entropy {:3.4f} predict {} actual {}'.format(
-                strftime("%H:%M:%S"), epoch, 100. * accuracy, max_entropy, predict, actual))
+            print('{} Epoch {} test accuracy {:3.3f}% max_entropy {:3.4f} predict {} actual {} uuid {}'.format(
+                strftime("%H:%M:%S"), epoch, 100. * accuracy, max_entropy, predict, actual, tuuids[bidx]))
             data0.save_worst_rec(model_name, stime, "test", epoch,
                                  tuuids[bidx], max_entropy, predict, actual)
             summary_str = None

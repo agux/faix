@@ -741,14 +741,16 @@ class DRnnPredictorV4:
             p = int(round(self._num_fcn_layers ** 0.5))
             for i in range(self._num_fcn_layers):
                 with tf.variable_scope("dense_block_{}".format(i+1)):
-                    block = dense_block(block, self._layer_width)
-                    if i > 0 and i % p == 0:
-                        bn = tf.contrib.layers.batch_norm(
+                    if i % p == 0:
+                        block = tf.contrib.layers.batch_norm(
                             inputs=block,
                             is_training=self.training,
                             updates_collections=None
                         )
-                        block = tf.nn.selu(bn, name="selu")
+                        if i > 0:
+                            block = tf.nn.selu(block, name="selu")
+                    block = dense_block(block, self._layer_width)
+                    if i > 0 and i % p == 0:
                         block = tf.contrib.nn.alpha_dropout(
                             block, 1.0 - self.dropout)
                         size = int(block.get_shape()[-1])
@@ -774,26 +776,26 @@ class DRnnPredictorV4:
         p = int(round(self._num_rnn_layers ** 0.35))
         output_size = self._layer_width + feat_size
         for i in range(self._num_rnn_layers):
-            for _ in range(self._rnn_layer_size):
+            for j in range(self._rnn_layer_size):
                 c = DenseCellWrapper(LayerNormGRUCell(
                     num_units=self._layer_width,
                     kernel_initializer=tf.truncated_normal_initializer(
                         stddev=stddev(1.0, feat_size)),
                     bias_initializer=tf.constant_initializer(0.1),
-                    layer_norm=True
+                    input_layer_norm=(not (i == 0 and j == 0))
                 ), output_size=output_size)
-                # if i > 0:
-                #     c = AlphaDropoutWrapper(
-                #         c, input_keep_prob=1.0-self.dropout)
+                if not (i == 0 and j == 0):
+                    c = AlphaDropoutWrapper(
+                        c, input_keep_prob=1.0-self.dropout)
                 output_size += self._layer_width
                 cells.append(c)
             if i == 0 or i % p != 0:
                 c = DenseCellWrapper(LayerNormNASCell(
                     num_units=self._layer_width,
                     use_biases=True,
-                    layer_norm=True
+                    input_layer_norm=True
                 ), output_size=output_size)
-                # c = AlphaDropoutWrapper(c, input_keep_prob=1.0-self.dropout)
+                c = AlphaDropoutWrapper(c, input_keep_prob=1.0-self.dropout)
                 output_size += self._layer_width
                 print("rnn layer_{} size:{}".format(i, output_size))
                 cells.append(c)
@@ -802,7 +804,7 @@ class DRnnPredictorV4:
                 c = AlphaDropoutWrapper(LayerNormNASCell(
                     num_units=size,
                     use_biases=True,
-                    layer_norm=True
+                    input_layer_norm=True
                 ), input_keep_prob=1.0-self.dropout)
                 output_size = size
                 print("rnn layer_{} decayed size:{}".format(i, output_size))

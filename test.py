@@ -7,6 +7,7 @@ import tensorflow as tf
 from pstk import data as dat
 from sqlalchemy import create_engine
 from joblib import Parallel, delayed
+from pstk.model.wavenet import time_to_batch
 
 
 def testGetFileName():
@@ -85,6 +86,40 @@ def testVariableScope():
         a = a-1
     print(a)
 
+
+def testTimeToBatch():
+    inputs = tf.constant([[['a0', 'b0'], ['c0', 'd0'], ['e0', 'f0'], ['g0', 'h0'], ['i0', 'j0']],
+                          [['a1', 'b1'], ['c1', 'd1'], ['e1', 'f1'], ['g1', 'h1'], ['0', '0']]])
+    print(inputs.get_shape())
+    ttb = time_to_batch(inputs, 2)
+    print(ttb.get_shape())
+    sess = tf.InteractiveSession()
+    r = sess.run([ttb])
+    print(r)
+
+
+def testConv1d():
+    # inputs = tf.constant([[[1, 0, 1],
+    #                        [0, 1, 0],
+    #                        [1, 0, 1],
+    #                        [1, 1, 1],
+    #                        [1, 1, 1]]], dtype=tf.float32)
+    inputs = tf.constant([[[1],
+                           [2],
+                           [3],
+                           [4],
+                           [5]]], dtype=tf.float32)
+    # kernel = tf.constant([[[6]],[[7]]], dtype=tf.float32)
+    print("shape:{}".format(inputs.get_shape()))
+    # c = tf.nn.conv1d(inputs, kernel, stride=1, padding='VALID')
+    c = tf.layers.conv1d(inputs, filters=1, kernel_size=2, strides=1,
+                         padding='VALID', use_bias=False)
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        out = sess.run([c])
+        print(out)
+
+
 # testGatherND()
 # testGetFileName()
 # print(__file__)
@@ -96,4 +131,8 @@ def testVariableScope():
 
 # testJoblib()
 
-testVariableScope()
+# testVariableScope()
+
+
+# testTimeToBatch()
+testConv1d()

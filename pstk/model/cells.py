@@ -579,6 +579,7 @@ class LayerNormGRUCell(_LayerRNNCell):
                  reuse=None,
                  kernel_initializer=None,
                  bias_initializer=None,
+                 input_layer_norm=False,
                  layer_norm=False,
                  name=None):
         super(LayerNormGRUCell, self).__init__(_reuse=reuse, name=name)
@@ -591,6 +592,7 @@ class LayerNormGRUCell(_LayerRNNCell):
         self._kernel_initializer = kernel_initializer
         self._bias_initializer = bias_initializer
         self._layer_norm = layer_norm
+        self._input_layer_norm = input_layer_norm
 
     @property
     def state_size(self):
@@ -634,6 +636,13 @@ class LayerNormGRUCell(_LayerRNNCell):
     def call(self, inputs, state):
         """Gated recurrent unit (GRU) with nunits cells."""
 
+        if self._input_layer_norm:
+            inputs = tf.contrib.layers.layer_norm(
+                scope="input_ln",
+                inputs=inputs,
+                reuse=tf.AUTO_REUSE
+            )
+
         gate_inputs = math_ops.matmul(
             array_ops.concat([inputs, state], 1), self._gate_kernel)
         gate_inputs = nn_ops.bias_add(gate_inputs, self._gate_bias)
@@ -672,7 +681,7 @@ class LayerNormNASCell(rnn_cell_impl.RNNCell):
     The class uses an optional projection layer.
     """
 
-    def __init__(self, num_units, num_proj=None, use_biases=False, layer_norm=False, reuse=None):
+    def __init__(self, num_units, num_proj=None, use_biases=False, input_layer_norm=False, layer_norm=False, reuse=None):
         """Initialize the parameters for a NAS cell.
 
         Args:
@@ -690,6 +699,7 @@ class LayerNormNASCell(rnn_cell_impl.RNNCell):
         self._num_units = num_units
         self._num_proj = num_proj
         self._use_biases = use_biases
+        self._input_layer_norm = input_layer_norm
         self._layer_norm = layer_norm
         self._reuse = reuse
 
@@ -732,6 +742,14 @@ class LayerNormNASCell(rnn_cell_impl.RNNCell):
           ValueError: If input size cannot be inferred from inputs via
             static shape inference.
         """
+
+        if self._input_layer_norm:
+            inputs = tf.contrib.layers.layer_norm(
+                scope="inputs_ln",
+                inputs=inputs,
+                reuse=tf.AUTO_REUSE
+            )
+
         sigmoid = math_ops.sigmoid
         tanh = math_ops.tanh
         selu = tf.nn.selu
@@ -769,11 +787,11 @@ class LayerNormNASCell(rnn_cell_impl.RNNCell):
                 inputs=m_matrix,
                 reuse=tf.AUTO_REUSE
             )
-            inputs_matrix = tf.contrib.layers.layer_norm(
-                scope="inputs_matrix_ln",
-                inputs=inputs_matrix,
-                reuse=tf.AUTO_REUSE
-            )
+            # inputs_matrix = tf.contrib.layers.layer_norm(
+            #     scope="inputs_matrix_ln",
+            #     inputs=inputs_matrix,
+            #     reuse=tf.AUTO_REUSE
+            # )
 
         # The NAS cell branches into 8 different splits for both the hidden state
         # and the input
