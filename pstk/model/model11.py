@@ -88,38 +88,39 @@ class DRnnPredictorV6:
     @staticmethod
     def rnn(self, inputs):
         # Deep Residual RNN
+        # TODO: try MultiRNNCell of MultiRNNCell, wrapped in a residual wrapper
         cells = []
         feat_size = int(inputs.get_shape()[-1])
         # p = int(round(self._rnn_layers ** 0.5))
         if feat_size != self._layer_width:
             # dimensionality adaptation
-            c = tf.nn.rnn_cell.GRUCell(
-                num_units=self._layer_width,
-                kernel_initializer=tf.truncated_normal_initializer(
-                    stddev=stddev(1.0, self._layer_width)),
-                bias_initializer=tf.constant_initializer(0.1)
-            )
-            # c = LayerNormNASCell(
+            # c = tf.nn.rnn_cell.GRUCell(
             #     num_units=self._layer_width,
-            #     use_biases=True
+            #     kernel_initializer=tf.truncated_normal_initializer(
+            #         stddev=stddev(1.0, self._layer_width)),
+            #     bias_initializer=tf.constant_initializer(0.1)
             # )
+            c = tf.contrib.rnn.NASCell(
+                num_units=self._layer_width,
+                use_biases=True
+            )
             cells.append(c)
-        for _ in range(self._rnn_layers):
+        # for _ in range(self._rnn_layers):
             # if i == 0 or i % p != 0:
-            c = tf.contrib.rnn.ResidualWrapper(tf.contrib.rnn.LayerNormBasicLSTMCell(
-                num_units=self._layer_width
-                # kernel_initializer=tf.truncated_normal_initializer(
-                #     stddev=stddev(1.0, self._layer_width)),
-                # bias_initializer=tf.constant_initializer(0.1)
-                # layer_norm=True
-            ))
+            # c = tf.contrib.rnn.ResidualWrapper(tf.contrib.rnn.LayerNormBasicLSTMCell(
+            #     num_units=self._layer_width
+            # kernel_initializer=tf.truncated_normal_initializer(
+            #     stddev=stddev(1.0, self._layer_width)),
+            # bias_initializer=tf.constant_initializer(0.1)
+            # layer_norm=True
+            # ))
             # else:
             # c = tf.contrib.rnn.ResidualWrapper(tf.contrib.rnn.NASCell(
             #     num_units=self._layer_width,
             #     use_biases=True
             #     # layer_norm=True
             # ))
-            cells.append(c)
+            # cells.append(c)
         # Stack layers of cell
         mc = tf.nn.rnn_cell.MultiRNNCell(cells)
         output, _ = tf.nn.dynamic_rnn(
