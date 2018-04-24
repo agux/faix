@@ -23,7 +23,7 @@ class SRnnPredictorV2:
     NAS
     '''
 
-    def __init__(self, data, target, seqlen, classes, cell,
+    def __init__(self, data, target, seqlen, classes, cell, use_peepholes=False,
                  layer_width=200, learning_rate=1e-3):
         self.data = data
         self.target = target
@@ -32,6 +32,7 @@ class SRnnPredictorV2:
         self._classes = classes
         self._learning_rate = learning_rate
         self._cell = cell
+        self._use_peepholes = use_peepholes
         self.precisions
         self.recalls
         self.f_score
@@ -72,9 +73,9 @@ class SRnnPredictorV2:
                 num_units=self._layer_width
             )
         elif _cell == 'lstm':
-            c = tf.contrib.rnn.LSTMCell(
-                num_units=self._layer_width
-                # use_peepholes=True,
+            c = tf.nn.rnn_cell.LSTMCell(
+                num_units=self._layer_width,
+                use_peepholes=self._use_peepholes
             )
         elif _cell == 'basiclstm':
             c = tf.contrib.rnn.BasicLSTMCell(
