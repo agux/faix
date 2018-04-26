@@ -23,7 +23,7 @@ class SRnnPredictorV2:
     NAS
     '''
 
-    def __init__(self, data, target, seqlen, classes, cell, use_peepholes=False,
+    def __init__(self, data, target, seqlen, classes, cell, use_peepholes=False, time_shifts=1,
                  layer_width=200, learning_rate=1e-3):
         self.data = data
         self.target = target
@@ -33,6 +33,7 @@ class SRnnPredictorV2:
         self._learning_rate = learning_rate
         self._cell = cell
         self._use_peepholes = use_peepholes
+        self._time_shifts = time_shifts
         self.precisions
         self.recalls
         self.f_score
@@ -78,7 +79,7 @@ class SRnnPredictorV2:
                 use_peepholes=self._use_peepholes
             )
         elif _cell == 'basiclstm':
-            c = tf.contrib.rnn.BasicLSTMCell(
+            c = tf.nn.rnn_cell.BasicLSTMCell(
                 num_units=self._layer_width
             )
         elif _cell == 'layernormbasiclstm':
@@ -88,12 +89,12 @@ class SRnnPredictorV2:
         elif _cell == 'glstm':
             c = tf.contrib.rnn.GLSTMCell(
                 num_units=self._layer_width,
-                number_of_groups=4
+                number_of_groups=self._time_shifts
             )
         elif _cell == 'gridlstm':
             c = tf.contrib.rnn.GridLSTMCell(
                 num_units=self._layer_width,
-                # use_peephole=True,
+                use_peephole=self._use_peepholes
                 # share_time_frequency_weights=True,
                 # num_unit_shards=4,
                 #feature_size = feat_size,
