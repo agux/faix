@@ -15,10 +15,12 @@ import numpy as np
 import math
 
 EPOCH_SIZE = 444
-LAYER_WIDTH = 300
+LAYER_WIDTH = 256
 MAX_STEP = 50
 TIME_SHIFT = 9
 LEARNING_RATE = 1e-3
+USE_PEEPHOLES = True
+TIED = False
 LOG_DIR = 'logdir'
 
 
@@ -27,8 +29,8 @@ def run():
     loader = data12.DataLoader(TIME_SHIFT)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     tuuids, tdata, tlabels, tseqlen = loader.loadTestSet(MAX_STEP)
-    print(tdata.shape)
-    print(tlabels.shape)
+    print('input shape: {}'.format(tdata.shape))
+    print('target shape: {}'.format(tlabels.shape))
     featSize = tdata.shape[2]
     nclass = tlabels.shape[1]
     classes = [i-nclass//2 for i in range(nclass)]
@@ -40,8 +42,9 @@ def run():
             data=data,
             target=target,
             seqlen=seqlen,
-            cell='gridlstm',
-            time_shifts=TIME_SHIFT + 1,
+            cell='grid2lstm',
+            use_peepholes=USE_PEEPHOLES,
+            tied=TIED,
             classes=classes,
             layer_width=LAYER_WIDTH,
             learning_rate=LEARNING_RATE)

@@ -41,7 +41,7 @@ def run():
             target=target,
             seqlen=seqlen,
             cell='glstm',
-            time_shifts=TIME_SHIFT + 1,
+            groups=TIME_SHIFT + 1,
             classes=classes,
             layer_width=LAYER_WIDTH,
             learning_rate=LEARNING_RATE)
