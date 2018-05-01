@@ -129,8 +129,8 @@ class SRnnPredictorV2:
             )
         elif _cell == 'lstmblock':
             c = tf.contrib.rnn.LSTMBlockCell(
-                num_units=self._layer_width
-                # use_peephole=True
+                num_units=self._layer_width,
+                use_peephole=self._use_peepholes
             )
         elif _cell == 'nas':
             c = tf.contrib.rnn.NASCell(
