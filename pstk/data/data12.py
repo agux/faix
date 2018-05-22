@@ -14,7 +14,7 @@ from data import connect
 '''
 OHLCV-LR + SH & SZ indices-LR(5*2) (5+10=15)
 Read from backward reinstated klines.
-Feature-wise standardization is adopted.
+In-place feature-wise standardization is adopted.
 '''
 
 k_cols = [

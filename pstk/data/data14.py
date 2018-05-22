@@ -17,7 +17,7 @@ OHLCV-LR + ma-LR(40) + Indicator(KDJ(3),MACD(3),RSI(3),BIAS(3),BOLL(12))
 
 Read from backward reinstated klines.
 
-Feature-wise standardization is adopted.
+In-place feature-wise standardization is adopted.
 '''
 
 
