@@ -26,7 +26,8 @@ class SRnnRegressor:
     GridLSTM,
     LSTMBlock,
     UGRNN,
-    NAS
+    NAS,
+    etc...
     '''
 
     def __init__(self, data, target, seqlen, cell, use_peepholes=False, groups=1,
@@ -181,7 +182,7 @@ class SRnnRegressor:
         with tf.name_scope("worst"):
             sqd = tf.squared_difference(logits, self.target)
             bidx = tf.argmax(sqd)
-            max_diff = tf.reduce_max(sqd)
+            max_diff = tf.sqrt(tf.reduce_max(sqd))
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
             return bidx, max_diff, predict, actual

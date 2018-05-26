@@ -13,9 +13,9 @@ from joblib import Parallel, delayed
 
 def connect():
     return mysql.connector.connect(
-        host='127.0.0.1', 
-        user='mysql', 
-        database='secu', 
+        host='127.0.0.1',
+        user='mysql',
+        database='secu',
         password='123456',
         # ssl_ca='',
         # use_pure=True,
@@ -59,42 +59,12 @@ ftQueryTpl = (
 num_cores = multiprocessing.cpu_count()
 
 
-def getFtQuery():
-    global k_cols
-    sep = " "
-    p_kline = sep.join(
-        ["(d.{0}-s.{0}_mean)/s.{0}_std {0},".format(c) for c in k_cols])
-    p_kline = p_kline[:-1]  # strip last comma
-    stats_tpl = (
-        " MAX(CASE "
-        "     WHEN t.fields = '{0}' THEN t.mean "
-        "     ELSE NULL "
-        " END) AS {0}_mean, "
-        " MAX(CASE "
-        "     WHEN t.fields = '{0}' THEN t.std "
-        "     ELSE NULL "
-        " END) AS {0}_std,"
-    )
-    stats = sep.join([stats_tpl.format(c) for c in k_cols])
-    stats = stats[:-1]  # strip last comma
-
-    qk = ftQueryTpl.format(p_kline, stats,
-                           " AND d.klid BETWEEN %s AND %s ")
-    qd = ftQueryTpl.format(p_kline, stats,
-                           " AND d.date in ({})")
-    return qk, qd
-
-
-ftQueryK, ftQueryD = getFtQuery()
-
-
-def getBatch(code, s, e, rcode, max_step, time_shift):
+def getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     '''
     [max_step, feature*time_shift], length
     '''
     cnx = connect()
     fcursor = cnx.cursor(buffered=True)
-    global ftQueryK, ftQueryD
     try:
         fcursor.execute(ftQueryK, (code, code, s, e, max_step+time_shift))
         col_names = fcursor.column_names
@@ -132,15 +102,19 @@ def getBatch(code, s, e, rcode, max_step, time_shift):
         cnx.close()
 
 
-def getSeries(uuid, code, klid, rcode, xcorl, max_step, time_shift):
+def getSeries(uuid, code, klid, rcode, xcorl, max_step, time_shift, ftQueryK, ftQueryD):
     s = max(0, klid-max_step+1-time_shift)
-    batch, total = getBatch(code, s, klid, rcode, max_step, time_shift)
+    batch, total = getBatch(
+        code, s, klid, rcode, max_step, time_shift, ftQueryK, ftQueryD)
     return uuid, batch, xcorl, total
 
 
 class DataLoader:
-    def __init__(self, time_shift=0):
+    def __init__(self, time_shift=0, feat_cols=None):
         self.time_shift = time_shift
+        self._feat_cols = k_cols if feat_cols is None else feat_cols
+        self._qk = None
+        self._qd = None
 
     def loadTestSet(self, max_step, ntest):
         global num_cores
@@ -162,8 +136,9 @@ class DataLoader:
             cursor.execute(query, (flag,))
             tset = cursor.fetchall()
             cursor.close()
+            qk, qd = self.getFtQuery()
             r = Parallel(n_jobs=num_cores)(delayed(getSeries)(
-                uuid, code, klid, rcode, corl, max_step, self.time_shift
+                uuid, code, klid, rcode, corl, max_step, self.time_shift, qk, qd
             ) for uuid, code, klid, rcode, corl in tset)
             uuids, data, xcorls, seqlen = zip(*r)
             # data = [batch, max_step, feature*time_shift]
@@ -193,8 +168,9 @@ class DataLoader:
             cursor.execute(query, (flag,))
             train_set = cursor.fetchall()
             cursor.close()
+            qk, qd = self.getFtQuery()
             r = Parallel(n_jobs=num_cores)(delayed(getSeries)(
-                uuid, code, klid, rcode, corl, max_step, self.time_shift
+                uuid, code, klid, rcode, corl, max_step, self.time_shift, qk, qd
             ) for uuid, code, klid, rcode, corl in train_set)
             uuids, data, xcorls, seqlen = zip(*r)
             # data = [batch, max_step, feature*time_shift]
@@ -206,3 +182,31 @@ class DataLoader:
             raise
         finally:
             cnx.close()
+
+    def getFtQuery(self):
+        if self._qk is not None and self._qd is not None:
+            return self._qk, self._qd
+
+        k_cols = self._feat_cols
+        sep = " "
+        p_kline = sep.join(
+            ["(d.{0}-s.{0}_mean)/s.{0}_std {0},".format(c) for c in k_cols])
+        p_kline = p_kline[:-1]  # strip last comma
+        stats_tpl = (
+            " MAX(CASE "
+            "     WHEN t.fields = '{0}' THEN t.mean "
+            "     ELSE NULL "
+            " END) AS {0}_mean, "
+            " MAX(CASE "
+            "     WHEN t.fields = '{0}' THEN t.std "
+            "     ELSE NULL "
+            " END) AS {0}_std,"
+        )
+        stats = sep.join([stats_tpl.format(c) for c in k_cols])
+        stats = stats[:-1]  # strip last comma
+
+        self._qk = ftQueryTpl.format(p_kline, stats,
+                                     " AND d.klid BETWEEN %s AND %s ")
+        self._qd = ftQueryTpl.format(p_kline, stats,
+                                     " AND d.date in ({})")
+        return self._qk, self._qd

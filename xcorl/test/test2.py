@@ -9,36 +9,31 @@ import tensorflow as tf
 from xc_model import base as model0
 from xc_data import base as data0
 from time import strftime
+from test1 import collect_summary
 import os
 import numpy as np
 import math
 
 N_TEST = 100
 TEST_INTERVAL = 50
-EPOCH_SIZE = 94315 // TEST_INTERVAL
 LAYER_WIDTH = 256
-MAX_STEP = 30
-TIME_SHIFT = 0
+MAX_STEP = 60
+TIME_SHIFT = 9
 LEARNING_RATE = 1e-3
 USE_PEEPHOLES = True
 TIED = False
 LOG_DIR = 'logdir'
 
+k_cols = [
+    "lr", "lr_h_c", "lr_o_c", "lr_l_c", "lr_vol", "lr_ma5", "lr_vol5",
+]
+
 # pylint: disable-msg=E0601
-
-
-def collect_summary(sess, model, base_dir):
-    train_writer = tf.summary.FileWriter(base_dir + "/train", sess.graph)
-    test_writer = tf.summary.FileWriter(base_dir + "/test", sess.graph)
-    with tf.name_scope("Basic"):
-        tf.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
-    summary = tf.summary.merge_all()
-    return summary, train_writer, test_writer
 
 
 def run():
     tf.logging.set_verbosity(tf.logging.INFO)
-    loader = data0.DataLoader(TIME_SHIFT)
+    loader = data0.DataLoader(TIME_SHIFT, k_cols)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     tuuids, tdata, txcorls, tseqlen = loader.loadTestSet(MAX_STEP, N_TEST)
     print('input shape: {}'.format(tdata.shape))
@@ -71,15 +66,16 @@ def run():
             sess, model, base_dir)
         saver = tf.train.Saver()
         bno = 0
-        for epoch in range(EPOCH_SIZE):
+        epoch = 0
+        while True:
             bno = epoch*TEST_INTERVAL
             print('{} running on test set...'.format(strftime("%H:%M:%S")))
             feeds = {data: tdata, target: txcorls, seqlen: tseqlen}
             mse, worst, test_summary_str = sess.run(
                 [model.cost, model.worst, summary], feeds)
             bidx, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
-            print('{} Epoch {} mse {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
-                strftime("%H:%M:%S"), epoch, mse, max_diff, predict, actual, tuuids[bidx]))
+            print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
+                strftime("%H:%M:%S"), epoch, math.sqrt(mse), max_diff, predict, actual, tuuids[bidx]))
             summary_str = None
             for _ in range(TEST_INTERVAL):
                 bno = bno+1
@@ -87,7 +83,11 @@ def run():
                     strftime("%H:%M:%S"), bno))
                 _, trdata, trxcorls, trseqlen = loader.loadTrainingData(
                     bno, MAX_STEP)
-                print('{} training...'.format(strftime("%H:%M:%S")))
+                if len(trdata) > 0:
+                    print('{} training...'.format(strftime("%H:%M:%S")))
+                else:
+                    print('{} end of training data, finish training.'.format(strftime("%H:%M:%S")))
+                    break
                 feeds = {data: trdata, target: trxcorls,  seqlen: trseqlen}
                 summary_str, worst = sess.run(
                     [summary, model.worst, model.optimize], feeds)[:-1]
@@ -100,14 +100,15 @@ def run():
                 test_writer.flush()
             checkpoint_file = os.path.join(base_dir, 'model.ckpt')
             saver.save(sess, checkpoint_file, global_step=bno)
+            epoch += 1
         # test last epoch
         print('{} running on test set...'.format(strftime("%H:%M:%S")))
         feeds = {data: tdata, target: txcorls, seqlen: tseqlen}
         mse, worst, test_summary_str = sess.run(
             [model.cost, model.worst, summary], feeds)
         bidx, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
-        print('{} Epoch {} mse {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
-            strftime("%H:%M:%S"), epoch, mse, max_diff, predict, actual, tuuids[bidx]))
+        print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
+            strftime("%H:%M:%S"), epoch, math.sqrt(mse), max_diff, predict, actual, tuuids[bidx]))
         train_writer.add_summary(summary_str, bno)
         test_writer.add_summary(test_summary_str, bno)
         train_writer.flush()
