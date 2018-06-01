@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 import tensorflow as tf
 # pylint: disable-msg=E0401
-from xc_model import base as model0
+from model import base as model0
 from xc_data import base as data0
 from time import strftime
 from test1 import collect_summary

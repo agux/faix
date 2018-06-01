@@ -23,7 +23,7 @@ def connect():
 
 
 '''
-Loads tagged sample xcorl data from database.
+Loads tagged sample wcc_trn data from database.
 Read from backward reinstated klines.
 In-place feature-wise standardization is adopted.
 '''
@@ -102,11 +102,11 @@ def getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
         cnx.close()
 
 
-def getSeries(uuid, code, klid, rcode, xcorl, max_step, time_shift, ftQueryK, ftQueryD):
+def getSeries(uuid, code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQueryD):
     s = max(0, klid-max_step+1-time_shift)
     batch, total = getBatch(
         code, s, klid, rcode, max_step, time_shift, ftQueryK, ftQueryD)
-    return uuid, batch, xcorl, total
+    return uuid, batch, val, total
 
 
 class DataLoader:
@@ -128,7 +128,7 @@ class DataLoader:
                 "SELECT "
                 "   uuid, code, klid, rcode, corl "
                 "FROM "
-                "   xcorl_trn "
+                "   wcc_trn "
                 "WHERE "
                 "   flag = %s "
             )
@@ -138,13 +138,13 @@ class DataLoader:
             cursor.close()
             qk, qd = self.getFtQuery()
             r = Parallel(n_jobs=num_cores)(delayed(getSeries)(
-                uuid, code, klid, rcode, corl, max_step, self.time_shift, qk, qd
-            ) for uuid, code, klid, rcode, corl in tset)
-            uuids, data, xcorls, seqlen = zip(*r)
+                uuid, code, klid, rcode, val, max_step, self.time_shift, qk, qd
+            ) for uuid, code, klid, rcode, val in tset)
+            uuids, data, vals, seqlen = zip(*r)
             # data = [batch, max_step, feature*time_shift]
-            # xcorls = [batch]
+            # vals = [batch]
             # seqlen = [batch]
-            return np.array(uuids), np.array(data), np.array(xcorls), np.array(seqlen)
+            return np.array(uuids), np.array(data), np.array(vals), np.array(seqlen)
         except:
             print(sys.exc_info()[0])
             raise
@@ -160,23 +160,26 @@ class DataLoader:
                 'SELECT '
                 "   uuid, code, klid, rcode, corl "
                 'FROM '
-                '   xcorl_trn '
+                '   wcc_trn '
                 'WHERE '
                 "   flag = %s"
             )
             flag = 'TRAIN_{}'.format(batch_no)
             cursor.execute(query, (flag,))
             train_set = cursor.fetchall()
+            total = cursor.rowcount
             cursor.close()
-            qk, qd = self.getFtQuery()
-            r = Parallel(n_jobs=num_cores)(delayed(getSeries)(
-                uuid, code, klid, rcode, corl, max_step, self.time_shift, qk, qd
-            ) for uuid, code, klid, rcode, corl in train_set)
-            uuids, data, xcorls, seqlen = zip(*r)
+            uuids, data, vals, seqlen = [], [], [], []
+            if total > 0:
+                qk, qd = self.getFtQuery()
+                r = Parallel(n_jobs=num_cores)(delayed(getSeries)(
+                    uuid, code, klid, rcode, val, max_step, self.time_shift, qk, qd
+                ) for uuid, code, klid, rcode, val in train_set)
+                uuids, data, vals, seqlen = zip(*r)
             # data = [batch, max_step, feature*time_shift]
-            # xcorls = [batch, xcorl]
+            # vals = [batch]
             # seqlen = [batch]
-            return np.array(uuids), np.array(data), np.array(xcorls), np.array(seqlen)
+            return np.array(uuids), np.array(data), np.array(vals), np.array(seqlen)
         except:
             print(sys.exc_info()[0])
             raise
