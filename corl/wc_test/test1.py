@@ -7,9 +7,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 import tensorflow as tf
 # pylint: disable-msg=E0401
 from model import base as model0
-from xc_data import base as data0
+from wc_data import base as data0
 from time import strftime
-from test1 import collect_summary
 import os
 import numpy as np
 import math
@@ -25,6 +24,15 @@ TIED = False
 LOG_DIR = 'logdir'
 
 # pylint: disable-msg=E0601
+
+
+def collect_summary(sess, model, base_dir):
+    train_writer = tf.summary.FileWriter(base_dir + "/train", sess.graph)
+    test_writer = tf.summary.FileWriter(base_dir + "/test", sess.graph)
+    with tf.name_scope("Basic"):
+        tf.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
+    summary = tf.summary.merge_all()
+    return summary, train_writer, test_writer
 
 
 def run():
