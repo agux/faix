@@ -8,7 +8,6 @@ import functools
 import tensorflow as tf
 import numpy as np
 import math
-from pstk.model.metrics import precision, recall
 from pstk.model.model import lazy_property, stddev
 from pstk.model.cells import LayerNormNASCell, LayerNormGRUCell
 

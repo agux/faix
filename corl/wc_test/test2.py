@@ -6,8 +6,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 import tensorflow as tf
 # pylint: disable-msg=E0401
-from model import base as model0
+from model import drnn_regressor
 from wc_data import base as data0
+from test1 import collect_summary
 from time import strftime
 import os
 import numpy as np
@@ -15,9 +16,9 @@ import math
 
 N_TEST = 100
 TEST_INTERVAL = 50
-LAYER_WIDTH = 256
-MAX_STEP = 30
-TIME_SHIFT = 2
+LAYER_WIDTH = 512
+MAX_STEP = 50
+TIME_SHIFT = 4
 LEARNING_RATE = 1e-3
 USE_PEEPHOLES = True
 TIED = False
@@ -26,18 +27,18 @@ LOG_DIR = 'logdir'
 # pylint: disable-msg=E0601
 
 
-def collect_summary(sess, model, base_dir):
-    train_writer = tf.summary.FileWriter(base_dir + "/train", sess.graph)
-    test_writer = tf.summary.FileWriter(base_dir + "/test", sess.graph)
-    with tf.name_scope("Basic"):
-        tf.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
-    summary = tf.summary.merge_all()
-    return summary, train_writer, test_writer
+k_cols = [
+    "lr", "lr_h", "lr_o", "lr_l",
+    "lr_h_c", "lr_o_c", "lr_l_c",
+    "lr_ma5", "lr_ma5_h", "lr_ma5_o", "lr_ma5_l",
+    "lr_ma10", "lr_ma10_h", "lr_ma10_o", "lr_ma10_l",
+    "lr_vol", "lr_vol5", "lr_vol10"
+]
 
 
 def run():
     tf.logging.set_verbosity(tf.logging.INFO)
-    loader = data0.DataLoader(TIME_SHIFT)
+    loader = data0.DataLoader(TIME_SHIFT, k_cols)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     tuuids, tdata, tvals, tseqlen = loader.loadTestSet(MAX_STEP, N_TEST)
     print('input shape: {}'.format(tdata.shape))
@@ -47,7 +48,7 @@ def run():
     target = tf.placeholder(tf.float32, [None], "target")
     seqlen = tf.placeholder(tf.int32, [None], "seqlen")
     with tf.Session() as sess:
-        model = model0.SRnnRegressorV2(
+        model = drnn_regressor.DRnnRegressorV1(
             data=data,
             target=target,
             seqlen=seqlen,
