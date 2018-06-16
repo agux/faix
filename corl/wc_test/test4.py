@@ -38,8 +38,16 @@ k_cols = [
     "lr_vol", "lr_vol5", "lr_vol10"
 ]
 
+parser = argparse.ArgumentParser()
+parser.add_argument('parallel', nargs='?', help='database operation parallel level',
+                    default=multiprocessing.cpu_count())
+parser.add_argument(
+    '--restart', help='restart training', action='store_true')
+args = parser.parse_args()
 
-def run(args):
+
+def run():
+    global args
     tf.logging.set_verbosity(tf.logging.INFO)
     loader = data0.DataLoader(TIME_SHIFT, k_cols, args.parallel)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
@@ -144,10 +152,4 @@ def run(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("parallel", type=int, nargs='?', help="database operation parallel level",
-                        action='store_const', default=multiprocessing.cpu_count())
-    parser.add_argument(
-        "--restart", help="restart training", action='store_true')
-    args = parser.parse_args()
-    run(args)
+    run()
