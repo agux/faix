@@ -39,7 +39,7 @@ k_cols = [
 ]
 
 parser = argparse.ArgumentParser()
-parser.add_argument('parallel', nargs='?', help='database operation parallel level',
+parser.add_argument('parallel', type=int, nargs='?', help='database operation parallel level',
                     default=multiprocessing.cpu_count())
 parser.add_argument(
     '--restart', help='restart training', action='store_true')
