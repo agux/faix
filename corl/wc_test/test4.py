@@ -90,9 +90,9 @@ def run():
         summary, train_writer, test_writer = collect_summary(
             sess, model, summary_dir)
 
+        test_summary_str = None
         while True:
             # bno = epoch*TEST_INTERVAL
-            test_summary_str = None
             epoch = bno // TEST_INTERVAL
             if bno % TEST_INTERVAL == 0:
                 print('{} running on test set...'.format(strftime("%H:%M:%S")))
