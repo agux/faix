@@ -4,6 +4,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
+import argparse
 import tensorflow as tf
 # pylint: disable-msg=E0401
 from model import base as base_model
@@ -13,9 +14,12 @@ from time import strftime
 import os
 import numpy as np
 import math
+import multiprocessing
+import shutil
 
 N_TEST = 100
 TEST_INTERVAL = 50
+SAVE_INTERVAL = 10
 LAYER_WIDTH = 512
 MAX_STEP = 50
 TIME_SHIFT = 4
@@ -35,9 +39,9 @@ k_cols = [
 ]
 
 
-def run():
+def run(args):
     tf.logging.set_verbosity(tf.logging.INFO)
-    loader = data0.DataLoader(TIME_SHIFT, k_cols)
+    loader = data0.DataLoader(TIME_SHIFT, k_cols, args.parallel)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     tuuids, tdata, tvals, tseqlen = loader.loadTestSet(MAX_STEP, N_TEST)
     print('input shape: {}'.format(tdata.shape))
@@ -51,63 +55,70 @@ def run():
             data=data,
             target=target,
             seqlen=seqlen,
-            dim = DIM,
+            dim=DIM,
             layer_width=LAYER_WIDTH,
             learning_rate=LEARNING_RATE)
         model_name = model.getName()
-        f = __file__
-        fbase = f[f.rfind('/')+1:f.rindex('.py')]
-        base_dir = '{}/{}_{}/{}'.format(LOG_DIR, fbase,
-                                        model_name, strftime("%Y%m%d_%H%M%S"))
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
-        if tf.gfile.Exists(base_dir):
-            tf.gfile.DeleteRecursively(base_dir)
-        tf.gfile.MakeDirs(base_dir)
-        sess.run(tf.global_variables_initializer())
-        summary, train_writer, test_writer = collect_summary(
-            sess, model, base_dir)
+        f = __file__
+        testn = f[f.rfind('/')+1:f.rindex('.py')]
+        base_dir = '{}/{}_{}'.format(LOG_DIR, testn, model_name)
+        training_dir = os.path.join(base_dir, 'training')
+        summary_dir = os.path.join(training_dir, 'summary')
+        checkpoint_file = os.path.join(training_dir, 'model.ckpt')
         saver = tf.train.Saver()
+
+        summary_str = None
         bno = 0
         epoch = 0
+        if tf.gfile.Exists(training_dir):
+            # tf.gfile.DeleteRecursively(base_dir)
+            saver.restore(sess, training_dir)
+            bno = sess.run(tf.train.get_or_create_global_step())
+        else:
+            sess.run(tf.global_variables_initializer())
+            tf.gfile.MakeDirs(training_dir)
+
+        summary, train_writer, test_writer = collect_summary(
+            sess, model, summary_dir)
+
         while True:
-            bno = epoch*TEST_INTERVAL
-            print('{} running on test set...'.format(strftime("%H:%M:%S")))
-            feeds = {data: tdata, target: tvals, seqlen: tseqlen}
-            mse, worst, test_summary_str = sess.run(
-                [model.cost, model.worst, summary], feeds)
-            bidx, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
-            print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
-                strftime("%H:%M:%S"), epoch, math.sqrt(mse), max_diff, predict, actual, tuuids[bidx]))
-            summary_str = None
-            fin = False
-            for _ in range(TEST_INTERVAL):
-                bno = bno+1
-                print('{} loading training data for batch {}...'.format(
-                    strftime("%H:%M:%S"), bno))
-                _, trdata, trvals, trseqlen = loader.loadTrainingData(
-                    bno, MAX_STEP)
-                if len(trdata) > 0:
-                    print('{} training...'.format(strftime("%H:%M:%S")))
-                else:
-                    print('{} end of training data, finish training.'.format(
-                        strftime("%H:%M:%S")))
-                    fin = True
-                    break
-                feeds = {data: trdata, target: trvals,  seqlen: trseqlen}
-                summary_str, worst = sess.run(
-                    [summary, model.worst, model.optimize], feeds)[:-1]
+            # bno = epoch*TEST_INTERVAL
+            test_summary_str = None
+            epoch = bno // TEST_INTERVAL
+            if bno % TEST_INTERVAL == 0:
+                print('{} running on test set...'.format(strftime("%H:%M:%S")))
+                feeds = {data: tdata, target: tvals, seqlen: tseqlen}
+                mse, worst, test_summary_str = sess.run(
+                    [model.cost, model.worst, summary], feeds)
                 bidx, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
-                print('{} bno {} max_diff {:3.4f} predict {} actual {}'.format(
-                    strftime("%H:%M:%S"), bno, max_diff, predict, actual))
-                train_writer.add_summary(summary_str, bno)
-                test_writer.add_summary(test_summary_str, bno)
-                train_writer.flush()
-                test_writer.flush()
-            checkpoint_file = os.path.join(base_dir, 'model.ckpt')
-            saver.save(sess, checkpoint_file, global_step=bno)
-            epoch += 1
-            if fin:
+                print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
+                    strftime("%H:%M:%S"), epoch, math.sqrt(mse), max_diff, predict, actual, tuuids[bidx]))
+
+            bno = bno+1
+            print('{} loading training data for batch {}...'.format(
+                strftime("%H:%M:%S"), bno))
+            _, trdata, trvals, trseqlen = loader.loadTrainingData(
+                bno, MAX_STEP)
+            if len(trdata) > 0:
+                print('{} training...'.format(strftime("%H:%M:%S")))
+            else:
+                print('{} end of training data, finish training.'.format(
+                    strftime("%H:%M:%S")))
                 break
+            feeds = {data: trdata, target: trvals,  seqlen: trseqlen}
+            summary_str, worst = sess.run(
+                [summary, model.worst, model.optimize], feeds)[:-1]
+            bidx, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
+            print('{} bno {} max_diff {:3.4f} predict {} actual {}'.format(
+                strftime("%H:%M:%S"), bno, max_diff, predict, actual))
+            train_writer.add_summary(summary_str, bno)
+            test_writer.add_summary(test_summary_str, bno)
+            # train_writer.flush()
+            # test_writer.flush()
+            if bno % SAVE_INTERVAL == 0:
+                saver.save(sess, checkpoint_file,
+                           global_step=tf.train.get_global_step())
         # test last epoch
         print('{} running on test set...'.format(strftime("%H:%M:%S")))
         feeds = {data: tdata, target: tvals, seqlen: tseqlen}
@@ -120,7 +131,23 @@ def run():
         test_writer.add_summary(test_summary_str, bno)
         train_writer.flush()
         test_writer.flush()
+        saver.save(sess, checkpoint_file,
+                   global_step=tf.train.get_global_step())
+        # training finished, move to 'trained' folder
+        trained = os.path.join(base_dir, 'trained')
+        tf.gfile.MakeDirs(trained)
+        tmp_dir = os.path.join(
+            base_dir, '{}'.format(strftime("%Y%m%d_%H%M%S")))
+        os.rename(training_dir, tmp_dir)
+        shutil.move(tmp_dir, trained)
+        print('{} model is saved to {}'.format(strftime("%H:%M:%S"), trained))
 
 
 if __name__ == '__main__':
-    run()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("parallel", nargs='?', help="database operation parallel level",
+                        action='store_const', default=multiprocessing.cpu_count())
+    parser.add_argument(
+        "--restart", help="restart training", action='store_true')
+    args = parser.parse_args()
+    run(args)

@@ -56,8 +56,6 @@ ftQueryTpl = (
     "LIMIT %s "
 )
 
-num_cores = multiprocessing.cpu_count()
-
 
 def getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     '''
@@ -110,14 +108,15 @@ def getSeries(uuid, code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQu
 
 
 class DataLoader:
-    def __init__(self, time_shift=0, feat_cols=None):
+    def __init__(self, time_shift=0, feat_cols=None, num_cores=multiprocessing.cpu_count()):
+        print("DataLoader using parallel level:{}".format(num_cores))
         self.time_shift = time_shift
+        self._num_cores = num_cores
         self._feat_cols = k_cols if feat_cols is None else feat_cols
         self._qk = None
         self._qd = None
 
     def loadTestSet(self, max_step, ntest):
-        global num_cores
         cnx = connect()
         try:
             rn = np.random.randint(ntest)
@@ -137,7 +136,7 @@ class DataLoader:
             tset = cursor.fetchall()
             cursor.close()
             qk, qd = self.getFtQuery()
-            r = Parallel(n_jobs=num_cores)(delayed(getSeries)(
+            r = Parallel(n_jobs=self._num_cores)(delayed(getSeries)(
                 uuid, code, klid, rcode, val, max_step, self.time_shift, qk, qd
             ) for uuid, code, klid, rcode, val in tset)
             uuids, data, vals, seqlen = zip(*r)
@@ -152,7 +151,6 @@ class DataLoader:
             cnx.close()
 
     def loadTrainingData(self, batch_no, max_step):
-        global num_cores
         cnx = connect()
         try:
             cursor = cnx.cursor(buffered=True)
@@ -172,7 +170,7 @@ class DataLoader:
             uuids, data, vals, seqlen = [], [], [], []
             if total > 0:
                 qk, qd = self.getFtQuery()
-                r = Parallel(n_jobs=num_cores)(delayed(getSeries)(
+                r = Parallel(n_jobs=self._num_cores)(delayed(getSeries)(
                     uuid, code, klid, rcode, val, max_step, self.time_shift, qk, qd
                 ) for uuid, code, klid, rcode, val in train_set)
                 uuids, data, vals, seqlen = zip(*r)
