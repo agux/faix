@@ -186,6 +186,7 @@ class SRnnRegressor:
             actual = tf.gather(self.target, bidx)
             return bidx, max_diff, predict, actual
 
+
 class SRnnRegressorV2:
     '''
     Simple RNN Regressor using one of:
@@ -359,18 +360,30 @@ class SRnnRegressorV2:
             actual = tf.gather(self.target, bidx)
             return bidx, max_diff, predict, actual
 
+
 class SRnnRegressorV3:
     '''
     Simple RNN Regressor using GridRNNCell, internal cell type is LSTMBlockCell.
     '''
 
-    def __init__(self, data, target, seqlen, layer_width=200, dim=3, learning_rate=1e-3):
+    def __init__(self, data=None, target=None, seqlen=None, layer_width=200, dim=3, learning_rate=1e-3):
         self.data = data
         self.target = target
         self.seqlen = seqlen
         self._layer_width = layer_width
         self._dim = dim
         self._learning_rate = learning_rate
+        if data is not None and target is not None and seqlen is not None:
+            self.logits
+            self.optimize
+            self.cost
+            self.worst
+
+    def setNodes(self, uuids, features, target, seqlen):
+        self.uuids = uuids
+        self.data = features
+        self.target = target
+        self.seqlen = seqlen
         self.logits
         self.optimize
         self.cost
@@ -425,7 +438,6 @@ class SRnnRegressorV3:
         )
         output = tf.concat(output, 1)
         output = self.last_relevant(output, self.seqlen)
-        print('last time step: {}'.format(output.get_shape()))
         return output
 
     @staticmethod
@@ -455,6 +467,7 @@ class SRnnRegressorV3:
             sqd = tf.squared_difference(logits, self.target)
             bidx = tf.argmax(sqd)
             max_diff = tf.sqrt(tf.reduce_max(sqd))
+            uuid = tf.gather(self.uuids, bidx)
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
-            return bidx, max_diff, predict, actual
+            return uuid, max_diff, predict, actual

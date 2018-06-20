@@ -8,7 +8,7 @@ import argparse
 import tensorflow as tf
 # pylint: disable-msg=E0401
 from model import base as base_model
-from wc_data import base as data0
+from wc_data import input_fn
 from test1 import collect_summary
 from time import strftime
 import os
@@ -27,7 +27,7 @@ DIM = 5
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
-# pylint: disable-msg=E0601
+# pylint: disable-msg=E0601,E1101
 
 
 k_cols = [
@@ -49,20 +49,8 @@ args = parser.parse_args()
 def run():
     global args
     tf.logging.set_verbosity(tf.logging.INFO)
-    loader = data0.DataLoader(TIME_SHIFT, k_cols, args.parallel)
-    print('{} loading test data...'.format(strftime("%H:%M:%S")))
-    tuuids, tdata, tvals, tseqlen = loader.loadTestSet(MAX_STEP, N_TEST)
-    print('input shape: {}'.format(tdata.shape))
-    print('target shape: {}'.format(tvals.shape))
-    featSize = tdata.shape[2]
-    data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
-    target = tf.placeholder(tf.float32, [None], "target")
-    seqlen = tf.placeholder(tf.int32, [None], "seqlen")
     with tf.Session() as sess:
         model = base_model.SRnnRegressorV3(
-            data=data,
-            target=target,
-            seqlen=seqlen,
             dim=DIM,
             layer_width=LAYER_WIDTH,
             learning_rate=LEARNING_RATE)
@@ -74,67 +62,86 @@ def run():
         training_dir = os.path.join(base_dir, 'training')
         summary_dir = os.path.join(training_dir, 'summary')
         checkpoint_file = os.path.join(training_dir, 'model.ckpt')
-        saver = tf.train.Saver()
+        saver = None
 
         summary_str = None
+        d = None
         bno = 0
         epoch = 0
+        restored = False
+        ckpt = tf.train.get_checkpoint_state(training_dir)
+
         if tf.gfile.Exists(training_dir):
-            # tf.gfile.DeleteRecursively(base_dir)
-            saver.restore(sess, training_dir)
-            bno = sess.run(tf.train.get_or_create_global_step())
-        else:
+            if ckpt is not None and ckpt.model_checkpoint_path:
+                # Extract from checkpoint filename
+                bno = int(os.path.basename(
+                    ckpt.model_checkpoint_path).split('-')[1])
+                d = input_fn.getInputs(
+                    bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel)
+                model.setNodes(d['uuids'], d['features'],
+                               d['labels'], d['seqlens'])
+                saver = tf.train.Saver()
+                saver.restore(sess, training_dir)
+                bno = sess.run(tf.train.get_or_create_global_step())
+                print('{} resume from last training, bno = {}'.format(
+                    strftime("%H:%M:%S"), bno))
+                restored = True
+            else:
+                tf.gfile.DeleteRecursively(training_dir)
+
+        if not restored:
+            d = input_fn.getInputs(
+                bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel)
+            model.setNodes(d['uuids'], d['features'],
+                           d['labels'], d['seqlens'])
+            saver = tf.train.Saver()
             sess.run(tf.global_variables_initializer())
             tf.gfile.MakeDirs(training_dir)
 
+        train_handle, test_handle = sess.run(
+            [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
+        train_feed = {d['handle']: train_handle}
+        test_feed = {d['handle']: test_handle}
+
         summary, train_writer, test_writer = collect_summary(
             sess, model, summary_dir)
-
         test_summary_str = None
         while True:
             # bno = epoch*TEST_INTERVAL
             epoch = bno // TEST_INTERVAL
             if bno % TEST_INTERVAL == 0:
                 print('{} running on test set...'.format(strftime("%H:%M:%S")))
-                feeds = {data: tdata, target: tvals, seqlen: tseqlen}
                 mse, worst, test_summary_str = sess.run(
-                    [model.cost, model.worst, summary], feeds)
-                bidx, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
+                    [model.cost, model.worst, summary], test_feed)
+                uuid, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
                 print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
-                    strftime("%H:%M:%S"), epoch, math.sqrt(mse), max_diff, predict, actual, tuuids[bidx]))
-
-            bno = bno+1
-            print('{} loading training data for batch {}...'.format(
-                strftime("%H:%M:%S"), bno))
-            _, trdata, trvals, trseqlen = loader.loadTrainingData(
-                bno, MAX_STEP)
-            if len(trdata) > 0:
-                print('{} training...'.format(strftime("%H:%M:%S")))
-            else:
-                print('{} end of training data, finish training.'.format(
-                    strftime("%H:%M:%S")))
+                    strftime("%H:%M:%S"), epoch, math.sqrt(mse), max_diff, predict, actual, uuid))
+            try:
+                print('{} training batch {}'.format(
+                    strftime("%H:%M:%S"), bno+1))
+                summary_str, worst = sess.run(
+                    [summary, model.worst, model.optimize], train_feed)[:-1]
+            except tf.errors.OutOfRangeError:
+                print("End of Dataset.")
                 break
-            feeds = {data: trdata, target: trvals,  seqlen: trseqlen}
-            summary_str, worst = sess.run(
-                [summary, model.worst, model.optimize], feeds)[:-1]
-            bidx, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
+            bno = bno+1
+            _, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
             print('{} bno {} max_diff {:3.4f} predict {} actual {}'.format(
                 strftime("%H:%M:%S"), bno, max_diff, predict, actual))
             train_writer.add_summary(summary_str, bno)
             test_writer.add_summary(test_summary_str, bno)
-            # train_writer.flush()
-            # test_writer.flush()
+            train_writer.flush()
+            test_writer.flush()
             if bno % SAVE_INTERVAL == 0:
                 saver.save(sess, checkpoint_file,
                            global_step=tf.train.get_global_step())
         # test last epoch
         print('{} running on test set...'.format(strftime("%H:%M:%S")))
-        feeds = {data: tdata, target: tvals, seqlen: tseqlen}
         mse, worst, test_summary_str = sess.run(
-            [model.cost, model.worst, summary], feeds)
-        bidx, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
+            [model.cost, model.worst, summary], test_feed)
+        uuid, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
         print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
-            strftime("%H:%M:%S"), epoch, math.sqrt(mse), max_diff, predict, actual, tuuids[bidx]))
+            strftime("%H:%M:%S"), epoch, math.sqrt(mse), max_diff, predict, actual, uuid))
         train_writer.add_summary(summary_str, bno)
         test_writer.add_summary(test_summary_str, bno)
         train_writer.flush()
