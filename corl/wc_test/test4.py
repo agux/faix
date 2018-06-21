@@ -124,7 +124,7 @@ def run():
         while True:
             # bno = epoch*TEST_INTERVAL
             epoch = bno // TEST_INTERVAL
-            if bno % TEST_INTERVAL == 0:
+            if restored or bno % TEST_INTERVAL == 0:
                 print('{} running on test set...'.format(strftime("%H:%M:%S")))
                 mse, worst, test_summary_str = sess.run(
                     [model.cost, model.worst, summary], test_feed)
