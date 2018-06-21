@@ -10,18 +10,20 @@ from pprint import pprint
 from time import strftime
 from joblib import Parallel, delayed
 
+cnxpool = mysql.connector.pooling.MySQLConnectionPool(
+    pool_name = "dbpool",
+    pool_size = 16,
+    host='127.0.0.1',
+    user='mysql',
+    database='secu',
+    password='123456',
+    # ssl_ca='',
+    # use_pure=True,
+    connect_timeout=60000
+)
 
 def connect():
-    return mysql.connector.connect(
-        pool_name = "default_pool",
-        pool_size = 32,
-        host='127.0.0.1',
-        user='mysql',
-        database='secu',
-        password='123456',
-        # ssl_ca='',
-        # use_pure=True,
-        connect_timeout=60000)
+    return cnxpool.get_connection()
 
 
 '''
