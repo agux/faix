@@ -6,7 +6,8 @@ from joblib import Parallel, delayed
 from loky import get_reusable_executor
 from mysql.connector.pooling import MySQLConnectionPool
 import tensorflow as tf
-import sys,os
+import sys
+import os
 import multiprocessing
 import numpy as np
 
@@ -16,6 +17,7 @@ feat_cols = []
 time_shift = None
 max_step = None
 _prefetch = None
+db_pool_size = None
 
 
 maxbno_query = (
@@ -36,11 +38,11 @@ cnxpool = None
 
 
 def _init():
-    global cnxpool
+    global cnxpool, db_pool_size
     print("PID %d: initializing mysql connection pool..." % os.getpid())
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
-        pool_size=16,
+        pool_size=db_pool_size or 5,
         host='127.0.0.1',
         user='mysql',
         database='secu',
@@ -56,7 +58,7 @@ def _getExecutor():
     if _executor is not None:
         return _executor
     _executor = get_reusable_executor(
-        max_workers=parallel*_prefetch, 
+        max_workers=parallel*_prefetch,
         initializer=_init,
         timeout=45)
     return _executor
@@ -217,7 +219,7 @@ def _getDataSetMeta(flag, start=0):
     return max_bno, batch_size
 
 
-def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), pfetch=2):
+def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), pfetch=2, pool=None):
     """Input function for the wcc training dataset.
 
     Returns:
@@ -225,15 +227,17 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
         uuids,features,labels,seqlens,train_iter,test_iter
     """
     # Create dataset for training
-    global feat_cols, max_step, time_shift, parallel, _prefetch
+    global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size
     time_shift = shift
     feat_cols = cols
     max_step = step
     parallel = cores
     _prefetch = pfetch
+    db_pool_size = pool
     feat_size = len(cols)*2*(shift+1)
     print("{} Using parallel: {}, prefetch: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch))
+    _init()
     with tf.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max
         max_bno, _ = _getDataSetMeta("TRAIN", start)

@@ -47,6 +47,8 @@ parser.add_argument('--db_host', type=str, help='database host address',
                     default=None)
 parser.add_argument('--db_port', type=int, help='database listening port',
                     default=None)
+parser.add_argument('--db_pool', type=int, help='database connection pool size',
+                    default=None)
 parser.add_argument(
     '--restart', help='restart training', action='store_true')
 args = parser.parse_args()
@@ -88,7 +90,7 @@ def run():
                 print('{} resume from last training, bno = {}'.format(
                     strftime("%H:%M:%S"), bno))
                 d = input_fn.getInputs(
-                    bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel, args.prefetch)
+                    bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel, args.prefetch, args.db_pool)
                 model.setNodes(d['uuids'], d['features'],
                                d['labels'], d['seqlens'])
                 saver = tf.train.Saver()
@@ -103,7 +105,7 @@ def run():
 
         if not restored:
             d = input_fn.getInputs(
-                bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel, args.prefetch)
+                bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel, args.prefetch, args.db_pool)
             model.setNodes(d['uuids'], d['features'],
                            d['labels'], d['seqlens'])
             saver = tf.train.Saver()
