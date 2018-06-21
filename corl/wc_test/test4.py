@@ -131,6 +131,7 @@ def run():
                 uuid, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
                 print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
                     strftime("%H:%M:%S"), epoch, math.sqrt(mse), max_diff, predict, actual, uuid))
+                restored = False
             try:
                 print('{} training batch {}'.format(
                     strftime("%H:%M:%S"), bno+1))
