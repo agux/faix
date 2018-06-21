@@ -458,7 +458,7 @@ class SRnnRegressorV3:
     def optimize(self):
         return tf.train.AdamOptimizer(self._learning_rate,
                                       epsilon=1e-7).minimize(
-            self.cost, global_step=tf.train.get_global_step())
+            self.cost, global_step=tf.train.get_or_create_global_step())
 
     @lazy_property
     def worst(self):

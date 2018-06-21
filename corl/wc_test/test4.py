@@ -136,7 +136,7 @@ def run():
             test_writer.add_summary(test_summary_str, bno)
             train_writer.flush()
             test_writer.flush()
-            if bno % SAVE_INTERVAL == 0:
+            if bno == 1 or bno % SAVE_INTERVAL == 0:
                 saver.save(sess, checkpoint_file,
                            global_step=tf.train.get_global_step())
         # test last epoch
