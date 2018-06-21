@@ -37,7 +37,7 @@ def _getExecutor():
     if _executor is not None:
         return _executor
     _executor = get_reusable_executor(
-        max_workers=parallel*_prefetch, timeout=20)
+        max_workers=parallel*_prefetch, timeout=45)
     return _executor
 
 
