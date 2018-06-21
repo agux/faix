@@ -78,21 +78,27 @@ def run():
         ckpt = tf.train.get_checkpoint_state(training_dir)
 
         if tf.gfile.Exists(training_dir):
-            if ckpt is not None and ckpt.model_checkpoint_path:
+            print("{} training folder exists".format(strftime("%H:%M:%S")))
+            if ckpt and ckpt.model_checkpoint_path:
+                print("{} found model checkpoint path: {}".format(
+                    strftime("%H:%M:%S"), ckpt.model_checkpoint_path))
                 # Extract from checkpoint filename
                 bno = int(os.path.basename(
                     ckpt.model_checkpoint_path).split('-')[1])
+                print('{} resume from last training, bno = {}'.format(
+                    strftime("%H:%M:%S"), bno))
                 d = input_fn.getInputs(
                     bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel, args.prefetch)
                 model.setNodes(d['uuids'], d['features'],
                                d['labels'], d['seqlens'])
                 saver = tf.train.Saver()
                 saver.restore(sess, training_dir)
-                bno = sess.run(tf.train.get_or_create_global_step())
-                print('{} resume from last training, bno = {}'.format(
-                    strftime("%H:%M:%S"), bno))
+                print('{} check restored global step: {}'.format(
+                    strftime("%H:%M:%S"), sess.run(tf.train.get_global_step())))
                 restored = True
             else:
+                print("{} model checkpoint path not found, cleaning training folder".format(
+                    strftime("%H:%M:%S")))
                 tf.gfile.DeleteRecursively(training_dir)
 
         if not restored:
@@ -106,7 +112,7 @@ def run():
 
         train_handle, test_handle = sess.run(
             [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
-        
+
         train_feed = {d['handle']: train_handle}
         test_feed = {d['handle']: test_handle}
 
