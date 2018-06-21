@@ -3,6 +3,7 @@
 from base import connect, getSeries, getBatch, ftQueryTpl, k_cols
 from time import strftime
 from joblib import Parallel, delayed
+from loky import get_reusable_executor
 import tensorflow as tf
 import sys
 import multiprocessing
@@ -13,6 +14,7 @@ parallel = None
 feat_cols = []
 time_shift = None
 max_step = None
+_prefetch = None
 
 
 maxbno_query = (
@@ -26,6 +28,22 @@ maxbno_query = (
     "    WHERE "
     "        flag LIKE %s) t "
 )
+
+_executor = None
+
+
+def _getExecutor():
+    global parallel, _executor, _prefetch
+    if _executor is not None:
+        return _executor
+    _executor = get_reusable_executor(
+        max_workers=parallel*_prefetch, timeout=20)
+    return _executor
+
+
+def _getSeries(p):
+    uuid, code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQueryD = p
+    return getSeries(uuid, code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQueryD)
 
 
 def _loadTestSet(max_step, ntest):
@@ -59,7 +77,7 @@ def _loadTestSet(max_step, ntest):
         # data = [batch, max_step, feature*time_shift]
         # vals = [batch]
         # seqlen = [batch]
-        return np.array(uuids, 'U'), np.array(data,'f'), np.array(vals,'f'), np.array(seqlen, 'i')
+        return np.array(uuids, 'U'), np.array(data, 'f'), np.array(vals, 'f'), np.array(seqlen, 'i')
     except:
         print(sys.exc_info()[0])
         raise
@@ -67,10 +85,10 @@ def _loadTestSet(max_step, ntest):
         cnx.close()
 
 
-def _loadTrainingData(batch_no):
+def _loadTrainingData(flag):
     global max_step, parallel, time_shift
     print("{} loading training set {}...".format(
-        strftime("%H:%M:%S"), batch_no))
+        strftime("%H:%M:%S"), flag))
     cnx = connect()
     try:
         cursor = cnx.cursor(buffered=True)
@@ -82,7 +100,6 @@ def _loadTrainingData(batch_no):
             'WHERE '
             "   flag = %s"
         )
-        flag = 'TRAIN_{}'.format(batch_no)
         cursor.execute(query, (flag,))
         train_set = cursor.fetchall()
         total = cursor.rowcount
@@ -90,14 +107,16 @@ def _loadTrainingData(batch_no):
         uuids, data, vals, seqlen = [], [], [], []
         if total > 0:
             qk, qd = _getFtQuery()
-            r = Parallel(n_jobs=parallel)(delayed(getSeries)(
-                uuid, code, klid, rcode, val, max_step, time_shift, qk, qd
-            ) for uuid, code, klid, rcode, val in train_set)
+            #joblib doesn't support nested threading
+            exc = _getExecutor()
+            params = [(uuid, code, klid, rcode, val, max_step, time_shift, qk, qd)
+                      for uuid, code, klid, rcode, val in train_set]
+            r = list(exc.map(_getSeries, params))
             uuids, data, vals, seqlen = zip(*r)
         # data = [batch, max_step, feature*time_shift]
         # vals = [batch]
         # seqlen = [batch]
-        return np.array(uuids,'U'), np.array(data,'f'), np.array(vals,'f'), np.array(seqlen, 'i')
+        return np.array(uuids, 'U'), np.array(data, 'f'), np.array(vals, 'f'), np.array(seqlen, 'i')
     except:
         print(sys.exc_info()[0])
         raise
@@ -176,7 +195,7 @@ def _getDataSetMeta(flag, start=0):
     return max_bno, batch_size
 
 
-def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count()):
+def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), prefetch=2):
     """Input function for the wcc training dataset.
 
     Returns:
@@ -184,11 +203,12 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
         uuids,features,labels,seqlens,train_iter,test_iter
     """
     # Create dataset for training
-    global feat_cols, max_step, time_shift, parallel
+    global feat_cols, max_step, time_shift, parallel, _prefetch
     time_shift = shift
     feat_cols = cols
     max_step = step
     parallel = cores
+    _prefetch = prefetch
     feat_size = len(cols)*2*(shift+1)
     print("{} Using parallel level:{}".format(strftime("%H:%M:%S"), parallel))
     with tf.variable_scope("build_inputs"):
@@ -202,7 +222,7 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
                 tf.py_func(_loadTrainingData, [f], [
                     tf.string, tf.float32, tf.float32, tf.int32])
             )
-        ).batch(1).prefetch(2)
+        ).batch(1).prefetch(prefetch)
         # Create dataset for testing
         max_bno, batch_size = _getDataSetMeta("TEST", 1)
         test_dataset = tf.data.Dataset.from_tensor_slices(
@@ -215,7 +235,8 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
         types = (tf.string, tf.float32, tf.float32, tf.int32)
         shapes = (tf.TensorShape([None]), tf.TensorShape(
             [None, step, feat_size]), tf.TensorShape([None]), tf.TensorShape([None]))
-        iter = tf.data.Iterator.from_string_handle(handle, types, train_dataset.output_shapes)
+        iter = tf.data.Iterator.from_string_handle(
+            handle, types, train_dataset.output_shapes)
 
         next_el = iter.get_next()
         uuids = tf.squeeze(next_el[0])

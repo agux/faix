@@ -39,8 +39,10 @@ k_cols = [
 ]
 
 parser = argparse.ArgumentParser()
-parser.add_argument('parallel', type=int, nargs='?', help='database operation parallel level',
+parser.add_argument('--parallel', type=int, help='database operation parallel level',
                     default=multiprocessing.cpu_count())
+parser.add_argument('--prefetch', type=int, help='dataset prefetch batches',
+                    default=2)
 parser.add_argument(
     '--restart', help='restart training', action='store_true')
 args = parser.parse_args()
@@ -77,7 +79,7 @@ def run():
                 bno = int(os.path.basename(
                     ckpt.model_checkpoint_path).split('-')[1])
                 d = input_fn.getInputs(
-                    bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel)
+                    bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel, args.prefetch)
                 model.setNodes(d['uuids'], d['features'],
                                d['labels'], d['seqlens'])
                 saver = tf.train.Saver()
@@ -91,7 +93,7 @@ def run():
 
         if not restored:
             d = input_fn.getInputs(
-                bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel)
+                bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel, args.prefetch)
             model.setNodes(d['uuids'], d['features'],
                            d['labels'], d['seqlens'])
             saver = tf.train.Saver()
