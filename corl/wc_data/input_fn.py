@@ -2,7 +2,7 @@
 
 from base import getSeries, getBatch, ftQueryTpl, k_cols
 from time import strftime
-from joblib import Parallel, delayed
+# from joblib import Parallel, delayed
 from loky import get_reusable_executor
 from mysql.connector.pooling import MySQLConnectionPool
 import tensorflow as tf
@@ -90,12 +90,10 @@ def _loadTestSet(max_step, ntest):
         tset = cursor.fetchall()
         cursor.close()
         qk, qd = _getFtQuery()
-        # print("====uuid:{},code:{},klid:{},rcode:{},val:{},max_step:{},time_shift:{},qk:{},qd:{}".format(
-        #     tset[0][0],tset[0][1],tset[0][2],tset[0][3],tset[0][4],max_step,time_shift,qk,qd
-        # ))
-        r = Parallel(n_jobs=parallel)(delayed(getSeries)(
-            uuid, code, klid, rcode, val, max_step, time_shift, qk, qd
-        ) for uuid, code, klid, rcode, val in tset)
+        exc = _getExecutor()
+        params = [(uuid, code, klid, rcode, val, max_step, time_shift, qk, qd)
+                    for uuid, code, klid, rcode, val in tset]
+        r = list(exc.map(_getSeries, params))
         uuids, data, vals, seqlen = zip(*r)
         # data = [batch, max_step, feature*time_shift]
         # vals = [batch]
