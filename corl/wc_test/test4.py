@@ -43,6 +43,10 @@ parser.add_argument('--parallel', type=int, help='database operation parallel le
                     default=multiprocessing.cpu_count())
 parser.add_argument('--prefetch', type=int, help='dataset prefetch batches',
                     default=2)
+parser.add_argument('--db_host', type=string, help='database host address',
+                    default=None)
+parser.add_argument('--db_port', type=int, help='database listening port',
+                    default=None)
 parser.add_argument(
     '--restart', help='restart training', action='store_true')
 args = parser.parse_args()

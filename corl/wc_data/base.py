@@ -13,6 +13,8 @@ from joblib import Parallel, delayed
 
 def connect():
     return mysql.connector.connect(
+        pool_name = "default_pool",
+        pool_size = 32,
         host='127.0.0.1',
         user='mysql',
         database='secu',
