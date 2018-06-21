@@ -1,11 +1,12 @@
 """Create the input data pipeline using `tf.data`"""
 
-from base import connect, getSeries, getBatch, ftQueryTpl, k_cols
+from base import getSeries, getBatch, ftQueryTpl, k_cols
 from time import strftime
 from joblib import Parallel, delayed
 from loky import get_reusable_executor
+from mysql.connector.pooling import MySQLConnectionPool
 import tensorflow as tf
-import sys
+import sys,os
 import multiprocessing
 import numpy as np
 
@@ -31,13 +32,33 @@ maxbno_query = (
 
 _executor = None
 
+cnxpool = None
+
+
+def _init():
+    global cnxpool
+    print("PID %d: initializing mysql connection pool..." % os.getpid())
+    cnxpool = MySQLConnectionPool(
+        pool_name="dbpool",
+        pool_size=16,
+        host='127.0.0.1',
+        user='mysql',
+        database='secu',
+        password='123456',
+        # ssl_ca='',
+        # use_pure=True,
+        connect_timeout=60000
+    )
+
 
 def _getExecutor():
     global parallel, _executor, _prefetch
     if _executor is not None:
         return _executor
     _executor = get_reusable_executor(
-        max_workers=parallel*_prefetch, timeout=45)
+        max_workers=parallel*_prefetch, 
+        initializer=_init,
+        timeout=45)
     return _executor
 
 
@@ -47,8 +68,8 @@ def _getSeries(p):
 
 
 def _loadTestSet(max_step, ntest):
-    global parallel, time_shift
-    cnx = connect()
+    global parallel, time_shift, cnxpool
+    cnx = cnxpool.get_connection()
     try:
         rn = np.random.randint(ntest)
         flag = 'TEST_{}'.format(rn)
@@ -86,10 +107,10 @@ def _loadTestSet(max_step, ntest):
 
 
 def _loadTrainingData(flag):
-    global max_step, parallel, time_shift
+    global max_step, parallel, time_shift, cnxpool
     print("{} loading training set {}...".format(
         strftime("%H:%M:%S"), flag))
-    cnx = connect()
+    cnx = cnxpool.get_connection()
     try:
         cursor = cnx.cursor(buffered=True)
         query = (
@@ -107,7 +128,7 @@ def _loadTrainingData(flag):
         uuids, data, vals, seqlen = [], [], [], []
         if total > 0:
             qk, qd = _getFtQuery()
-            #joblib doesn't support nested threading
+            # joblib doesn't support nested threading
             exc = _getExecutor()
             params = [(uuid, code, klid, rcode, val, max_step, time_shift, qk, qd)
                       for uuid, code, klid, rcode, val in train_set]
@@ -155,7 +176,8 @@ def _getFtQuery():
 
 
 def _getDataSetMeta(flag, start=0):
-    cnx = connect()
+    global cnxpool
+    cnx = cnxpool.get_connection()
     max_bno, batch_size = None, None
     try:
         print('{} querying max batch no for {} set...'.format(
@@ -210,7 +232,8 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
     parallel = cores
     _prefetch = pfetch
     feat_size = len(cols)*2*(shift+1)
-    print("{} Using parallel: {}, prefetch: {}".format(strftime("%H:%M:%S"), parallel, _prefetch))
+    print("{} Using parallel: {}, prefetch: {}".format(
+        strftime("%H:%M:%S"), parallel, _prefetch))
     with tf.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max
         max_bno, _ = _getDataSetMeta("TRAIN", start)

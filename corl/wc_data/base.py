@@ -1,5 +1,6 @@
 from __future__ import print_function
 import mysql.connector
+from mysql.connector.pooling import MySQLConnectionPool
 import sys
 import sqlalchemy as sqla
 import numpy as np
@@ -10,7 +11,7 @@ from pprint import pprint
 from time import strftime
 from joblib import Parallel, delayed
 
-cnxpool = mysql.connector.pooling.MySQLConnectionPool(
+cnxpool = MySQLConnectionPool(
     pool_name = "dbpool",
     pool_size = 16,
     host='127.0.0.1',
@@ -23,6 +24,7 @@ cnxpool = mysql.connector.pooling.MySQLConnectionPool(
 )
 
 def connect():
+    global cnxpool
     return cnxpool.get_connection()
 
 
