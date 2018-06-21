@@ -102,6 +102,8 @@ def run():
 
         train_handle, test_handle = sess.run(
             [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
+        sess.run([d['train_iter'].initializer, d['test_iter'].initializer])
+        
         train_feed = {d['handle']: train_handle}
         test_feed = {d['handle']: test_handle}
 
