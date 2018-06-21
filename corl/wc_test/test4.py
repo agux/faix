@@ -87,14 +87,14 @@ def run():
                 # Extract from checkpoint filename
                 bno = int(os.path.basename(
                     ckpt.model_checkpoint_path).split('-')[1])
-                print('{} resume from last training, bno = {}'.format(
+                print('{} resuming from last training, bno = {}'.format(
                     strftime("%H:%M:%S"), bno))
                 d = input_fn.getInputs(
                     bno+1, TIME_SHIFT, k_cols, MAX_STEP, args.parallel, args.prefetch, args.db_pool)
                 model.setNodes(d['uuids'], d['features'],
                                d['labels'], d['seqlens'])
                 saver = tf.train.Saver()
-                saver.restore(sess, training_dir)
+                saver.restore(sess, ckpt.model_checkpoint_path)
                 print('{} check restored global step: {}'.format(
                     strftime("%H:%M:%S"), sess.run(tf.train.get_global_step())))
                 restored = True
