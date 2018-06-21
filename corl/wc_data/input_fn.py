@@ -195,7 +195,7 @@ def _getDataSetMeta(flag, start=0):
     return max_bno, batch_size
 
 
-def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), prefetch=2):
+def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), pfetch=2):
     """Input function for the wcc training dataset.
 
     Returns:
@@ -208,9 +208,9 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
     feat_cols = cols
     max_step = step
     parallel = cores
-    _prefetch = prefetch
+    _prefetch = pfetch
     feat_size = len(cols)*2*(shift+1)
-    print("{} Using parallel level:{}".format(strftime("%H:%M:%S"), parallel))
+    print("{} Using parallel: {}, prefetch: {}".format(strftime("%H:%M:%S"), parallel, _prefetch))
     with tf.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max
         max_bno, _ = _getDataSetMeta("TRAIN", start)
@@ -222,7 +222,7 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
                 tf.py_func(_loadTrainingData, [f], [
                     tf.string, tf.float32, tf.float32, tf.int32])
             )
-        ).batch(1).prefetch(prefetch)
+        ).batch(1).prefetch(_prefetch)
         # Create dataset for testing
         max_bno, batch_size = _getDataSetMeta("TEST", 1)
         test_dataset = tf.data.Dataset.from_tensor_slices(
