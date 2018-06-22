@@ -1,6 +1,6 @@
 """Create the input data pipeline using `tf.data`"""
 
-from base import ftQueryTpl, k_cols
+from base import ftQueryTpl
 from time import strftime
 # from joblib import Parallel, delayed
 from loky import get_reusable_executor
@@ -22,6 +22,30 @@ db_host = None
 db_port = None
 db_pwd = None
 
+k_cols = ["lr"]
+
+ftQueryTpl = (
+    "SELECT  "
+    "    date, "
+    "    {0} "  # (d.COLS - mean) / std
+    "FROM "
+    "    kline_d_b d "
+    "        LEFT OUTER JOIN "
+    "    (SELECT  "
+    "        %s code, "
+    "        t.method, "
+    "        {1} "  # mean & std fields
+    "    FROM "
+    "        fs_stats t "
+    "    WHERE "
+    "        t.method = 'standardization' "
+    "    GROUP BY code , t.method) s USING (code) "
+    "WHERE "
+    "    d.code = %s "
+    "    {2} "
+    "ORDER BY klid "
+    "LIMIT %s "
+)
 
 maxbno_query = (
     "SELECT  "
