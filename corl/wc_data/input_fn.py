@@ -1,6 +1,6 @@
 """Create the input data pipeline using `tf.data`"""
 
-from base import getSeries, getBatch, ftQueryTpl, k_cols
+from base import ftQueryTpl, k_cols
 from time import strftime
 # from joblib import Parallel, delayed
 from loky import get_reusable_executor
@@ -18,6 +18,9 @@ time_shift = None
 max_step = None
 _prefetch = None
 db_pool_size = None
+db_host = None
+db_port = None
+db_pwd = None
 
 
 maxbno_query = (
@@ -38,15 +41,16 @@ cnxpool = None
 
 
 def _init():
-    global cnxpool, db_pool_size
+    global cnxpool, db_pool_size, db_host, db_port, db_pwd
     print("PID %d: initializing mysql connection pool..." % os.getpid())
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
         pool_size=db_pool_size or 5,
-        host='127.0.0.1',
+        host=db_host or '127.0.0.1',
+        port=db_port,
         user='mysql',
         database='secu',
-        password='123456',
+        password=db_pwd or '123456',
         # ssl_ca='',
         # use_pure=True,
         connect_timeout=60000
@@ -64,9 +68,56 @@ def _getExecutor():
     return _executor
 
 
+def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
+    '''
+    [max_step, feature*time_shift], length
+    '''
+    global cnxpool
+    cnx = cnxpool.get_connection()
+    fcursor = cnx.cursor(buffered=True)
+    try:
+        fcursor.execute(ftQueryK, (code, code, s, e, max_step+time_shift))
+        col_names = fcursor.column_names
+        featSize = (len(col_names)-1)*2
+        total = fcursor.rowcount
+        rows = fcursor.fetchall()
+        # extract dates and transform to sql 'in' query
+        dates = "'{}'".format("','".join([r[0] for r in rows]))
+        qd = ftQueryD.format(dates)
+        fcursor.execute(qd, (rcode, rcode, max_step+time_shift))
+        rtotal = fcursor.rowcount
+        r_rows = fcursor.fetchall()
+        if total != rtotal:
+            raise ValueError(
+                "rcode prior data size {} != code's: {}".format(rtotal, total))
+        batch = []
+        for t in range(time_shift+1):
+            steps = np.zeros((max_step, featSize), dtype='f')
+            offset = max_step + time_shift - total
+            s = max(0, t - offset)
+            e = total - time_shift + t
+            for i, row in enumerate(rows[s:e]):
+                for j, col in enumerate(row[1:]):
+                    steps[i+offset][j] = col
+            for i, row in enumerate(r_rows[s:e]):
+                for j, col in enumerate(row[1:]):
+                    steps[i+offset][j+featSize//2] = col
+            batch.append(steps)
+        return np.concatenate(batch, 1), total - time_shift
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        fcursor.close()
+        cnx.close()
+
+
 def _getSeries(p):
     uuid, code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQueryD = p
-    return getSeries(uuid, code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQueryD)
+    s = max(0, klid-max_step+1-time_shift)
+    batch, total = _getBatch(
+        code, s, klid, rcode, max_step, time_shift, ftQueryK, ftQueryD)
+    return uuid, batch, val, total
 
 
 def _loadTestSet(max_step, ntest):
@@ -92,7 +143,7 @@ def _loadTestSet(max_step, ntest):
         qk, qd = _getFtQuery()
         exc = _getExecutor()
         params = [(uuid, code, klid, rcode, val, max_step, time_shift, qk, qd)
-                    for uuid, code, klid, rcode, val in tset]
+                  for uuid, code, klid, rcode, val in tset]
         r = list(exc.map(_getSeries, params))
         uuids, data, vals, seqlen = zip(*r)
         # data = [batch, max_step, feature*time_shift]
@@ -217,7 +268,7 @@ def _getDataSetMeta(flag, start=0):
     return max_bno, batch_size
 
 
-def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), pfetch=2, pool=None):
+def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), pfetch=2, pool=None, host=None, port=None, pwd=None):
     """Input function for the wcc training dataset.
 
     Returns:
@@ -225,7 +276,7 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
         uuids,features,labels,seqlens,train_iter,test_iter
     """
     # Create dataset for training
-    global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size
+    global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size, db_host, db_port, db_pwd
     time_shift = shift
     feat_cols = cols
     max_step = step
@@ -233,6 +284,9 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
     _prefetch = pfetch
     db_pool_size = pool
     feat_size = len(cols)*2*(shift+1)
+    db_host = host
+    db_port = port
+    db_pwd = pwd
     print("{} Using parallel: {}, prefetch: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch))
     _init()
@@ -246,7 +300,7 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
             lambda f: tuple(
                 tf.py_func(_loadTrainingData, [f], [
                     tf.string, tf.float32, tf.float32, tf.int32])
-            )
+            ), parallel
         ).batch(1).prefetch(_prefetch)
         # Create dataset for testing
         max_bno, batch_size = _getDataSetMeta("TEST", 1)
