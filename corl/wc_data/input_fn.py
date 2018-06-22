@@ -1,6 +1,5 @@
 """Create the input data pipeline using `tf.data`"""
 
-from base import ftQueryTpl
 from time import strftime
 # from joblib import Parallel, delayed
 from loky import get_reusable_executor
