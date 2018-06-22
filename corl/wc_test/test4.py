@@ -9,7 +9,6 @@ import tensorflow as tf
 # pylint: disable-msg=E0401
 from model import base as base_model
 from wc_data import input_fn
-from test1 import collect_summary
 from time import strftime
 import os
 import numpy as np
@@ -55,6 +54,14 @@ parser.add_argument(
     '--restart', help='restart training', action='store_true')
 args = parser.parse_args()
 
+
+def collect_summary(sess, model, base_dir):
+    train_writer = tf.summary.FileWriter(base_dir + "/train", sess.graph)
+    test_writer = tf.summary.FileWriter(base_dir + "/test", sess.graph)
+    with tf.name_scope("Basic"):
+        tf.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
+    summary = tf.summary.merge_all()
+    return summary, train_writer, test_writer
 
 def run():
     global args
