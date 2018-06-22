@@ -310,8 +310,8 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
     db_host = host
     db_port = port
     db_pwd = pwd
-    print("{} Using parallel: {}, prefetch: {}".format(
-        strftime("%H:%M:%S"), parallel, _prefetch))
+    print("{} Using parallel: {}, prefetch: {} db_host: {} port: {} pwd: {}".format(
+        strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port, db_pwd))
     _init()
     with tf.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max

@@ -49,7 +49,7 @@ parser.add_argument('--db_port', type=int, help='database listening port',
 parser.add_argument('--db_pwd', type=str, help='database password',
                     default=None)
 parser.add_argument('--db_pool', type=int, help='database connection pool size',
-                    default=None)
+                    default=multiprocessing.cpu_count())
 parser.add_argument(
     '--restart', help='restart training', action='store_true')
 args = parser.parse_args()
