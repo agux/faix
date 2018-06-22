@@ -63,8 +63,11 @@ _executor = None
 cnxpool = None
 
 
-def _init():
-    global cnxpool, db_pool_size, db_host, db_port, db_pwd
+def _init(db_pool_size=None,
+          db_host=None,
+          db_port=None,
+          db_pwd=None):
+    global cnxpool
     print("PID %d: initializing mysql connection pool..." % os.getpid())
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
@@ -81,12 +84,13 @@ def _init():
 
 
 def _getExecutor():
-    global parallel, _executor, _prefetch
+    global parallel, _executor, _prefetch, db_pool_size, db_host, db_port, db_pwd
     if _executor is not None:
         return _executor
     _executor = get_reusable_executor(
         max_workers=parallel*_prefetch,
         initializer=_init,
+        initargs=(db_pool_size, db_host, db_port, db_pwd),
         timeout=45)
     return _executor
 
@@ -310,9 +314,9 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
     db_host = host
     db_port = port
     db_pwd = pwd
-    print("{} Using parallel: {}, prefetch: {} db_host: {} port: {} pwd: {}".format(
-        strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port, db_pwd))
-    _init()
+    print("{} Using parallel: {}, prefetch: {} db_host: {} port: {}".format(
+        strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port))
+    _init(db_pool_size, db_host, db_port, db_pwd)
     with tf.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max
         max_bno, _ = _getDataSetMeta("TRAIN", start)
