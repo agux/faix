@@ -70,7 +70,7 @@ def _init():
         pool_name="dbpool",
         pool_size=db_pool_size or 5,
         host=db_host or '127.0.0.1',
-        port=db_port,
+        port=db_port or 3306,
         user='mysql',
         database='secu',
         password=db_pwd or '123456',
