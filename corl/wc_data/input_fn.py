@@ -147,12 +147,12 @@ def _getSeries(p):
     return uuid, batch, val, total
 
 
-def _loadTestSet(max_step, ntest):
+def _loadTestSet(max_step, ntest, vset=None):
     global parallel, time_shift, cnxpool
     cnx = cnxpool.get_connection()
     try:
-        rn = np.random.randint(ntest)
-        flag = 'TEST_{}'.format(rn)
+        setno = vset or np.random.randint(ntest)
+        flag = 'TEST_{}'.format(setno)
         print('{} selected test set: {}'.format(
             strftime("%H:%M:%S"), flag))
         query = (
@@ -295,7 +295,7 @@ def _getDataSetMeta(flag, start=0):
     return max_bno, batch_size
 
 
-def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), pfetch=2, pool=None, host=None, port=None, pwd=None):
+def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), pfetch=2, pool=None, host=None, port=None, pwd=None, vset=None):
     """Input function for the wcc training dataset.
 
     Returns:
@@ -332,7 +332,7 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
         # Create dataset for testing
         max_bno, batch_size = _getDataSetMeta("TEST", 1)
         test_dataset = tf.data.Dataset.from_tensor_slices(
-            _loadTestSet(step, max_bno+1)).batch(batch_size).repeat()
+            _loadTestSet(step, max_bno+1, vset)).batch(batch_size).repeat()
 
         train_iterator = train_dataset.make_one_shot_iterator()
         test_iterator = test_dataset.make_one_shot_iterator()
