@@ -56,12 +56,15 @@ args = parser.parse_args()
 
 
 def collect_summary(sess, model, base_dir):
-    train_writer = tf.summary.FileWriter(base_dir + "/train", sess.graph)
-    test_writer = tf.summary.FileWriter(base_dir + "/test", sess.graph)
+    train_writer = tf.summary.FileWriter(os.path.join(
+        base_dir, "train", strftime("%Y%m%d_%H%M%S")), sess.graph)
+    test_writer = tf.summary.FileWriter(os.path.join(
+        base_dir, "test", strftime("%Y%m%d_%H%M%S")), sess.graph)
     with tf.name_scope("Basic"):
         tf.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
     summary = tf.summary.merge_all()
     return summary, train_writer, test_writer
+
 
 def run():
     global args
@@ -177,7 +180,7 @@ def run():
         trained = os.path.join(base_dir, 'trained')
         tf.gfile.MakeDirs(trained)
         tmp_dir = os.path.join(
-            base_dir, '{}'.format(strftime("%Y%m%d_%H%M%S")))
+            base_dir, strftime("%Y%m%d_%H%M%S"))
         os.rename(training_dir, tmp_dir)
         shutil.move(tmp_dir, trained)
         print('{} model is saved to {}'.format(strftime("%H:%M:%S"), trained))
