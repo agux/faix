@@ -327,7 +327,7 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
             lambda f: tuple(
                 tf.py_func(_loadTrainingData, [f], [
                     tf.string, tf.float32, tf.float32, tf.int32])
-            ), parallel
+            ), _prefetch
         ).batch(1).prefetch(_prefetch)
         # Create dataset for testing
         max_bno, batch_size = _getDataSetMeta("TEST", 1)
