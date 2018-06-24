@@ -305,7 +305,7 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
     # Create dataset for training
     global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size, db_host, db_port, db_pwd
     time_shift = shift
-    feat_cols = cols
+    feat_cols = cols or k_cols
     max_step = step
     parallel = cores
     _prefetch = pfetch
