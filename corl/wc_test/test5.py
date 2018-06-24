@@ -75,12 +75,12 @@ def validate(sess, model, summary, feed, bno, epoch):
     if diff < bst_score:
         bst_score = diff
         bst_file.seek(0)
-        bst_file.write('{}\n{}'.format(diff, bno))
+        bst_file.write('{}\n{}\n'.format(diff, bno))
         bst_file.truncate()
         bst_saver.save(sess, bst_ckpt,
                        global_step=tf.train.get_global_step())
-        print('{} acquired better model with validation score {}, at batch {}',
-              strftime("%H:%M:%S"), diff, bno)
+        print('{} acquired better model with validation score {}, at batch {}'.format(
+              strftime("%H:%M:%S"), diff, bno))
     return test_summary_str
 
 
