@@ -107,10 +107,10 @@ def run():
         restored = False
         bno, epoch, bst_score = 0, 0, sys.maxint
         ckpt = tf.train.get_checkpoint_state(training_dir)
-        bst_file = open(os.path.join(training_dir, 'best_score'), 'r+')
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
+            bst_file = open(os.path.join(training_dir, 'best_score'), 'r+')
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
                     strftime("%H:%M:%S"), ckpt.model_checkpoint_path))
@@ -144,6 +144,7 @@ def run():
             saver = tf.train.Saver()
             sess.run(tf.global_variables_initializer())
             tf.gfile.MakeDirs(training_dir)
+            bst_file = open(os.path.join(training_dir, 'best_score'), 'r+')
         bst_saver = tf.train.Saver()
 
         train_handle, test_handle = sess.run(
