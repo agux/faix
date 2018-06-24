@@ -310,7 +310,7 @@ def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_co
     parallel = cores
     _prefetch = pfetch
     db_pool_size = pool
-    feat_size = len(cols)*2*(shift+1)
+    feat_size = len(feat_cols)*2*(shift+1)
     db_host = host
     db_port = port
     db_pwd = pwd
