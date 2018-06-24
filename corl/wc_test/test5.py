@@ -119,7 +119,7 @@ def run():
                 print('{} resuming from last training, bno = {}'.format(
                     strftime("%H:%M:%S"), bno))
                 d = input_fn.getInputs(
-                    bno+1, TIME_SHIFT, MAX_STEP, args.parallel,
+                    bno+1, TIME_SHIFT, None, MAX_STEP, args.parallel,
                     args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
                 model.setNodes(d['uuids'], d['features'],
                                d['labels'], d['seqlens'])
@@ -138,7 +138,7 @@ def run():
 
         if not restored:
             d = input_fn.getInputs(
-                bno+1, TIME_SHIFT, MAX_STEP, args.parallel,
+                bno+1, TIME_SHIFT, None, MAX_STEP, args.parallel,
                 args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
             model.setNodes(d['uuids'], d['features'],
                            d['labels'], d['seqlens'])
