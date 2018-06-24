@@ -107,6 +107,7 @@ def run():
         restored = False
         bno, epoch, bst_score = 0, 0, sys.maxint
         ckpt = tf.train.get_checkpoint_state(training_dir)
+        bst_file = open(os.path.join(training_dir, 'best_score'), 'r+')
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
@@ -128,13 +129,11 @@ def run():
                 print('{} check restored global step: {}'.format(
                     strftime("%H:%M:%S"), sess.run(tf.train.get_global_step())))
                 restored = True
-                bst_file = open(os.path.join(training_dir, 'best_score'), 'r+')
                 bst_score = bst_file.readline().rstrip()
             else:
                 print("{} model checkpoint path not found, cleaning training folder".format(
                     strftime("%H:%M:%S")))
                 tf.gfile.DeleteRecursively(training_dir)
-                bst_file = open(os.path.join(training_dir, 'best_score'), 'r+')
 
         if not restored:
             d = input_fn.getInputs(
