@@ -295,7 +295,9 @@ def _getDataSetMeta(flag, start=0):
     return max_bno, batch_size
 
 
-def getInputs(start=0, shift=0, cols=None, step=30, cores=multiprocessing.cpu_count(), pfetch=2, pool=None, host=None, port=None, pwd=None, vset=None):
+def getInputs(start=0, shift=0, cols=None, step=30,
+              cores=multiprocessing.cpu_count(), pfetch=2,
+              pool=None, host=None, port=None, pwd=None, vset=None):
     """Input function for the wcc training dataset.
 
     Returns:

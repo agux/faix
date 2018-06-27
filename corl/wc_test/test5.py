@@ -45,6 +45,8 @@ parser.add_argument('--vset', type=int, help='validation set number',
                     default=None)
 parser.add_argument('--db_pool', type=int, help='database connection pool size',
                     default=multiprocessing.cpu_count())
+parser.add_argument('--start', type=int, help='start training at specified batch no',
+                    default=None)
 parser.add_argument(
     '--restart', help='restart training', action='store_true')
 args = parser.parse_args()
@@ -100,7 +102,7 @@ def run():
         training_dir = os.path.join(base_dir, 'training')
         summary_dir = os.path.join(training_dir, 'summary')
         checkpoint_file = os.path.join(training_dir, 'model.ckpt')
-        bst_ckpt = os.path.join(training_dir, 'best', 'model,ckpt')
+        bst_ckpt = os.path.join(training_dir, 'best', 'model.ckpt')
         saver = None
         summary_str = None
         d = None
@@ -110,7 +112,8 @@ def run():
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
-            bst_file = open(os.path.join(training_dir, 'best_score'), 'w+')
+            bst_file = open(os.path.join(training_dir, 'best_score'), 'a+')
+            bst_file.seek(0)
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
                     strftime("%H:%M:%S"), ckpt.model_checkpoint_path))
