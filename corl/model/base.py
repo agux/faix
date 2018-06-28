@@ -525,13 +525,13 @@ class SRnnRegressorV4:
     def fcn(self, inputs):
         layer = inputs
         with tf.variable_scope("fcn"):
-            layer = tf.keras.layers.AlphaDropout(inputs=layer, rate=self._dropout)
+            layer = tf.contrib.nn.alpha_dropout(layer, keep_prob=1.0-self._dropout)
             layer = tf.layers.dense(
                     inputs=layer,
                     units=self._layer_width,
                     kernel_initializer=tf.keras.initializers.lecun_normal(),
                     bias_initializer=tf.constant_initializer(0.1),
-                    activation=tf.keras.activations.selu
+                    activation=tf.nn.selu
             )
         return layer
 
