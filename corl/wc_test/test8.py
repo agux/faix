@@ -30,6 +30,8 @@ DROP_OUT = 0.5
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
+feat_cols = ["lr", "lr_vol"]
+
 # pylint: disable-msg=E0601,E1101
 
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
@@ -94,7 +96,7 @@ def run(args):
                 print('{} resuming from last training, bno = {}'.format(
                     strftime("%H:%M:%S"), bno))
                 d = input_fn.getInputs(
-                    bno+1, TIME_SHIFT, None, MAX_STEP, args.parallel,
+                    bno+1, TIME_SHIFT, feat_cols, MAX_STEP, args.parallel,
                     args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
                 model.setNodes(d['uuids'], d['features'],
                                d['labels'], d['seqlens'])
@@ -119,7 +121,7 @@ def run(args):
 
         if not restored:
             d = input_fn.getInputs(
-                bno+1, TIME_SHIFT, None, MAX_STEP, args.parallel,
+                bno+1, TIME_SHIFT, feat_cols, MAX_STEP, args.parallel,
                 args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
             model.setNodes(d['uuids'], d['features'],
                            d['labels'], d['seqlens'])
