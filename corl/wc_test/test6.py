@@ -10,6 +10,7 @@ import tensorflow as tf
 from model import base as base_model
 from wc_data import input_fn
 from time import strftime
+from test5 import collect_summary
 import os
 import numpy as np
 import math
@@ -24,46 +25,36 @@ LAYER_WIDTH = 512
 MAX_STEP = 35
 TIME_SHIFT = 4
 DIM = 5
+DROP_OUT = 0.5
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
 # pylint: disable-msg=E0601,E1101
 
+def parseArgs():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--parallel', type=int, help='database operation parallel level',
+                        default=multiprocessing.cpu_count())
+    parser.add_argument('--prefetch', type=int, help='dataset prefetch batches',
+                        default=2)
+    parser.add_argument('--db_host', type=str, help='database host address',
+                        default=None)
+    parser.add_argument('--db_port', type=int, help='database listening port',
+                        default=None)
+    parser.add_argument('--db_pwd', type=str, help='database password',
+                        default=None)
+    parser.add_argument('--vset', type=int, help='validation set number',
+                        default=None)
+    parser.add_argument('--db_pool', type=int, help='database connection pool size',
+                        default=multiprocessing.cpu_count())
+    parser.add_argument('--start', type=int, help='start training at specified batch no',
+                        default=None)
+    parser.add_argument(
+        '--restart', help='restart training', action='store_true')
+    return parser.parse_args()
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--parallel', type=int, help='database operation parallel level',
-                    default=multiprocessing.cpu_count())
-parser.add_argument('--prefetch', type=int, help='dataset prefetch batches',
-                    default=2)
-parser.add_argument('--db_host', type=str, help='database host address',
-                    default=None)
-parser.add_argument('--db_port', type=int, help='database listening port',
-                    default=None)
-parser.add_argument('--db_pwd', type=str, help='database password',
-                    default=None)
-parser.add_argument('--vset', type=int, help='validation set number',
-                    default=None)
-parser.add_argument('--db_pool', type=int, help='database connection pool size',
-                    default=multiprocessing.cpu_count())
-parser.add_argument('--start', type=int, help='start training at specified batch no',
-                    default=None)
-parser.add_argument(
-    '--restart', help='restart training', action='store_true')
-args = parser.parse_args()
 
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
-
-
-def collect_summary(sess, model, base_dir):
-    train_writer = tf.summary.FileWriter(os.path.join(
-        base_dir, "train", strftime("%Y%m%d_%H%M%S")), sess.graph)
-    test_writer = tf.summary.FileWriter(os.path.join(
-        base_dir, "test", strftime("%Y%m%d_%H%M%S")), sess.graph)
-    with tf.name_scope("Basic"):
-        tf.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
-    summary = tf.summary.merge_all()
-    return summary, train_writer, test_writer
-
 
 def validate(sess, model, summary, feed, bno, epoch):
     global bst_saver, bst_score, bst_file, bst_ckpt
@@ -86,12 +77,14 @@ def validate(sess, model, summary, feed, bno, epoch):
     return test_summary_str
 
 
-def run():
-    global args, bst_saver, bst_score, bst_file, bst_ckpt
+def run(args):
+    global bst_saver, bst_score, bst_file, bst_ckpt
     tf.logging.set_verbosity(tf.logging.INFO)
+    dropout = tf.placeholder(tf.float32, [], name="dropout")
     with tf.Session() as sess:
-        model = base_model.SRnnRegressorV3(
+        model = base_model.SRnnRegressorV4(
             dim=DIM,
+            dropout=dropout,
             layer_width=LAYER_WIDTH,
             learning_rate=LEARNING_RATE)
         model_name = model.getName()
@@ -161,8 +154,8 @@ def run():
         train_handle, test_handle = sess.run(
             [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
 
-        train_feed = {d['handle']: train_handle}
-        test_feed = {d['handle']: test_handle}
+        train_feed = {d['handle']: train_handle, dropout: DROP_OUT}
+        test_feed = {d['handle']: test_handle, dropout: 0}
 
         summary, train_writer, test_writer = collect_summary(
             sess, model, summary_dir)
@@ -214,4 +207,5 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    args = parseArgs()
+    run(args)
