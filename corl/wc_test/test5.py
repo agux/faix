@@ -112,7 +112,7 @@ def run():
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
-            bst_file = open(os.path.join(training_dir, 'best_score'), 'a+')
+            bst_file = open(os.path.join(training_dir, 'best_score'), 'w+')
             bst_file.seek(0)
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
@@ -133,6 +133,14 @@ def run():
                     strftime("%H:%M:%S"), sess.run(tf.train.get_global_step())))
                 restored = True
                 bst_score = bst_file.readline().rstrip()
+                rbno = sess.run(tf.train.get_global_step())
+                print('{} check restored global step: {}'.format(
+                    strftime("%H:%M:%S"), rbno))
+                if bno != rbno:
+                    print('{} bno({}) inconsistent with global step({}). reset global step with bno.'.format(
+                        strftime("%H:%M:%S"), bno, rbno))
+                    gstep = tf.train.get_global_step(sess.graph)
+                    sess.run([tf.assign(gstep, bno)])
             else:
                 print("{} model checkpoint path not found, cleaning training folder".format(
                     strftime("%H:%M:%S")))
