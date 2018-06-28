@@ -604,8 +604,8 @@ class SRnnRegressorV4:
 
 class SRnnRegressorV5:
     '''
-    Simple RNN Regressor using GridRNNCell, internal cell type is LSTMBlockCell.
-    With alpha_dropout, selu, and lecun_normal initializer. 
+    Simple RNN Regressor using GridRNNCell, internal cell type is BasicLSTMCell.
+    With dropout, relu, and variance_scaling_initializer. 
     '''
 
     def __init__(self, data=None, target=None, seqlen=None, layer_width=200, dim=3, dropout=0.5, learning_rate=1e-3):
@@ -653,22 +653,21 @@ class SRnnRegressorV5:
     def fcn(self, inputs):
         layer = inputs
         with tf.variable_scope("fcn"):
-            layer = tf.contrib.nn.alpha_dropout(layer, keep_prob=1.0-self._dropout)
+            layer = tf.nn.dropout(layer, keep_prob=1.0-self._dropout)
             layer = tf.layers.dense(
                     inputs=layer,
                     units=self._layer_width,
                     kernel_initializer=tf.variance_scaling_initializer(),
                     bias_initializer=tf.constant_initializer(0.1),
-                    activation=tf.nn.selu
+                    activation=tf.nn.relu
             )
         return layer
 
     @staticmethod
     def newCell(width, _dim):
         def cell_fn(n):
-            return tf.contrib.rnn.LSTMBlockCell(
-                num_units=n,
-                use_peephole=True
+            return tf.nn.rnn_cell.BasicLSTMCell(
+                num_units=n
             )
         c = tf.contrib.grid_rnn.GridRNNCell(
             num_units=width,
