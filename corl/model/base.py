@@ -657,7 +657,7 @@ class SRnnRegressorV5:
             layer = tf.layers.dense(
                     inputs=layer,
                     units=self._layer_width,
-                    kernel_initializer=tf.keras.initializers.lecun_normal(),
+                    kernel_initializer=tf.variance_scaling_initializer(),
                     bias_initializer=tf.constant_initializer(0.1),
                     activation=tf.nn.selu
             )
