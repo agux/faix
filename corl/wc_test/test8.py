@@ -58,11 +58,11 @@ def validate(sess, model, summary, feed, bno, epoch):
 def run(args):
     global bst_saver, bst_score, bst_file, bst_ckpt
     tf.logging.set_verbosity(tf.logging.INFO)
-    dropout = tf.placeholder(tf.float32, [], name="dropout")
+    training = tf.placeholder(tf.bool, [], name="training")
     with tf.Session() as sess:
-        model = base_model.SRnnRegressorV5(
+        model = base_model.SRnnRegressorV6(
             dim=DIM,
-            dropout=dropout,
+            training=training,
             layer_width=LAYER_WIDTH,
             learning_rate=LEARNING_RATE)
         model_name = model.getName()
@@ -132,8 +132,8 @@ def run(args):
         train_handle, test_handle = sess.run(
             [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
 
-        train_feed = {d['handle']: train_handle, dropout: DROP_OUT}
-        test_feed = {d['handle']: test_handle, dropout: 0.0}
+        train_feed = {d['handle']: train_handle, training: True}
+        test_feed = {d['handle']: test_handle, training: False}
 
         summary, train_writer, test_writer = collect_summary(
             sess, model, summary_dir)
