@@ -480,14 +480,14 @@ class DRnnRegressorV4:
     With layer norm, alpha dropout, selu, and variance_scaling_initializer. 
     '''
 
-    def __init__(self, data=None, target=None, seqlen=None, layer_width=200, dim=3, dropout=None, learning_rate=1e-3):
+    def __init__(self, data=None, target=None, seqlen=None, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3):
         self.data = data
         self.target = target
         self.seqlen = seqlen
         self._layer_width = layer_width
         self._dim = dim
         self._learning_rate = learning_rate
-        self._dropout = dropout
+        self._keep_prob = keep_prob
         self._c_recln = 1
         if data is not None and target is not None and seqlen is not None:
             self.logits
@@ -543,8 +543,9 @@ class DRnnRegressorV4:
     @staticmethod
     def newCell(width, _dim):
         def cell_fn(n):
-            return tf.nn.rnn_cell.BasicLSTMCell(
-                num_units=n
+            return tf.contrib.rnn.LSTMBlockCell(
+                num_units=n,
+                use_peephole=True
             )
         c = tf.contrib.grid_rnn.GridRNNCell(
             num_units=width,
@@ -567,7 +568,7 @@ class DRnnRegressorV4:
             layer = tf.contrib.layers.layer_norm(layer, begin_norm_axis=0)
             layer = tf.nn.selu(layer)
             layer = tf.contrib.nn.alpha_dropout(
-                layer, keep_prob=1.0-self._dropout)
+                layer, keep_prob=self._keep_prob)
             self._c_recln = self._c_recln + 1
             return layer
 

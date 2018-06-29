@@ -26,7 +26,7 @@ LAYER_WIDTH = 256
 MAX_STEP = 35
 TIME_SHIFT = 4
 DIM = 3
-DROP_OUT = 0.3
+KEEP_PROB = 0.7
 LEARNING_RATE = 1e-3
 LOG_DIR = 'logdir'
 
@@ -60,7 +60,7 @@ def validate(sess, model, summary, feed, bno, epoch):
 def run(args):
     global bst_saver, bst_score, bst_file, bst_ckpt
     tf.logging.set_verbosity(tf.logging.INFO)
-    dropout = tf.placeholder(tf.float32, [], name="dropout")
+    keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
     with tf.Session() as sess:
         model = drnn.DRnnRegressorV4(
             dim=DIM,
@@ -134,9 +134,6 @@ def run(args):
         train_handle, test_handle = sess.run(
             [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
 
-        train_feed = {d['handle']: train_handle, dropout: DROP_OUT}
-        test_feed = {d['handle']: test_handle, dropout: 0.0}
-
         summary, train_writer, test_writer = collect_summary(
             sess, model, summary_dir)
         test_summary_str = None
@@ -145,13 +142,13 @@ def run(args):
             epoch = bno // TEST_INTERVAL
             if restored or bno % TEST_INTERVAL == 0:
                 test_summary_str = validate(
-                    sess, model, summary, test_feed, bno, epoch)
+                    sess, model, summary, {d['handle']: test_handle, keep_prob: 1}, bno, epoch)
                 restored = False
             try:
                 print('{} training batch {}'.format(
                     strftime("%H:%M:%S"), bno+1))
                 summary_str, worst = sess.run(
-                    [summary, model.worst, model.optimize], train_feed)[:-1]
+                    [summary, model.worst, model.optimize], {d['handle']: train_handle, keep_prob: KEEP_PROB})[:-1]
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
@@ -168,7 +165,7 @@ def run(args):
                            global_step=tf.train.get_global_step())
         # test last epoch
         test_summary_str = validate(
-            sess, model, summary, test_feed, bno, epoch)
+            sess, model, summary, {d['handle']: test_handle, keep_prob: 1}, bno, epoch)
         train_writer.add_summary(summary_str, bno)
         test_writer.add_summary(test_summary_str, bno)
         train_writer.flush()
