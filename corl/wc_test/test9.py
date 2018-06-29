@@ -19,7 +19,7 @@ import multiprocessing
 import shutil
 
 # N_TEST = 100
-VSET = 7
+VSET = 9
 TEST_INTERVAL = 50
 SAVE_INTERVAL = 10
 LAYER_WIDTH = 256
@@ -62,7 +62,7 @@ def run(args):
     tf.logging.set_verbosity(tf.logging.INFO)
     training = tf.placeholder(tf.bool, [], name="training")
     with tf.Session() as sess:
-        model = drss.DRnnRegressorV3(
+        model = drnn.DRnnRegressorV3(
             dim=DIM,
             training=training,
             layer_width=LAYER_WIDTH,
