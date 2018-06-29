@@ -476,8 +476,8 @@ class DRnnRegressorV3:
 
 class DRnnRegressorV4:
     '''
-    Deep RNN Regressor using 2 layers GridRNNCell and 3 layers FCN. Internal cell type is BasicLSTMCell.
-    With layer norm, alpha dropout, selu, and variance_scaling_initializer. 
+    Deep RNN Regressor using 2-layer GridRNNCell and 3-layer FCN. Internal cell type is BasicLSTMCell.
+    With alpha dropout, selu, and variance_scaling_initializer. 
     '''
 
     def __init__(self, data=None, target=None, seqlen=None, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3):
@@ -494,6 +494,12 @@ class DRnnRegressorV4:
             self.optimize
             self.cost
             self.worst
+        self.recln_ops = {
+            "selu": lambda layer: tf.nn.selu(layer),
+            "ln": lambda layer: tf.contrib.layers.layer_norm(layer, begin_norm_axis=0),
+            "dropout": lambda layer: tf.contrib.nn.alpha_dropout(
+                layer, keep_prob=keep_prob),
+        }
 
     def setNodes(self, uuids, features, target, seqlen):
         self.uuids = uuids
@@ -537,7 +543,7 @@ class DRnnRegressorV4:
                     bias_initializer=tf.constant_initializer(0.1)
                 )
                 fsize = fsize // 2
-        layer = self.recln(self, layer)
+        layer = self.recln(self, layer, ["selu","dropout"])
         return layer
 
     @staticmethod
@@ -563,12 +569,10 @@ class DRnnRegressorV4:
         return c
 
     @staticmethod
-    def recln(self, layer):
+    def recln(self, layer, ops=[]):
         with tf.variable_scope("rec_linear_{}".format(self._c_recln)):
-            layer = tf.contrib.layers.layer_norm(layer, begin_norm_axis=0)
-            layer = tf.nn.selu(layer)
-            layer = tf.contrib.nn.alpha_dropout(
-                layer, keep_prob=self._keep_prob)
+            for op in ops:
+                layer = self.recln_ops[op](layer)
             self._c_recln = self._c_recln + 1
             return layer
 
@@ -588,7 +592,7 @@ class DRnnRegressorV4:
                 )
                 layer = tf.concat(layer, 1)
                 width = width * 2
-            layer = self.recln(self, layer)
+            layer = self.recln(self, layer, ["dropout"])
         output = self.last_relevant(layer, self.seqlen)
         return output
 

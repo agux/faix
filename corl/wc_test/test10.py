@@ -75,7 +75,7 @@ def run(args):
         training_dir = os.path.join(base_dir, 'training')
         summary_dir = os.path.join(training_dir, 'summary')
         checkpoint_file = os.path.join(training_dir, 'model.ckpt')
-        bst_ckpt = os.path.join(training_dir, 'best', 'model.ckpt')
+        bst_ckpt = os.path.join(base_dir, 'best', 'model.ckpt')
         saver = None
         summary_str = None
         d = None
@@ -85,7 +85,7 @@ def run(args):
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
-            bst_file = open(os.path.join(training_dir, 'best_score'), 'w+')
+            bst_file = open(os.path.join(base_dir, 'best_score'), 'w+')
             bst_file.seek(0)
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
@@ -128,7 +128,7 @@ def run(args):
             saver = tf.train.Saver(name="reg_saver")
             sess.run(tf.global_variables_initializer())
             tf.gfile.MakeDirs(training_dir)
-            bst_file = open(os.path.join(training_dir, 'best_score'), 'w+')
+            bst_file = open(os.path.join(base_dir, 'best_score'), 'w+')
         bst_saver = tf.train.Saver(name="bst_saver")
 
         train_handle, test_handle = sess.run(
