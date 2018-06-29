@@ -430,7 +430,7 @@ class DRnnRegressorV3:
                 dtype=tf.float32,
                 sequence_length=self.seqlen if i < nlayer else None
             )
-            layer = tf.concat(concat_dim=1, values=layer)
+            layer = tf.concat(layer, 1)
             if i < nlayer:
                 layer = tf.contrib.layers.batch_norm(
                     inputs=layer,
