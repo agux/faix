@@ -488,6 +488,7 @@ class DRnnRegressorV4:
         self._dim = dim
         self._learning_rate = learning_rate
         self._dropout = dropout
+        self._c_recln = 1
         if data is not None and target is not None and seqlen is not None:
             self.logits
             self.optimize
@@ -562,11 +563,12 @@ class DRnnRegressorV4:
 
     @staticmethod
     def recln(self, layer):
-        with tf.variable_scope("rec_linear"):
+        with tf.variable_scope("rec_linear_{}".format(self._c_recln)):
             layer = tf.contrib.layers.layer_norm(layer, begin_norm_axis=0)
             layer = tf.nn.selu(layer)
             layer = tf.contrib.nn.alpha_dropout(
                 layer, keep_prob=1.0-self._dropout)
+            self._c_recln = self._c_recln + 1
             return layer
 
     @staticmethod
