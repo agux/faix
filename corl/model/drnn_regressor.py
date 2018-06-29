@@ -424,19 +424,20 @@ class DRnnRegressorV3:
         nlayer = 2
         for i in range(nlayer):
             i = i+1
-            layer, _ = tf.nn.dynamic_rnn(
-                self.newCell(self._layer_width * i, self._dim * i),
-                layer,
-                dtype=tf.float32,
-                sequence_length=self.seqlen if i < nlayer else None
-            )
-            layer = tf.concat(layer, 1)
-            if i < nlayer:
-                layer = tf.contrib.layers.batch_norm(
-                    inputs=layer,
-                    is_training=self._training,
-                    updates_collections=None
+            with tf.variable_scope("rnn_{}".format(i)):
+                layer, _ = tf.nn.dynamic_rnn(
+                    self.newCell(self._layer_width * i, self._dim * i),
+                    layer,
+                    dtype=tf.float32,
+                    sequence_length=self.seqlen if i < nlayer else None
                 )
+                layer = tf.concat(layer, 1)
+                if i < nlayer:
+                    layer = tf.contrib.layers.batch_norm(
+                        inputs=layer,
+                        is_training=self._training,
+                        updates_collections=None
+                    )
         output = self.last_relevant(layer, self.seqlen)
         return output
 
