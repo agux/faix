@@ -530,7 +530,7 @@ class DRnnRegressorV4:
 
     @staticmethod
     def fcn(self, inputs):
-        layer = inputs
+        layer = self.recln(self, inputs, ["selu"])
         fsize = int(inputs.get_shape()[-1])
         with tf.variable_scope("fcn"):
             nlayer = 3
@@ -592,7 +592,8 @@ class DRnnRegressorV4:
                 )
                 layer = tf.concat(layer, 1)
                 width = width * 2
-            layer = self.recln(self, layer, ["dropout"])
+            if i < nlayer:
+                layer = self.recln(self, layer, ["dropout"])
         output = self.last_relevant(layer, self.seqlen)
         return output
 
