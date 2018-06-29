@@ -64,7 +64,7 @@ def run(args):
     with tf.Session() as sess:
         model = drnn.DRnnRegressorV4(
             dim=DIM,
-            dropout=dropout,
+            keep_prob=keep_prob,
             layer_width=LAYER_WIDTH,
             learning_rate=LEARNING_RATE)
         model_name = model.getName()
