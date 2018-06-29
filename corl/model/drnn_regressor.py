@@ -476,8 +476,8 @@ class DRnnRegressorV3:
 
 class DRnnRegressorV4:
     '''
-    Deep RNN Regressor using 2-layer GridRNNCell and 3-layer FCN. Internal cell type is BasicLSTMCell.
-    With alpha dropout, selu, and variance_scaling_initializer. 
+    Deep RNN Regressor using 1-layer GridRNNCell and 3-layer FCN. Internal cell type is BasicLSTMCell.
+    With selu, and variance_scaling_initializer. 
     '''
 
     def __init__(self, data=None, target=None, seqlen=None, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3):
@@ -543,7 +543,7 @@ class DRnnRegressorV4:
                     bias_initializer=tf.constant_initializer(0.1)
                 )
                 fsize = fsize // 2
-        layer = self.recln(self, layer, ["selu","dropout"])
+        layer = self.recln(self, layer, ["selu"])
         return layer
 
     @staticmethod
@@ -579,21 +579,13 @@ class DRnnRegressorV4:
     @staticmethod
     def rnn(self, inputs):
         layer = inputs
-        nlayer = 2
-        width = self._layer_width
-        for i in range(nlayer):
-            i = i+1
-            with tf.variable_scope("rnn_{}".format(i)):
-                layer, _ = tf.nn.dynamic_rnn(
-                    self.newCell(width, self._dim),
-                    layer,
-                    dtype=tf.float32,
-                    sequence_length=self.seqlen
-                )
-                layer = tf.concat(layer, 1)
-                width = width * 2
-            if i < nlayer:
-                layer = self.recln(self, layer, ["dropout"])
+        layer, _ = tf.nn.dynamic_rnn(
+            self.newCell(self._layer_width, self._dim),
+            layer,
+            dtype=tf.float32,
+            sequence_length=self.seqlen
+        )
+        layer = tf.concat(layer, 1)
         output = self.last_relevant(layer, self.seqlen)
         return output
 
