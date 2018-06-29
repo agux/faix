@@ -579,7 +579,7 @@ class DRnnRegressorV4:
                 layer = tf.concat(layer, 1)
                 width = width * 2
             if i < nlayer:
-                layer = tf.contrib.layers.layer_norm(layer, begin_norm_axis=1)
+                layer = tf.contrib.layers.layer_norm(layer, begin_norm_axis=0)
         output = self.last_relevant(layer, self.seqlen)
         return output
 
