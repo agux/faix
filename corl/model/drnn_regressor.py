@@ -526,7 +526,6 @@ class DRnnRegressorV4:
         layer = inputs
         fsize = int(inputs.get_shape()[-1])
         with tf.variable_scope("fcn"):
-            layer = tf.contrib.layers.layer_norm(layer, begin_norm_axis=0)
             nlayer = 3
             for i in range(nlayer):
                 i = i+1
@@ -534,11 +533,10 @@ class DRnnRegressorV4:
                     inputs=layer,
                     units=fsize,
                     kernel_initializer=tf.variance_scaling_initializer(),
-                    bias_initializer=tf.constant_initializer(0.1),
-                    activation=tf.nn.selu
+                    bias_initializer=tf.constant_initializer(0.1)
                 )
                 fsize = fsize // 2
-            layer = tf.contrib.nn.alpha_dropout(layer,keep_prob=1.0-self._dropout)
+        layer = self.recln(self, layer)
         return layer
 
     @staticmethod
@@ -563,6 +561,15 @@ class DRnnRegressorV4:
         return c
 
     @staticmethod
+    def recln(self, layer):
+        with tf.variable_scope("rec_linear"):
+            layer = tf.contrib.layers.layer_norm(layer, begin_norm_axis=0)
+            layer = tf.nn.selu(layer)
+            layer = tf.contrib.nn.alpha_dropout(
+                layer, keep_prob=1.0-self._dropout)
+            return layer
+
+    @staticmethod
     def rnn(self, inputs):
         layer = inputs
         nlayer = 2
@@ -571,15 +578,14 @@ class DRnnRegressorV4:
             i = i+1
             with tf.variable_scope("rnn_{}".format(i)):
                 layer, _ = tf.nn.dynamic_rnn(
-                    self.newCell(width, self._dim * i),
+                    self.newCell(width, self._dim),
                     layer,
                     dtype=tf.float32,
-                    sequence_length=self.seqlen if i < nlayer else None
+                    sequence_length=self.seqlen
                 )
                 layer = tf.concat(layer, 1)
                 width = width * 2
-            if i < nlayer:
-                layer = tf.contrib.layers.layer_norm(layer, begin_norm_axis=0)
+            layer = self.recln(self, layer)
         output = self.last_relevant(layer, self.seqlen)
         return output
 
