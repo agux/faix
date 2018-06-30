@@ -104,7 +104,7 @@ def run(args):
                 saver = tf.train.Saver(name="reg_saver")
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 restored = True
-                bst_score = int(bst_file.readline().rstrip())
+                bst_score = float(bst_file.readline().rstrip())
                 print('{} previous best score: {}'.format(
                     strftime("%H:%M:%S"), bst_score))
                 bst_file.seek(0)
