@@ -48,6 +48,7 @@ def validate(sess, model, summary, feed, bno, epoch):
     if diff < bst_score:
         bst_score = diff
         bst_file.seek(0)
+        bst_file.truncate()
         bst_file.write('{}\n{}\n'.format(diff, bno))
         bst_file.truncate()
         bst_saver.save(sess, bst_ckpt,
@@ -85,7 +86,7 @@ def run(args):
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
-            bst_file = open(os.path.join(base_dir, 'best_score'), 'a+')
+            bst_file = open(os.path.join(base_dir, 'best_score'), 'w+')
             bst_file.seek(0)
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
@@ -103,9 +104,10 @@ def run(args):
                 saver = tf.train.Saver(name="reg_saver")
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 restored = True
-                bst_score = bst_file.readline().rstrip()
+                bst_score = int(bst_file.readline().rstrip())
                 print('{} previous best score: {}'.format(
                     strftime("%H:%M:%S"), bst_score))
+                bst_file.seek(0)
                 rbno = sess.run(tf.train.get_global_step())
                 print('{} check restored global step: {}, previous batch no: {}'.format(
                     strftime("%H:%M:%S"), rbno, bno))
