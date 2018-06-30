@@ -620,3 +620,153 @@ class DRnnRegressorV4:
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
             return uuid, max_diff, predict, actual
+
+
+class DRnnRegressorV5:
+    '''
+    Deep RNN Regressor using 1-layer GridRNNCell and 3-layer FCN. Internal cell type is BasicLSTMCell.
+    With selu, layer norm, alpha_dropout, and variance_scaling_initializer. 
+    '''
+
+    def __init__(self, data=None, target=None, seqlen=None, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3):
+        self.data = data
+        self.target = target
+        self.seqlen = seqlen
+        self._layer_width = layer_width
+        self._dim = dim
+        self._learning_rate = learning_rate
+        self._keep_prob = keep_prob
+        self._c_recln = 1
+        if data is not None and target is not None and seqlen is not None:
+            self.logits
+            self.optimize
+            self.cost
+            self.worst
+        self.recln_ops = {
+            "selu": lambda layer: tf.nn.selu(layer),
+            "ln": lambda layer: tf.contrib.layers.layer_norm(layer, begin_norm_axis=0),
+            "dropout": lambda layer: tf.contrib.nn.alpha_dropout(
+                layer, keep_prob=keep_prob),
+        }
+
+    def setNodes(self, uuids, features, target, seqlen):
+        self.uuids = uuids
+        self.data = features
+        self.target = target
+        self.seqlen = seqlen
+        self.logits
+        self.optimize
+        self.cost
+        self.worst
+
+    def getName(self):
+        return self.__class__.__name__
+
+    @lazy_property
+    def logits(self):
+        layer = self.rnn(self, self.data)
+        layer = self.fcn(self, layer)
+        with tf.variable_scope("output"):
+            output = tf.layers.dense(
+                inputs=layer,
+                units=1,
+                kernel_initializer=tf.variance_scaling_initializer(),
+                bias_initializer=tf.constant_initializer(0.1)
+            )
+            output = tf.squeeze(output)
+            return output
+
+    @staticmethod
+    def fcn(self, inputs):
+        layer = self.recln(self, inputs, ["ln", "selu"])
+        fsize = int(inputs.get_shape()[-1])
+        with tf.variable_scope("fcn"):
+            nlayer = 3
+            for i in range(nlayer):
+                i = i+1
+                layer = tf.layers.dense(
+                    inputs=layer,
+                    units=fsize,
+                    kernel_initializer=tf.variance_scaling_initializer(),
+                    bias_initializer=tf.constant_initializer(0.1)
+                )
+                if i == 1:
+                    layer = self.recln(self, layer, ["dropout"])
+                fsize = fsize // 2
+        layer = self.recln(self, layer, ["selu"])
+        return layer
+
+    @staticmethod
+    def newCell(width, _dim):
+        def cell_fn(n):
+            return tf.contrib.rnn.LSTMBlockCell(
+                num_units=n,
+                use_peephole=True
+            )
+        c = tf.contrib.grid_rnn.GridRNNCell(
+            num_units=width,
+            num_dims=_dim,
+            input_dims=0,
+            output_dims=0,
+            priority_dims=0,
+            tied=False,
+            non_recurrent_dims=None,
+            cell_fn=cell_fn,
+            non_recurrent_fn=None,
+            state_is_tuple=True,
+            output_is_tuple=True
+        )
+        return c
+
+    @staticmethod
+    def recln(self, layer, ops=[]):
+        with tf.variable_scope("rec_linear_{}".format(self._c_recln)):
+            for op in ops:
+                layer = self.recln_ops[op](layer)
+            self._c_recln = self._c_recln + 1
+            return layer
+
+    @staticmethod
+    def rnn(self, inputs):
+        layer = inputs
+        layer, _ = tf.nn.dynamic_rnn(
+            self.newCell(self._layer_width, self._dim),
+            layer,
+            dtype=tf.float32,
+            sequence_length=self.seqlen
+        )
+        layer = tf.concat(layer, 1)
+        output = self.last_relevant(layer, self.seqlen)
+        return output
+
+    @staticmethod
+    def last_relevant(output, length):
+        with tf.name_scope("last_relevant"):
+            batch_size = tf.shape(output)[0]
+            relevant = tf.gather_nd(output, tf.stack(
+                [tf.range(batch_size), length-1], axis=1))
+            return relevant
+
+    @lazy_property
+    def cost(self):
+        logits = self.logits
+        with tf.name_scope("cost"):
+            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+
+    @lazy_property
+    def optimize(self):
+        return tf.train.AdamOptimizer(self._learning_rate,
+                                      epsilon=1e-7).minimize(
+            self.cost, global_step=tf.train.get_or_create_global_step())
+
+    @lazy_property
+    def worst(self):
+        logits = self.logits
+        with tf.name_scope("worst"):
+            sqd = tf.squared_difference(logits, self.target)
+            bidx = tf.argmax(sqd)
+            max_diff = tf.sqrt(tf.reduce_max(sqd))
+            uuid = tf.gather(self.uuids, bidx)
+            predict = tf.gather(logits, bidx)
+            actual = tf.gather(self.target, bidx)
+            return uuid, max_diff, predict, actual

@@ -10,13 +10,13 @@ import tensorflow as tf
 from model import drnn_regressor as drnn
 from wc_data import input_fn
 from time import strftime
-from test5 import collect_summary
 from test6 import parseArgs
 import os
 import numpy as np
 import math
 import multiprocessing
 import shutil
+import random
 
 # N_TEST = 100
 VSET = 9
@@ -26,8 +26,9 @@ LAYER_WIDTH = 512
 MAX_STEP = 35
 TIME_SHIFT = 4
 DIM = 6
-KEEP_PROB = 0.7
+KEEP_PROB = 0.5
 LEARNING_RATE = 1e-3
+SEED = 285139
 LOG_DIR = 'logdir'
 
 feat_cols = ["lr", "lr_vol"]
@@ -35,6 +36,19 @@ feat_cols = ["lr", "lr_vol"]
 # pylint: disable-msg=E0601,E1101
 
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
+
+
+def collect_summary(sess, model, base_dir):
+    ts = strftime("%Y%m%d_%H%M%S")
+    train_writer = tf.summary.FileWriter(os.path.join(
+        base_dir, "train_{}".format(ts)), sess.graph)
+    test_writer = tf.summary.FileWriter(os.path.join(
+        base_dir, "test_{}".format(ts)), sess.graph)
+    with tf.name_scope("Basic"):
+        tf.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
+    summary = tf.summary.merge_all()
+    return summary, train_writer, test_writer
+
 
 def validate(sess, model, summary, feed, bno, epoch):
     global bst_saver, bst_score, bst_file, bst_ckpt
@@ -60,9 +74,10 @@ def validate(sess, model, summary, feed, bno, epoch):
 def run(args):
     global bst_saver, bst_score, bst_file, bst_ckpt
     tf.logging.set_verbosity(tf.logging.INFO)
+    random.seed(SEED)
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
     with tf.Session() as sess:
-        model = drnn.DRnnRegressorV4(
+        model = drnn.DRnnRegressorV5(
             dim=DIM,
             keep_prob=keep_prob,
             layer_width=LAYER_WIDTH,
@@ -73,7 +88,6 @@ def run(args):
         testn = f[f.rfind('/')+1:f.rindex('.py')]
         base_dir = '{}/{}_{}'.format(LOG_DIR, testn, model_name)
         training_dir = os.path.join(base_dir, 'training')
-        summary_dir = os.path.join(training_dir, 'summary')
         checkpoint_file = os.path.join(training_dir, 'model.ckpt')
         bst_ckpt = os.path.join(base_dir, 'best', 'model.ckpt')
         saver = None
@@ -85,7 +99,7 @@ def run(args):
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
-            bst_file = open(os.path.join(base_dir, 'best_score'), 'a+')
+            bst_file = open(os.path.join(base_dir, 'best_score'), 'w+')
             bst_file.seek(0)
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
@@ -135,7 +149,7 @@ def run(args):
             [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
 
         summary, train_writer, test_writer = collect_summary(
-            sess, model, summary_dir)
+            sess, model, training_dir)
         test_summary_str = None
         while True:
             # bno = epoch*TEST_INTERVAL
@@ -145,10 +159,11 @@ def run(args):
                     sess, model, summary, {d['handle']: test_handle, keep_prob: 1}, bno, epoch)
                 restored = False
             try:
-                print('{} training batch {}'.format(
-                    strftime("%H:%M:%S"), bno+1))
+                kp = min(1, random.uniform(KEEP_PROB, 1.25))
+                print('{} training batch {}, random keep_prob:{}'.format(
+                    strftime("%H:%M:%S"), bno+1, kp))
                 summary_str, worst = sess.run(
-                    [summary, model.worst, model.optimize], {d['handle']: train_handle, keep_prob: KEEP_PROB})[:-1]
+                    [summary, model.worst, model.optimize], {d['handle']: train_handle, keep_prob: kp})[:-1]
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
