@@ -36,6 +36,7 @@ feat_cols = ["lr", "lr_vol"]
 
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
 
+
 def validate(sess, model, summary, feed, bno, epoch):
     global bst_saver, bst_score, bst_file, bst_ckpt
     print('{} running on test set...'.format(strftime("%H:%M:%S")))
@@ -104,9 +105,13 @@ def run(args):
                 saver = tf.train.Saver(name="reg_saver")
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 restored = True
-                bst_score = float(bst_file.readline().rstrip())
-                print('{} previous best score: {}'.format(
-                    strftime("%H:%M:%S"), bst_score))
+                try:
+                    bst_score = float(bst_file.readline().rstrip())
+                    print('{} previous best score: {}'.format(
+                        strftime("%H:%M:%S"), bst_score))
+                except Exception:
+                    print('{} not able to read best score. best_score file is invalid.'.format(
+                        strftime("%H:%M:%S")))
                 bst_file.seek(0)
                 rbno = sess.run(tf.train.get_global_step())
                 print('{} check restored global step: {}, previous batch no: {}'.format(
