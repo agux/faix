@@ -86,7 +86,7 @@ def run(args):
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
-            bst_file = open(os.path.join(base_dir, 'best_score'), 'w+')
+            bst_file = open(os.path.join(base_dir, 'best_score'), 'rw+')
             bst_file.seek(0)
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
