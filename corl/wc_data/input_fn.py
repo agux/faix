@@ -68,7 +68,7 @@ def _init(db_pool_size=None,
           db_port=None,
           db_pwd=None):
     global cnxpool
-    print("PID %d: initializing mysql connection pool..." % os.getpid())
+    print("PID {}: initializing mysql connection pool...".format(os.getpid()))
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
         pool_size=db_pool_size or 5,
@@ -91,7 +91,7 @@ def _getExecutor():
         max_workers=parallel*_prefetch,
         initializer=_init,
         initargs=(db_pool_size, db_host, db_port, db_pwd),
-        timeout=45)
+        timeout=450)
     return _executor
 
 

@@ -1,0 +1,76 @@
+{
+    "namespace": "tflab.secu",
+    "type": "record",
+    "name": "wcc_trn",
+    "fields": [
+        {
+            "name": "uuid",
+            "type": "string"
+        },
+        {
+            "name": "code",
+            "type": "string"
+        },
+        {
+            "name": "date",
+            "type": "string"
+        },
+        {
+            "name": "klid",
+            "type": "int"
+        },
+        {
+            "name": "rcode",
+            "type": "string"
+        },
+        {
+            "name": "corl",
+            "type": [
+                "double",
+                "null"
+            ]
+        },
+        {
+            "name": "corl_stz",
+            "type": [
+                "double",
+                "null"
+            ]
+        },
+        {
+            "name": "min_diff",
+            "type": [
+                "double",
+                "null"
+            ]
+        },
+        {
+            "name": "max_diff",
+            "type": [
+                "double",
+                "null"
+            ]
+        },
+        {
+            "name": "flag",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        {
+            "name": "udate",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        {
+            "name": "utime",
+            "type": [
+                "string",
+                "null"
+            ]
+        }
+    ]
+}

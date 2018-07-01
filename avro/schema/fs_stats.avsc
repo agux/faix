@@ -1,0 +1,57 @@
+{
+    "namespace": "tflab.secu",
+    "type": "record",
+    "name": "fs_stats",
+    "fields": [
+        {
+            "name": "method",
+            "type": "string"
+        },
+        {
+            "name": "fields",
+            "type": "string"
+        },
+        {
+            "name": "tab",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        {
+            "name": "mean",
+            "type": [
+                "double",
+                "null"
+            ]
+        },
+        {
+            "name": "std",
+            "type": [
+                "double",
+                "null"
+            ]
+        },
+        {
+            "name": "vmax",
+            "type": [
+                "double",
+                "null"
+            ]
+        },
+        {
+            "name": "udate",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        {
+            "name": "utime",
+            "type": [
+                "string",
+                "null"
+            ]
+        }
+    ]
+}
