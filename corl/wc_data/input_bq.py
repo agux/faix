@@ -127,7 +127,7 @@ def _loadTestSet(max_step, ntest, vset=None):
     job_config.query_parameters = query_params
     query = (
         "SELECT "
-        "   code, klid, rcode, corl "
+        "   code, klid, rcode, corl_stz "
         "FROM "
         "   wcc_trn "
         "WHERE "
@@ -155,7 +155,7 @@ def _loadTrainingData(flag):
         strftime("%H:%M:%S"), flag))
     query = (
         'SELECT '
-        "   code, klid, rcode, corl "
+        "   code, klid, rcode, corl_stz "
         'FROM '
         '   wcc_trn '
         'WHERE '
