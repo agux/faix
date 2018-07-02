@@ -60,6 +60,7 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     global client
     limit = max_step+time_shift
     job_config = bq.QueryJobConfig()
+    job_config.use_legacy_sql = True
     job_config.query_parameters = [
         bq.ScalarQueryParameter('code', 'STRING', code),
         bq.ScalarQueryParameter('klid_start', 'INT64', s),
@@ -77,6 +78,7 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     dates = "'{}'".format("','".join([r.date for r in rows]))
     qd = ftQueryD.format(dates)
     job_config = bq.QueryJobConfig()
+    job_config.use_legacy_sql = True
     job_config.query_parameters = [
         bq.ScalarQueryParameter('code', 'STRING', rcode),
         bq.ScalarQueryParameter('limit', 'INT64', limit)
@@ -119,11 +121,11 @@ def _loadTestSet(max_step, ntest, vset=None):
     flag = 'TEST_{}'.format(setno)
     print('{} selected test set: {}'.format(
         strftime("%H:%M:%S"), flag))
-    query_params = [
+    job_config = bq.QueryJobConfig()
+    job_config.use_legacy_sql = True
+    job_config.query_parameters = [
         bq.ScalarQueryParameter('flag', 'STRING', flag),
     ]
-    job_config = bq.QueryJobConfig()
-    job_config.query_parameters = query_params
     query = (
         "SELECT "
         "   code, klid, rcode, corl_stz "
@@ -160,11 +162,11 @@ def _loadTrainingData(flag):
         'WHERE '
         "   flag = @flag"
     )
-    query_params = [
+    job_config = bq.QueryJobConfig()
+    job_config.use_legacy_sql = True
+    job_config.query_parameters = [
         bq.ScalarQueryParameter('flag', 'STRING', flag),
     ]
-    job_config = bq.QueryJobConfig()
-    job_config.query_parameters = query_params
     query_job = client.query(
         query,
         job_config=job_config
