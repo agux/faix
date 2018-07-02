@@ -37,7 +37,7 @@ ftQueryTpl = (
     "    code = @code "
     "    {1} "
     "ORDER BY klid "
-    "LIMIT @limit "
+    "LIMIT {} "
 )
 
 
@@ -62,13 +62,12 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     query_params = [
         bq.ScalarQueryParameter('code', 'STRING', code),
         bq.ScalarQueryParameter('klid_start', 'INT64', s),
-        bq.ScalarQueryParameter('klid_end', 'INT64', e),
-        bq.ScalarQueryParameter('limit', 'INT64', limit)
+        bq.ScalarQueryParameter('klid_end', 'INT64', e)
     ]
     job_config = bq.QueryJobConfig()
     job_config.query_parameters = query_params
     query_job = client.query(
-        ftQueryK,
+        ftQueryK.format(limit),
         job_config=job_config)
     rows = list(query_job)
     total = len(rows)
@@ -76,10 +75,9 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     featSize = (num_feats-1)*2
     # extract dates and transform to sql 'in' query
     dates = "'{}'".format("','".join([r.date for r in rows]))
-    qd = ftQueryD.format(dates)
+    qd = ftQueryD.format(dates, limit)
     query_params = [
-        bq.ScalarQueryParameter('code', 'STRING', rcode),
-        bq.ScalarQueryParameter('limit', 'INT64', limit)
+        bq.ScalarQueryParameter('code', 'STRING', rcode)
     ]
     job_config.query_parameters = query_params
     query_job = client.query(
