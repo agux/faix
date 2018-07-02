@@ -32,7 +32,7 @@ ftQueryTpl = (
     "    date, "
     "    {0} "  # (d.COLS - mean) / std
     "FROM "
-    "    kline_d_b d "
+    "    secu.kline_d_b d "
     "WHERE "
     "    d.code = @code "
     "    {1} "
@@ -129,7 +129,7 @@ def _loadTestSet(max_step, ntest, vset=None):
         "SELECT "
         "   code, klid, rcode, corl_stz "
         "FROM "
-        "   wcc_trn "
+        "   secu.wcc_trn "
         "WHERE "
         "   flag = @flag "
     )
@@ -157,7 +157,7 @@ def _loadTrainingData(flag):
         'SELECT '
         "   code, klid, rcode, corl_stz "
         'FROM '
-        '   wcc_trn '
+        '   secu.wcc_trn '
         'WHERE '
         "   flag = @flag"
     )
