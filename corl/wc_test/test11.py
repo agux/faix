@@ -9,7 +9,6 @@ import tensorflow as tf
 from model import drnn_regressor as drnn
 from wc_data import input_fn, input_bq
 from time import strftime
-from test6 import parseArgs
 import numpy as np
 import math
 import multiprocessing
@@ -36,6 +35,29 @@ feat_cols = ["lr", "lr_vol"]
 
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
 
+def parseArgs():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ds', type=str, help='datasource. such as db, or BigQuery.',
+                        default='db')
+    parser.add_argument('--parallel', type=int, help='database operation parallel level',
+                        default=multiprocessing.cpu_count())
+    parser.add_argument('--prefetch', type=int, help='dataset prefetch batches',
+                        default=2)
+    parser.add_argument('--db_host', type=str, help='database host address',
+                        default=None)
+    parser.add_argument('--db_port', type=int, help='database listening port',
+                        default=None)
+    parser.add_argument('--db_pwd', type=str, help='database password',
+                        default=None)
+    parser.add_argument('--vset', type=int, help='validation set number',
+                        default=None)
+    parser.add_argument('--db_pool', type=int, help='database connection pool size',
+                        default=multiprocessing.cpu_count())
+    parser.add_argument('--start', type=int, help='start training at specified batch no',
+                        default=None)
+    parser.add_argument(
+        '--restart', help='restart training', action='store_true')
+    return parser.parse_args()
 
 def collect_summary(sess, model, base_dir):
     ts = strftime("%Y%m%d_%H%M%S")
