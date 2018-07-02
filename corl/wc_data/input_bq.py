@@ -53,35 +53,34 @@ def _getExecutor():
     return _executor
 
 
-def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD, cols, stats):
+def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     '''
     [max_step, feature*time_shift], length
     '''
     global client
     limit = max_step+time_shift
-    query_params = [
+    job_config = bq.QueryJobConfig()
+    job_config.query_parameters = [
         bq.ScalarQueryParameter('code', 'STRING', code),
         bq.ScalarQueryParameter('klid_start', 'INT64', s),
         bq.ScalarQueryParameter('klid_end', 'INT64', e),
         bq.ScalarQueryParameter('limit', 'INT64', limit)
     ]
-    job_config = bq.QueryJobConfig()
-    job_config.query_parameters = query_params
     query_job = client.query(
         ftQueryK,
         job_config=job_config)
     rows = list(query_job)
     total = len(rows)
-    num_feats = len(cols)
+    num_feats = len(rows[0])
     featSize = (num_feats-1)*2
     # extract dates and transform to sql 'in' query
     dates = "'{}'".format("','".join([r.date for r in rows]))
     qd = ftQueryD.format(dates)
-    query_params = [
+    job_config = bq.QueryJobConfig()
+    job_config.query_parameters = [
         bq.ScalarQueryParameter('code', 'STRING', rcode),
         bq.ScalarQueryParameter('limit', 'INT64', limit)
     ]
-    job_config.query_parameters = query_params
     query_job = client.query(
         qd,
         job_config=job_config)
@@ -97,29 +96,25 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD, cols,
         s = max(0, t - offset)
         e = total - time_shift + t
         for i, row in enumerate(rows[s:e]):
-            for j, col in enumerate(cols):
-                mean = stats['{}_mean'.format(col)]
-                std = stats['{}_std'.format(col)]
-                steps[i+offset][j] = (row[col]-mean)/std
+            for j, col in enumerate(row[1:]):
+                steps[i+offset][j] = col
         for i, row in enumerate(r_rows[s:e]):
-            for j, col in enumerate(cols):
-                mean = stats['{}_mean'.format(col)]
-                std = stats['{}_std'.format(col)]
-                steps[i+offset][j+featSize//2] = (row[col]-mean)/std
+            for j, col in enumerate(row[1:]):
+                steps[i+offset][j+featSize//2] = col
         batch.append(steps)
     return np.concatenate(batch, 1), total - time_shift
 
 
 def _getSeries(p):
-    code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQueryD, cols, stats = p
+    code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQueryD = p
     s = max(0, klid-max_step+1-time_shift)
     batch, total = _getBatch(
-        code, s, klid, rcode, max_step, time_shift, ftQueryK, ftQueryD, cols, stats)
+        code, s, klid, rcode, max_step, time_shift, ftQueryK, ftQueryD)
     return batch, val, total
 
 
 def _loadTestSet(max_step, ntest, vset=None):
-    global client, time_shift, fs_stats, feat_cols
+    global client, time_shift
     setno = vset or np.random.randint(ntest)
     flag = 'TEST_{}'.format(setno)
     print('{} selected test set: {}'.format(
@@ -143,7 +138,7 @@ def _loadTestSet(max_step, ntest, vset=None):
     tset = list(query_job)
     qk, qd = _getFtQuery()
     exc = _getExecutor()
-    params = [(code, klid, rcode, val, max_step, time_shift, qk, qd, feat_cols, fs_stats)
+    params = [(code, klid, rcode, val, max_step, time_shift, qk, qd)
               for code, klid, rcode, val in tset]
     r = list(exc.map(_getSeries, params))
     data, vals, seqlen = zip(*r)
@@ -154,7 +149,7 @@ def _loadTestSet(max_step, ntest, vset=None):
 
 
 def _loadTrainingData(flag):
-    global client, max_step, time_shift, fs_stats, feat_cols
+    global client, max_step, time_shift
     print("{} loading training set {}...".format(
         strftime("%H:%M:%S"), flag))
     query = (
@@ -181,7 +176,7 @@ def _loadTrainingData(flag):
         qk, qd = _getFtQuery()
         # joblib doesn't support nested threading
         exc = _getExecutor()
-        params = [(code, klid, rcode, val, max_step, time_shift, qk, qd, feat_cols, fs_stats)
+        params = [(code, klid, rcode, val, max_step, time_shift, qk, qd)
                   for code, klid, rcode, val in train_set]
         r = list(exc.map(_getSeries, params))
         data, vals, seqlen = zip(*r)
@@ -192,14 +187,14 @@ def _loadTrainingData(flag):
 
 
 def _getFtQuery():
-    global qk, qd, feat_cols
+    global qk, qd, feat_cols, fs_stats
     if qk is not None and qd is not None:
         return qk, qd
 
     k_cols = feat_cols
     sep = " "
     p_kline = sep.join(
-        ["{},".format(c) for c in k_cols])
+        ["({0}-{1})/{2} {0},".format(c, fs_stats["{}_mean".format(c)], fs_stats["{}_std".format(c)]) for c in k_cols])
     p_kline = p_kline[:-1]  # strip last comma
 
     qk = ftQueryTpl.format(
