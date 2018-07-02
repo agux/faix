@@ -23,8 +23,6 @@ _prefetch = None
 k_cols = ["lr"]
 fs_stats = {}
 
-client = bq.Client(project=PROJECT_ID)
-
 _executor = None
 
 ftQueryTpl = (
@@ -57,10 +55,9 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     '''
     [max_step, feature*time_shift], length
     '''
-    global client
+    client = bq.Client(project=PROJECT_ID)
     limit = max_step+time_shift
     job_config = bq.QueryJobConfig()
-    job_config.use_legacy_sql = True
     job_config.query_parameters = [
         bq.ScalarQueryParameter('code', 'STRING', code),
         bq.ScalarQueryParameter('klid_start', 'INT64', s),
@@ -78,7 +75,6 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     dates = "'{}'".format("','".join([r.date for r in rows]))
     qd = ftQueryD.format(dates)
     job_config = bq.QueryJobConfig()
-    job_config.use_legacy_sql = True
     job_config.query_parameters = [
         bq.ScalarQueryParameter('code', 'STRING', rcode),
         bq.ScalarQueryParameter('limit', 'INT64', limit)
@@ -116,16 +112,16 @@ def _getSeries(p):
 
 
 def _loadTestSet(max_step, ntest, vset=None):
-    global client, time_shift
+    global time_shift
     setno = vset or np.random.randint(ntest)
     flag = 'TEST_{}'.format(setno)
     print('{} selected test set: {}'.format(
         strftime("%H:%M:%S"), flag))
     job_config = bq.QueryJobConfig()
-    job_config.use_legacy_sql = True
     job_config.query_parameters = [
         bq.ScalarQueryParameter('flag', 'STRING', flag),
     ]
+    client = bq.Client(project=PROJECT_ID)
     query = (
         "SELECT "
         "   code, klid, rcode, corl_stz "
@@ -151,7 +147,7 @@ def _loadTestSet(max_step, ntest, vset=None):
 
 
 def _loadTrainingData(flag):
-    global client, max_step, time_shift
+    global max_step, time_shift
     print("{} loading training set {}...".format(
         strftime("%H:%M:%S"), flag))
     query = (
@@ -163,10 +159,10 @@ def _loadTrainingData(flag):
         "   flag = @flag"
     )
     job_config = bq.QueryJobConfig()
-    job_config.use_legacy_sql = True
     job_config.query_parameters = [
         bq.ScalarQueryParameter('flag', 'STRING', flag),
     ]
+    client = bq.Client(project=PROJECT_ID)
     query_job = client.query(
         query,
         job_config=job_config
@@ -214,6 +210,7 @@ def init_fs_stats():
         "where method = 'standardization'"
         "and fields in ({})"
     ).format("'{}'".format("','".join(feat_cols)))
+    client = bq.Client(project=PROJECT_ID)
     query_job = client.query(query)
     for r in query_job:
         print('{} mean={}, std={}'.format(r.fields, r.mean, r.std))
@@ -230,7 +227,7 @@ def getInputs(start=0, shift=0, cols=None, step=30, test_batch_size=None,
         features,labels,seqlens,train_iter,test_iter
     """
     # Create dataset for training
-    global feat_cols, max_step, time_shift, parallel, _prefetch, client
+    global feat_cols, max_step, time_shift, parallel, _prefetch
     time_shift = shift
     feat_cols = cols or k_cols
     max_step = step
