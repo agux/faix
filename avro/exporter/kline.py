@@ -14,6 +14,18 @@ import multiprocessing
 import numpy as np
 import errno
 
+exp_fields = ['code', 'date', 'klid', 'lr', 'lr_h', 'lr_h_c', 'lr_o', 'lr_o_c',
+              'lr_l', 'lr_l_c', 'lr_vol', 'lr_ma5', 'lr_ma5_o', 'lr_ma5_h', 'lr_ma5_l',
+              'lr_ma10', 'lr_ma10_o', 'lr_ma10_h', 'lr_ma10_l', 'lr_ma20', 'lr_ma20_o',
+              'lr_ma20_h', 'lr_ma20_l', 'lr_ma30', 'lr_ma30_o', 'lr_ma30_h', 'lr_ma30_l',
+              'lr_ma60', 'lr_ma60_o', 'lr_ma60_h', 'lr_ma60_l', 'lr_ma120', 'lr_ma120_o',
+              'lr_ma120_h', 'lr_ma120_l', 'lr_ma200', 'lr_ma200_o', 'lr_ma200_h', 'lr_ma200_l',
+              'lr_ma250', 'lr_ma250_o', 'lr_ma250_h', 'lr_ma250_l', 'lr_vol5', 'lr_vol10',
+              'lr_vol20', 'lr_vol30', 'lr_vol60', 'lr_vol120', 'lr_vol200', 'lr_vol250',
+              'udate', 'utime']
+
+field_str = ','.join(exp_fields)
+
 parallel_threshold = 2 ** 21
 
 _executor = None
@@ -26,7 +38,7 @@ schema = None
 def _init():
     global cnxpool, schema
     schema = avro.schema.parse(
-        open(os.path.join("schema", "wcc_trn.avsc"), "rb").read())
+        open(os.path.join("schema", "kline.avsc"), "rb").read())
     print("PID %d: initializing mysql connection pool..." % os.getpid())
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
@@ -54,24 +66,25 @@ def _getExecutor():
     return _executor
 
 
-def _exp_wcctrn(p):
-    global cnxpool, count, file_path, schema
-    flag, dest = p
+def _exp_kline(p):
+    global cnxpool, count, file_path, schema, field_str
+    table, code, dest = p
     print('{} [{}] exporting {}...'.format(
-        strftime("%H:%M:%S"), os.getpid(), flag))
+        strftime("%H:%M:%S"), os.getpid(), code))
     cnx = cnxpool.get_connection()
     writer = None
     _schema = None
     if file_path is None or count >= parallel_threshold:
         file_path = os.path.join(
-            dest, "wcc_trn", "{}_{}.avro".format(os.getpid(), strftime("%Y%m%d_%H%M%S")))
+            dest, table, "{}_{}.avro".format(os.getpid(), strftime("%Y%m%d_%H%M%S")))
         print('{} allocating new file {}...'.format(
             strftime("%H:%M:%S"), file_path))
         count = 0
         _schema = schema
     try:
         cursor = cnx.cursor(dictionary=True, buffered=True)
-        cursor.execute("SELECT * from wcc_trn where flag = %s", (flag,))
+        cursor.execute("SELECT {} from {} where code = %s".format(
+            field_str, table), (code,))
         rows = cursor.fetchall()
         total = cursor.rowcount
         cursor.close()
@@ -89,7 +102,7 @@ def _exp_wcctrn(p):
             writer.close()
 
 
-class WccTrnExporter:
+class KlineExporter:
 
     def __init__(self, cpool):
         self._cpool = cpool
@@ -98,24 +111,25 @@ class WccTrnExporter:
         cnx = self._cpool.get_connection()
         cursor = None
         try:
-            file_dir = os.path.join(dest, "wcc_trn")
+            file_dir = os.path.join(dest, table)
             if not os.path.exists(file_dir):
                 try:
                     os.makedirs(file_dir)
                 except OSError as exc:  # Guard against race condition
                     if exc.errno != errno.EEXIST:
                         raise
-            print('{} fetching flags...'.format(strftime("%H:%M:%S")))
-            query = "SELECT distinct flag from wcc_trn"
+            print('{} fetching security codes from {}...'.format(
+                strftime("%H:%M:%S"), table))
+            query = "SELECT distinct code from {}".format(table)
             cursor = cnx.cursor(buffered=True)
             cursor.execute(query)
             rows = cursor.fetchall()
             total = cursor.rowcount
             cursor.close()
-            print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
-            params = [(row[0], dest) for row in rows]
+            print('{} num codes: {}'.format(strftime("%H:%M:%S"), total))
+            params = [(table, row[0], dest) for row in rows]
             exc = _getExecutor()
-            exc.map(_exp_wcctrn, params)
+            exc.map(_exp_kline, params)
         except:
             print(sys.exc_info()[0])
             raise

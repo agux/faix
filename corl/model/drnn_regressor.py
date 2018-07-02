@@ -649,8 +649,7 @@ class DRnnRegressorV5:
                 layer, keep_prob=keep_prob),
         }
 
-    def setNodes(self, uuids, features, target, seqlen):
-        self.uuids = uuids
+    def setNodes(self, features, target, seqlen):
         self.data = features
         self.target = target
         self.seqlen = seqlen
@@ -766,7 +765,6 @@ class DRnnRegressorV5:
             sqd = tf.squared_difference(logits, self.target)
             bidx = tf.argmax(sqd)
             max_diff = tf.sqrt(tf.reduce_max(sqd))
-            uuid = tf.gather(self.uuids, bidx)
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
-            return uuid, max_diff, predict, actual
+            return max_diff, predict, actual

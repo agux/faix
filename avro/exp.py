@@ -5,6 +5,7 @@ from mysql.connector.pooling import MySQLConnectionPool
 from avro.io import DatumWriter
 from avro.datafile import DataFileWriter
 from exporter.wcc_trn import WccTrnExporter
+from exporter.kline import KlineExporter
 
 import avro
 import avro.schema
@@ -26,7 +27,13 @@ cnxpool = MySQLConnectionPool(
     connect_timeout=60000
 )
 
-exp_dict = {"wcc_trn": WccTrnExporter(cnxpool)}
+klexp = KlineExporter(cnxpool)
+exp_dict = {
+    "wcc_trn": WccTrnExporter(cnxpool),
+    "kline_d_b": klexp,
+    "kline_d_n": klexp,
+    "kline_d": klexp,
+}
 
 
 def export(table, dest):
@@ -55,7 +62,7 @@ def export(table, dest):
                 writer.append(row)
             cursor.close()
         else:
-            exp_dict[table].export(dest)
+            exp_dict[table].export(table, dest)
     except:
         print(sys.exc_info()[0])
         raise

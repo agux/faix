@@ -33,6 +33,8 @@ LOG_DIR = 'logdir'
 
 def parseArgs():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--ds', type=str, help='datasource. such as db, or BigQuery.',
+                        default='db')
     parser.add_argument('--parallel', type=int, help='database operation parallel level',
                         default=multiprocessing.cpu_count())
     parser.add_argument('--prefetch', type=int, help='dataset prefetch batches',

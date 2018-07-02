@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 import tensorflow as tf
 # pylint: disable-msg=E0401
 from model import drnn_regressor as drnn
-from wc_data import input_fn
+from wc_data import input_fn, input_bq
 from time import strftime
 from test6 import parseArgs
 import numpy as np
@@ -18,6 +18,7 @@ import random
 
 # N_TEST = 100
 VSET = 9
+TEST_BATCH_SIZE = 3000
 TEST_INTERVAL = 50
 SAVE_INTERVAL = 10
 LAYER_WIDTH = 512
@@ -53,10 +54,10 @@ def validate(sess, model, summary, feed, bno, epoch):
     print('{} running on test set...'.format(strftime("%H:%M:%S")))
     mse, worst, test_summary_str = sess.run(
         [model.cost, model.worst, summary], feed)
-    diff, uuid, max_diff, predict, actual = math.sqrt(
-        mse), worst[0], worst[1], worst[2], worst[3]
-    print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {} uuid {}'.format(
-        strftime("%H:%M:%S"), epoch, diff, max_diff, predict, actual, uuid))
+    diff, max_diff, predict, actual = math.sqrt(
+        mse), worst[0], worst[1], worst[2]
+    print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {}'.format(
+        strftime("%H:%M:%S"), epoch, diff, max_diff, predict, actual))
     if diff < bst_score:
         bst_score = diff
         bst_file.seek(0)
@@ -68,6 +69,18 @@ def validate(sess, model, summary, feed, bno, epoch):
         print('{} acquired better model with validation score {}, at batch {}'.format(
               strftime("%H:%M:%S"), diff, bno))
     return test_summary_str
+
+
+def getInput(start, args):
+    ds = args.ds.lower()
+    if ds == 'db':
+        return input_fn.getInputs(
+            start, TIME_SHIFT, feat_cols, MAX_STEP, args.parallel,
+            args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
+    elif ds == 'bigquery':
+        return input_bq.getInputs(start, TIME_SHIFT, feat_cols, MAX_STEP, TEST_BATCH_SIZE,
+                                  vset=args.vset or VSET)
+    return None
 
 
 def run(args):
@@ -108,11 +121,8 @@ def run(args):
                     ckpt.model_checkpoint_path).split('-')[1])
                 print('{} resuming from last training, bno = {}'.format(
                     strftime("%H:%M:%S"), bno))
-                d = input_fn.getInputs(
-                    bno+1, TIME_SHIFT, feat_cols, MAX_STEP, args.parallel,
-                    args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
-                model.setNodes(d['uuids'], d['features'],
-                               d['labels'], d['seqlens'])
+                d = getInput(bno+1, args)
+                model.setNodes(d['features'], d['labels'], d['seqlens'])
                 saver = tf.train.Saver(name="reg_saver")
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 restored = True
@@ -138,10 +148,8 @@ def run(args):
                 tf.gfile.DeleteRecursively(training_dir)
 
         if not restored:
-            d = input_fn.getInputs(
-                bno+1, TIME_SHIFT, feat_cols, MAX_STEP, args.parallel,
-                args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
-            model.setNodes(d['uuids'], d['features'],
+            d = getInput(bno+1, args)
+            model.setNodes(d['features'],
                            d['labels'], d['seqlens'])
             saver = tf.train.Saver(name="reg_saver")
             sess.run(tf.global_variables_initializer())
