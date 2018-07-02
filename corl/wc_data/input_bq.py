@@ -61,9 +61,9 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     limit = max_step+time_shift
     query_params = [
         bq.ScalarQueryParameter('code', 'STRING', code),
-        bq.ScalarQueryParameter('klid_start', 'INT32', s),
-        bq.ScalarQueryParameter('klid_end', 'INT32', e),
-        bq.ScalarQueryParameter('limit', 'INT32', limit)
+        bq.ScalarQueryParameter('klid_start', 'INT64', s),
+        bq.ScalarQueryParameter('klid_end', 'INT64', e),
+        bq.ScalarQueryParameter('limit', 'INT64', limit)
     ]
     job_config = bq.QueryJobConfig()
     job_config.query_parameters = query_params
@@ -79,7 +79,7 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     qd = ftQueryD.format(dates)
     query_params = [
         bq.ScalarQueryParameter('code', 'STRING', rcode),
-        bq.ScalarQueryParameter('limit', 'INT32', limit)
+        bq.ScalarQueryParameter('limit', 'INT64', limit)
     ]
     job_config.query_parameters = query_params
     query_job = client.query(
