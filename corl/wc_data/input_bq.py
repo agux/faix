@@ -32,9 +32,9 @@ ftQueryTpl = (
     "    date, "
     "    {0} "  # (d.COLS - mean) / std
     "FROM "
-    "    secu.kline_d_b d "
+    "    secu.kline_d_b "
     "WHERE "
-    "    d.code = @code "
+    "    code = @code "
     "    {1} "
     "ORDER BY klid "
     "LIMIT @limit "
@@ -195,12 +195,14 @@ def _getFtQuery():
     k_cols = feat_cols
     sep = " "
     p_kline = sep.join(
-        ["(d.{0}-{1})/{2} {0},".format(c, fs_stats["{}_mean".format(c)], fs_stats["{}_std".format(c)]) for c in k_cols])
+        ["({0}-{1})/{2} {0},".format(c, fs_stats["{}_mean".format(c)], fs_stats["{}_std".format(c)]) for c in k_cols])
     p_kline = p_kline[:-1]  # strip last comma
 
     qk = ftQueryTpl.format(
-        p_kline, " AND d.klid BETWEEN @klid_start AND @klid_end ")
-    qd = ftQueryTpl.format(p_kline, " AND d.date in ({})")
+        p_kline, " AND klid BETWEEN @klid_start AND @klid_end ")
+    qd = ftQueryTpl.format(p_kline, " AND date in ({})")
+    print('qk:\n{}'.format(qk))
+    print('qd:\n{}'.format(qd))
     return qk, qd
 
 
