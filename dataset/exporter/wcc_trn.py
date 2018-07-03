@@ -94,7 +94,7 @@ class WccTrnExporter:
     def __init__(self, cpool):
         self._cpool = cpool
 
-    def export(self, table, dest):
+    def export(self, table, dest, args):
         cnx = self._cpool.get_connection()
         cursor = None
         try:

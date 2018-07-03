@@ -6,6 +6,7 @@ from avro.io import DatumWriter
 from avro.datafile import DataFileWriter
 from exporter.wcc_trn import WccTrnExporter
 from exporter.kline import KlineExporter
+from exporter.wctrain import WcTrainExporter
 
 import avro
 import avro.schema
@@ -33,11 +34,13 @@ exp_dict = {
     "kline_d_b": klexp,
     "kline_d_n": klexp,
     "kline_d": klexp,
+    "wctrain": WcTrainExporter(cnxpool)
 }
 
 
-def export(table, dest):
+def export(table, args):
     global cnxpool
+    dest = args.dest
     cnx = cnxpool.get_connection()
     writer = None
     try:
@@ -62,7 +65,7 @@ def export(table, dest):
                 writer.append(row)
             cursor.close()
         else:
-            exp_dict[table].export(table, dest)
+            exp_dict[table].export(table, dest, args)
     except:
         print(sys.exc_info()[0])
         raise

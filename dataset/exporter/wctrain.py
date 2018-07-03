@@ -1,0 +1,244 @@
+from __future__ import print_function
+# pylint: disable-msg=E0611
+from time import strftime
+from loky import get_reusable_executor
+from mysql.connector.pooling import MySQLConnectionPool
+
+import sys
+import os
+import multiprocessing
+import numpy as np
+import errno
+import gzip
+import json
+
+_executor = None
+cnxpool = None
+qk, qd = None, None
+
+ftQueryTpl = (
+    "SELECT  "
+    "    date, "
+    "    {0} "  # (d.COLS - mean) / std
+    "FROM "
+    "    kline_d_b d "
+    "        LEFT OUTER JOIN "
+    "    (SELECT  "
+    "        %s code, "
+    "        t.method, "
+    "        {1} "  # mean & std fields
+    "    FROM "
+    "        fs_stats t "
+    "    WHERE "
+    "        t.method = 'standardization' "
+    "    GROUP BY code , t.method) s USING (code) "
+    "WHERE "
+    "    d.code = %s "
+    "    {2} "
+    "ORDER BY klid "
+    "LIMIT %s "
+)
+
+
+def _getFtQuery(k_cols):
+    global qk, qd
+    if qk is not None and qd is not None:
+        return qk, qd
+
+    sep = " "
+    p_kline = sep.join(
+        ["(d.{0}-s.{0}_mean)/s.{0}_std {0},".format(c) for c in k_cols])
+    p_kline = p_kline[:-1]  # strip last comma
+    stats_tpl = (
+        " MAX(CASE "
+        "     WHEN t.fields = '{0}' THEN t.mean "
+        "     ELSE NULL "
+        " END) AS {0}_mean, "
+        " MAX(CASE "
+        "     WHEN t.fields = '{0}' THEN t.std "
+        "     ELSE NULL "
+        " END) AS {0}_std,"
+    )
+    stats = sep.join([stats_tpl.format(c) for c in k_cols])
+    stats = stats[:-1]  # strip last comma
+
+    qk = ftQueryTpl.format(p_kline, stats,
+                           " AND d.klid BETWEEN %s AND %s ")
+    qd = ftQueryTpl.format(p_kline, stats,
+                           " AND d.date in ({})")
+    return qk, qd
+
+
+def _init():
+    global cnxpool
+    print("PID %d: initializing mysql connection pool..." % os.getpid())
+    cnxpool = MySQLConnectionPool(
+        pool_name="dbpool",
+        pool_size=3,
+        host='127.0.0.1',
+        port=3306,
+        user='mysql',
+        database='secu',
+        password='123456',
+        # ssl_ca='',
+        # use_pure=True,
+        connect_timeout=60000
+    )
+
+
+def _getExecutor(workers=multiprocessing.cpu_count()):
+    global _executor
+    if _executor is not None:
+        return _executor
+    _executor = get_reusable_executor(
+        max_workers=workers,
+        initializer=_init,
+        # initargs=(db_pool_size, db_host, db_port, db_pwd),
+        timeout=1800)
+    return _executor
+
+
+def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
+    '''
+    [max_step, feature*time_shift], length
+    '''
+    global cnxpool
+    cnx = cnxpool.get_connection()
+    fcursor = cnx.cursor(buffered=True)
+    limit = max_step+time_shift
+    try:
+        fcursor.execute(ftQueryK, (code, code, s, e, limit))
+        col_names = fcursor.column_names
+        featSize = (len(col_names)-1)*2
+        total = fcursor.rowcount
+        rows = fcursor.fetchall()
+        # extract dates and transform to sql 'in' query
+        dates = "'{}'".format("','".join([r[0] for r in rows]))
+        qd = ftQueryD.format(dates)
+        fcursor.execute(qd, (rcode, rcode, limit))
+        rtotal = fcursor.rowcount
+        r_rows = fcursor.fetchall()
+        if total != rtotal:
+            raise ValueError(
+                "rcode prior data size {} != code's: {}".format(rtotal, total))
+        batch = []
+        for t in range(time_shift+1):
+            steps = np.zeros((max_step, featSize), dtype='f')
+            offset = max_step + time_shift - total
+            s = max(0, t - offset)
+            e = total - time_shift + t
+            for i, row in enumerate(rows[s:e]):
+                for j, col in enumerate(row[1:]):
+                    steps[i+offset][j] = col
+            for i, row in enumerate(r_rows[s:e]):
+                for j, col in enumerate(row[1:]):
+                    steps[i+offset][j+featSize//2] = col
+            batch.append(steps)
+        return np.concatenate(batch, 1), total - time_shift
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        fcursor.close()
+        cnx.close()
+
+
+def _getSeries(p):
+    # print('{} p: {}'.format(os.getpid(), p))
+    code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQueryD = p
+    s = max(0, klid-max_step+1-time_shift)
+    batch, total = _getBatch(
+        code, s, klid, rcode, max_step, time_shift, ftQueryK, ftQueryD)
+    return batch, val, total
+
+
+def _write_file(flag, file_path, payload):
+    print('{} exporting {}'.format(
+        strftime("%H:%M:%S"), file_path))
+    with gzip.GzipFile(file_path, 'wb') as fout:
+        fout.write(json.dumps(
+            payload, separators=(',', ':')).encode('utf-8'))
+    print('{} finished processing batch {}'.format(
+        strftime("%H:%M:%S"), flag))
+
+
+def _exp_wctrain(p):
+    global cnxpool
+    flag, dest, feat_cols, max_step, time_shift = p
+    print('{} loading {}...'.format(
+        strftime("%H:%M:%S"), flag))
+    cnx = cnxpool.get_connection()
+    try:
+        cursor = cnx.cursor(buffered=True)
+        cursor.execute(
+            "SELECT code, klid, rcode, corl_stz from wcc_trn where flag = %s", (flag,))
+        rows = cursor.fetchall()
+        cursor.close()
+        data, vals, seqlen = [], [], []
+        qk, qd = _getFtQuery(feat_cols)
+        exc = _getExecutor(multiprocessing.cpu_count()//2)
+        params = [(code, klid, rcode, val, max_step, time_shift, qk, qd)
+                  for code, klid, rcode, val in rows]
+        r = list(exc.map(_getSeries, params))
+        data, vals, seqlen = zip(*r)
+        # data = [batch, max_step, feature*time_shift]
+        # vals = [batch]
+        # seqlen = [batch]
+        payload = {
+            'features': np.array(data, 'f').tolist(),
+            'labels': np.array(vals, 'f').tolist(),
+            'seqlens': np.array(seqlen, 'i').tolist()
+        }
+        file_path = os.path.join(dest, "{}.json.gz".format(flag))
+        _write_file(flag, file_path, payload)
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        cnx.close()
+    return os.getpid()
+
+
+class WcTrainExporter:
+
+    def __init__(self, cpool):
+        global cnxpool
+        cnxpool = cpool
+
+    def export(self, table, dest, args):
+        global cnxpool
+        feat_cols = args.fields
+        max_step = int(args.options[0])
+        time_shift = int(args.options[1])
+        assert feat_cols is not None and max_step is not None and time_shift is not None
+        print('{} feat_cols: {}'.format(strftime("%H:%M:%S"), feat_cols))
+        print('{} max_step: {}'.format(strftime("%H:%M:%S"), max_step))
+        print('{} time_shift: {}'.format(strftime("%H:%M:%S"), time_shift))
+        cnx = cnxpool.get_connection()
+        cursor = None
+        try:
+            file_dir = os.path.join(dest, "wc_train")
+            if not os.path.exists(file_dir):
+                try:
+                    os.makedirs(file_dir)
+                except OSError as exc:  # Guard against race condition
+                    if exc.errno != errno.EEXIST:
+                        raise
+            print('{} destination: {}'.format(strftime("%H:%M:%S"), file_dir))
+            print('{} fetching flags...'.format(strftime("%H:%M:%S")))
+            query = "SELECT distinct flag from wcc_trn"
+            cursor = cnx.cursor(buffered=True)
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            total = cursor.rowcount
+            cursor.close()
+            print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
+            exc = _getExecutor(multiprocessing.cpu_count()//2+1)
+            params = [(row[0], file_dir, feat_cols, max_step, time_shift)
+                      for row in rows]
+            set(exc.map(_exp_wctrain, params))
+        except:
+            print(sys.exc_info()[0])
+            raise
+        finally:
+            cnx.close()
