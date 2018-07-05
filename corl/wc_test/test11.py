@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 import tensorflow as tf
 # pylint: disable-msg=E0401
 from model import drnn_regressor as drnn
-from wc_data import input_fn, input_bq
+from wc_data import input_fn, input_bq, input_file
 from time import strftime
 import argparse
 import numpy as np
@@ -36,10 +36,13 @@ feat_cols = ["lr", "lr_vol"]
 
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
 
+
 def parseArgs():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ds', type=str, help='datasource. such as db, or BigQuery.',
+    parser.add_argument('--ds', type=str, help='datasource. such as file, db, or BigQuery.',
                         default='db')
+    parser.add_argument('--dir', type=str,
+                        help='directory path for training and test set.')
     parser.add_argument('--parallel', type=int, help='database operation parallel level',
                         default=multiprocessing.cpu_count())
     parser.add_argument('--prefetch', type=int, help='dataset prefetch batches',
@@ -59,6 +62,7 @@ def parseArgs():
     parser.add_argument(
         '--restart', help='restart training', action='store_true')
     return parser.parse_args()
+
 
 def collect_summary(sess, model, base_dir):
     ts = strftime("%Y%m%d_%H%M%S")
@@ -96,6 +100,7 @@ def validate(sess, model, summary, feed, bno, epoch):
 
 def getInput(start, args):
     ds = args.ds.lower()
+    print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
     if ds == 'db':
         return input_fn.getInputs(
             start, TIME_SHIFT, feat_cols, MAX_STEP, args.parallel,
@@ -103,6 +108,9 @@ def getInput(start, args):
     elif ds == 'bigquery':
         return input_bq.getInputs(start, TIME_SHIFT, feat_cols, MAX_STEP, TEST_BATCH_SIZE,
                                   vset=args.vset or VSET)
+    elif ds == 'file':
+        return input_file.getInputs(
+            args.dir, start, args.prefetch, args.vset or VSET)
     return None
 
 
@@ -172,8 +180,7 @@ def run(args):
 
         if not restored:
             d = getInput(bno+1, args)
-            model.setNodes(d['features'],
-                           d['labels'], d['seqlens'])
+            model.setNodes(d['features'], d['labels'], d['seqlens'])
             saver = tf.train.Saver(name="reg_saver")
             sess.run(tf.global_variables_initializer())
             tf.gfile.MakeDirs(training_dir)
