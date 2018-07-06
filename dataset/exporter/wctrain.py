@@ -11,6 +11,11 @@ import numpy as np
 import errno
 import gzip
 import json
+import ConfigParser
+
+'''
+example entry command: python main.py --table wctrain --fields lr lr_vol --dest /Users/jx/ProgramData/mysql/dataset 35 4 /Volumes/EXTOS/wc_train
+'''
 
 _executor = None
 cnxpool = None
@@ -164,7 +169,20 @@ def _write_file(flag, file_path, payload):
 
 def _exp_wctrain(p):
     global cnxpool
-    flag, dest, feat_cols, max_step, time_shift = p
+    flag, dest, feat_cols, max_step, time_shift, alt_dirs = p
+
+    file_path = os.path.join(dest, "{}.json.gz".format(flag))
+    if os.path.exists(file_path):
+        print('{} {} file already exists, skipping'.format(
+            strftime("%H:%M:%S"), flag))
+        return os.getpid()
+    else:
+        for d in alt_dirs:
+            if os.path.exists(os.path.join(d, "{}.json.gz".format(flag))):
+                print('{} {} file already exists, skipping'.format(
+                    strftime("%H:%M:%S"), flag))
+                return os.getpid()
+
     print('{} loading {}...'.format(
         strftime("%H:%M:%S"), flag))
     cnx = cnxpool.get_connection()
@@ -176,7 +194,7 @@ def _exp_wctrain(p):
         cursor.close()
         data, vals, seqlen = [], [], []
         qk, qd = _getFtQuery(feat_cols)
-        exc = _getExecutor(multiprocessing.cpu_count()//2)
+        exc = _getExecutor(2)
         params = [(code, klid, rcode, val, max_step, time_shift, qk, qd)
                   for code, klid, rcode, val in rows]
         r = list(exc.map(_getSeries, params))
@@ -189,7 +207,6 @@ def _exp_wctrain(p):
             'labels': np.array(vals, 'f').tolist(),
             'seqlens': np.array(seqlen, 'i').tolist()
         }
-        file_path = os.path.join(dest, "{}.json.gz".format(flag))
         _write_file(flag, file_path, payload)
     except:
         print(sys.exc_info()[0])
@@ -197,6 +214,46 @@ def _exp_wctrain(p):
     finally:
         cnx.close()
     return os.getpid()
+
+
+def getMetaInfo():
+    global cnxpool
+    # get batch_size and count for training/test set
+    cnx = cnxpool.get_connection()
+    try:
+        cursor = cnx.cursor()
+        d = {}
+        print('{} counting test set...'.format(strftime("%H:%M:%S")))
+        cursor.execute(
+            "SELECT count(*) from (select distinct flag from wcc_trn where flag like 'TEST_%') t")
+        d['test_count'] = cursor.fetchone()[0]
+        print('{} number of test set: {}'.format(
+            strftime("%H:%M:%S"), d['test_count']))
+        print('{} querying test set batch size...'.format(strftime("%H:%M:%S")))
+        cursor.execute(
+            "SELECT count(*) from wcc_trn where flag = 'TEST_1'")
+        d['test_bsize'] = cursor.fetchone()[0]
+        print('{} test set batch size: {}'.format(
+            strftime("%H:%M:%S"), d['test_bsize']))
+
+        print('{} counting training set...'.format(strftime("%H:%M:%S")))
+        cursor.execute(
+            "SELECT count(*) from (select distinct flag from wcc_trn where flag like 'TRAIN_%') t")
+        d['train_count'] = cursor.fetchone()[0]
+        print('{} number of training set: {}'.format(
+            strftime("%H:%M:%S"), d['train_count']))
+        print('{} querying training set batch size...'.format(strftime("%H:%M:%S")))
+        cursor.execute(
+            "SELECT count(*) from wcc_trn where flag = 'TRAIN_1'")
+        d['train_bsize'] = cursor.fetchone()[0]
+        print('{} training set batch size: {}'.format(
+            strftime("%H:%M:%S"), d['train_bsize']))
+        return d
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        cnx.close()
 
 
 class WcTrainExporter:
@@ -210,6 +267,7 @@ class WcTrainExporter:
         feat_cols = args.fields
         max_step = int(args.options[0])
         time_shift = int(args.options[1])
+        alt_dirs = args.options[2:] if len(args.options) > 2 else None
         assert feat_cols is not None and max_step is not None and time_shift is not None
         print('{} feat_cols: {}'.format(strftime("%H:%M:%S"), feat_cols))
         print('{} max_step: {}'.format(strftime("%H:%M:%S"), max_step))
@@ -225,6 +283,33 @@ class WcTrainExporter:
                     if exc.errno != errno.EEXIST:
                         raise
             print('{} destination: {}'.format(strftime("%H:%M:%S"), file_dir))
+            # export meta file if not exists
+            meta_file = os.path.join(file_dir, 'meta.txt')
+            if not os.path.exists(meta_file):
+                print('{} writing meta info to {} ...'.format(
+                    strftime("%H:%M:%S"), meta_file))
+                d = getMetaInfo()
+                cfg = ConfigParser.ConfigParser()
+                sect_com = 'common'
+                cfg.add_section(sect_com)
+                cfg.set(sect_com, 'target', 'stock correlation analysis')
+                cfg.set(sect_com, 'time_step', str(max_step))
+                cfg.set(sect_com, 'time_shift', str(time_shift))
+                cfg.set(sect_com, 'features', ', '.join(map(str, feat_cols)))
+                feature_size = len(feat_cols) * 2 * (time_shift+1)
+                cfg.set(sect_com, 'feature_size', str(feature_size))
+                cfg.set(sect_com, 'structure',
+                        '[?, {}, {}]'.format(max_step, feature_size))
+                sect_test = 'test set'
+                cfg.add_section(sect_test)
+                cfg.set(sect_test, 'batch_size', str(d['test_bsize']))
+                cfg.set(sect_test, 'count', str(d['test_count']))
+                sect_train = 'training set'
+                cfg.add_section(sect_train)
+                cfg.set(sect_train, 'batch_size', str(d['train_bsize']))
+                cfg.set(sect_train, 'count', str(d['train_count']))
+                with open(meta_file, 'wb+') as f:
+                    cfg.write(f)
             print('{} fetching flags...'.format(strftime("%H:%M:%S")))
             query = "SELECT distinct flag from wcc_trn"
             cursor = cnx.cursor(buffered=True)
@@ -233,8 +318,8 @@ class WcTrainExporter:
             total = cursor.rowcount
             cursor.close()
             print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
-            exc = _getExecutor(multiprocessing.cpu_count()//2+1)
-            params = [(row[0], file_dir, feat_cols, max_step, time_shift)
+            exc = _getExecutor(multiprocessing.cpu_count())
+            params = [(row[0], file_dir, feat_cols, max_step, time_shift, alt_dirs)
                       for row in rows]
             set(exc.map(_exp_wctrain, params))
         except:
