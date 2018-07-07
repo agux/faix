@@ -1,36 +1,59 @@
 """Create the input data pipeline using `tf.data`"""
 
 from time import strftime
-# from joblib import Parallel, delayed
+from google.cloud import storage as gcs
+from retrying import retry
 import tensorflow as tf
 import sys
 import os
+import re
 import multiprocessing
 import numpy as np
-import glob
-import re
 import gzip
 import json
 import ConfigParser
+import tempfile as tmpf
 
 file_dir = None
+gcs_client = None
 
 
-def _loadTestSet(vset=None):
+@retry(stop_max_attempt_number=7, wait_exponential_multiplier=1000, wait_exponential_max=32000,)
+def file_from_gcs(bucket_name, object_name):
+    global gcs_client
+    if gcs_client is not None:
+        gcs_client = gcs.Client()
+    bucket = gcs_client.get_bucket(bucket_name)
+    blob = bucket.blob(object_name)
+    tmp = tmpf.SpooledTemporaryFile(max_size=1024*1024*100)
+    blob.download_to_file(tmp)
+    return tmp
+
+
+def _loadData(file_dir, flag):
+    file = None
+    if file_dir.startswith('gs://'):
+        s = re.search('gs://([^/]+?)/(.+?)', file_dir)
+        bn = s.gropu(1)
+        on = '{}/{}.json.gz'.format(s.group(2), flag)
+        with gzip.GzipFile(fileobj=file_from_gcs(bn, on), mode='rb') as fin:
+            return json.loads(fin.read().decode('utf-8'))
+    else:
+        file = os.path.join(file_dir, '{}.json.gz'.format(flag))
+        with gzip.GzipFile(file, 'rb') as fin:
+            return json.loads(fin.read().decode('utf-8'))
+
+
+def _loadTestSet(max_bno, vset=None):
     global file_dir
     setno = vset
     if setno is None:
-        files = glob.glob(os.path.join(file_dir, 'TEST_*.json.gz'))
-        ntest = max([int(re.search('TEST_(.+?).json.gz', path).group(1))
-                     for path in files])
-        setno = np.random.randint(ntest)
+        setno = np.random.randint(max_bno)
     flag = 'TEST_{}'.format(setno)
     print('{} selected test set: {}'.format(
         strftime("%H:%M:%S"), flag))
-    # load json data from gz file
-    file = os.path.join(file_dir, '{}.json.gz'.format(flag))
-    with gzip.GzipFile(file, 'rb') as fin:
-        data = json.loads(fin.read().decode('utf-8'))
+    # load json data from local or remote gz file
+    data = _loadData(file_dir, flag)
     # data = [batch, max_step, feature*time_shift]
     # vals = [batch]
     # seqlen = [batch]
@@ -66,6 +89,7 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
     feature_size = config.getint('common', 'feature_size')
     max_bno = config.getint('training set', 'count')
     test_batch_size = config.getint('test set', 'batch_size')
+    test_max_bno = config.getint('test set', 'count')
     # Create dataset for training
     print("{} Using prefetch: {}".format(
         strftime("%H:%M:%S"), prefetch))
@@ -80,7 +104,7 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
         ).batch(1).prefetch(prefetch)
         # Create dataset for testing
         test_dataset = tf.data.Dataset.from_tensor_slices(
-            _loadTestSet(vset)).batch(test_batch_size).repeat()
+            _loadTestSet(test_max_bno, vset)).batch(test_batch_size).repeat()
 
         train_iterator = train_dataset.make_one_shot_iterator()
         test_iterator = test_dataset.make_one_shot_iterator()

@@ -163,8 +163,6 @@ def _write_file(flag, file_path, payload):
     with gzip.GzipFile(file_path, 'wb') as fout:
         fout.write(json.dumps(
             payload, separators=(',', ':')).encode('utf-8'))
-    print('{} finished processing batch {}'.format(
-        strftime("%H:%M:%S"), flag))
 
 
 def _exp_wctrain(p):
@@ -318,7 +316,7 @@ class WcTrainExporter:
             total = cursor.rowcount
             cursor.close()
             print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
-            exc = _getExecutor(multiprocessing.cpu_count())
+            exc = _getExecutor(max(2, multiprocessing.cpu_count()-1))
             params = [(row[0], file_dir, feat_cols, max_step, time_shift, alt_dirs)
                       for row in rows]
             set(exc.map(_exp_wctrain, params))
