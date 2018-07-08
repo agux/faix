@@ -41,7 +41,7 @@ def _file_from_gcs(bucket_name, object_name):
 def _loadData(file_dir, flag):
     file = None
     if file_dir.startswith('gs://'):
-        s = re.search('gs://([^/]+?)/(.+?)', file_dir)
+        s = re.search('gs://([^/]*)/(.*)', file_dir)
         bn = s.group(1)
         on = '{}/{}.json.gz'.format(s.group(2), flag)
         with gzip.GzipFile(fileobj=_file_from_gcs(bn, on), mode='rb') as fin:
@@ -105,6 +105,8 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
     """
     global file_dir
     file_dir = dir
+    print("{} loading file from: {} Start from: {} Using prefetch: {}".format(
+        strftime("%H:%M:%S"), file_dir, start, prefetch))
     # read meta.txt from file_dir
     config = _read_meta_config(file_dir)
     time_step = config.getint('common', 'time_step')
@@ -113,8 +115,6 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
     test_batch_size = config.getint('test set', 'batch_size')
     test_max_bno = config.getint('test set', 'count')
     # Create dataset for training
-    print("{} loading file from: {} Using prefetch: {}".format(
-        strftime("%H:%M:%S"), file_dir, prefetch))
     with tf.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max
         flags = ["TRAIN_{}".format(bno) for bno in range(start, max_bno)]
