@@ -36,6 +36,7 @@ def _file_from_gcs(bucket_name, object_name, spooled=True):
     tmp = tmpf.SpooledTemporaryFile(
         max_size=1024*1024*100) if spooled else tmpf.NamedTemporaryFile()
     blob.download_to_file(tmp)
+    tmp.seek(0)
     return tmp
 
 
