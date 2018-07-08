@@ -26,7 +26,7 @@ def print_n_retry(exception):
 @retry(retry_on_exception=print_n_retry,
        stop_max_attempt_number=7,
        wait_exponential_multiplier=1000,
-       wait_exponential_max=32000,)
+       wait_exponential_max=32000)
 def _file_from_gcs(bucket_name, object_name):
     global gcs_client
     if gcs_client is None:
@@ -85,7 +85,7 @@ def _read_meta_config(file_dir):
     file = None
     config = ConfigParser.ConfigParser()
     if file_dir.startswith('gs://'):
-        s = re.search('gs://([^/]+?)/(.+?)', file_dir)
+        s = re.search('gs://([^/]*)/(.*)', file_dir)
         bn = s.group(1)
         on = '{}/meta.txt'.format(s.group(2))
         file = _file_from_gcs(bn, on)
