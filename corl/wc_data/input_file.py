@@ -34,7 +34,7 @@ def _loadData(file_dir, flag):
     file = None
     if file_dir.startswith('gs://'):
         s = re.search('gs://([^/]+?)/(.+?)', file_dir)
-        bn = s.gropu(1)
+        bn = s.group(1)
         on = '{}/{}.json.gz'.format(s.group(2), flag)
         with gzip.GzipFile(fileobj=_file_from_gcs(bn, on), mode='rb') as fin:
             return json.loads(fin.read().decode('utf-8'))
@@ -78,7 +78,7 @@ def _read_meta_config(file_dir):
     config = ConfigParser.ConfigParser()
     if file_dir.startswith('gs://'):
         s = re.search('gs://([^/]+?)/(.+?)', file_dir)
-        bn = s.gropu(1)
+        bn = s.group(1)
         on = '{}/meta.txt'.format(s.group(2))
         file = _file_from_gcs(bn, on)
     else:
