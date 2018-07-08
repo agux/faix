@@ -89,7 +89,7 @@ def _read_meta_config(file_dir):
         s = re.search('gs://([^/]*)/(.*)', file_dir)
         bn = s.group(1)
         on = '{}/meta.txt'.format(s.group(2))
-        file = open(_file_from_gcs(bn, on), 'rb')
+        file = _file_from_gcs(bn, on)
     else:
         file = open(os.path.join(file_dir, 'meta.txt'), 'rb')
     config.readfp(file)
