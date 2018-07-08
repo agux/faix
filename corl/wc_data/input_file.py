@@ -95,14 +95,12 @@ def _read_meta_config(file_dir):
     config.readfp(file)
     file.seek(0)
     print('{} read meta.txt:\n{}'.format(strftime("%H:%M:%S"), file.read()))
-    print("{} meta.txt contains sections:{}".format(
-        strftime("%H:%M:%S"), config.sections()))
+    file.close()
     time_step = config.getint('common', 'time_step')
     feature_size = config.getint('common', 'feature_size')
     max_bno = config.getint('training set', 'count')
     test_batch_size = config.getint('test set', 'batch_size')
     test_max_bno = config.getint('test set', 'count')
-    file.close()
     return time_step, feature_size, max_bno, test_batch_size, test_max_bno
 
 
