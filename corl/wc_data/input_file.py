@@ -92,8 +92,13 @@ def _read_meta_config(file_dir):
     else:
         file = open(os.path.join(file_dir, 'meta.txt'), 'r')
     config.readfp(file)
+    time_step = config.getint('common', 'time_step')
+    feature_size = config.getint('common', 'feature_size')
+    max_bno = config.getint('training set', 'count')
+    test_batch_size = config.getint('test set', 'batch_size')
+    test_max_bno = config.getint('test set', 'count')
     file.close()
-    return config
+    return time_step, feature_size, max_bno, test_batch_size, test_max_bno
 
 
 def getInputs(dir, start=0, prefetch=2, vset=None):
@@ -108,12 +113,8 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
     print("{} loading file from: {} Start from: {} Using prefetch: {}".format(
         strftime("%H:%M:%S"), file_dir, start, prefetch))
     # read meta.txt from file_dir
-    config = _read_meta_config(file_dir)
-    time_step = config.getint('common', 'time_step')
-    feature_size = config.getint('common', 'feature_size')
-    max_bno = config.getint('training set', 'count')
-    test_batch_size = config.getint('test set', 'batch_size')
-    test_max_bno = config.getint('test set', 'count')
+    time_step, feature_size, max_bno, test_batch_size, test_max_bno = _read_meta_config(
+        file_dir)
     # Create dataset for training
     with tf.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max
