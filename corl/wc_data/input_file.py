@@ -84,15 +84,17 @@ def _loadTrainingData(flag):
 
 def _read_meta_config(file_dir):
     file = None
-    config = ConfigParser.ConfigParser()
+    config = ConfigParser.RawConfigParser()
     if file_dir.startswith('gs://'):
         s = re.search('gs://([^/]*)/(.*)', file_dir)
         bn = s.group(1)
         on = '{}/meta.txt'.format(s.group(2))
-        file = _file_from_gcs(bn, on, False)
+        file = open(_file_from_gcs(bn, on), 'rb')
     else:
-        file = open(os.path.join(file_dir, 'meta.txt'), 'r')
+        file = open(os.path.join(file_dir, 'meta.txt'), 'rb')
     config.readfp(file)
+    print("{} meta.txt contains sections:{}".format(
+        strftime("%H:%M:%S"), config.sections()))
     time_step = config.getint('common', 'time_step')
     feature_size = config.getint('common', 'feature_size')
     max_bno = config.getint('training set', 'count')
