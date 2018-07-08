@@ -74,9 +74,8 @@ def _loadTrainingData(flag):
     global file_dir
     print("{} loading training set {}...".format(
         strftime("%H:%M:%S"), flag))
-    file = os.path.join(file_dir, '{}.json.gz'.format(flag))
-    with gzip.GzipFile(file, 'rb') as fin:
-        data = json.loads(fin.read().decode('utf-8'))
+    # load json data from local or remote gz file
+    data = _loadData(file_dir, flag)
     # data = [batch, max_step, feature*time_shift]
     # vals = [batch]
     # seqlen = [batch]
