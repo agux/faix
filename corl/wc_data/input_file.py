@@ -27,13 +27,14 @@ def print_n_retry(exception):
        stop_max_attempt_number=7,
        wait_exponential_multiplier=1000,
        wait_exponential_max=32000)
-def _file_from_gcs(bucket_name, object_name):
+def _file_from_gcs(bucket_name, object_name, spooled=True):
     global gcs_client
     if gcs_client is None:
         gcs_client = gcs.Client()
     bucket = gcs_client.get_bucket(bucket_name)
     blob = bucket.blob(object_name)
-    tmp = tmpf.SpooledTemporaryFile(max_size=1024*1024*100)
+    tmp = tmpf.SpooledTemporaryFile(
+        max_size=1024*1024*100) if spooled else tmpf.NamedTemporaryFile()
     blob.download_to_file(tmp)
     return tmp
 
@@ -88,7 +89,7 @@ def _read_meta_config(file_dir):
         s = re.search('gs://([^/]*)/(.*)', file_dir)
         bn = s.group(1)
         on = '{}/meta.txt'.format(s.group(2))
-        file = _file_from_gcs(bn, on)
+        file = _file_from_gcs(bn, on, False)
     else:
         file = open(os.path.join(file_dir, 'meta.txt'), 'r')
     config.readfp(file)
