@@ -93,6 +93,8 @@ def _read_meta_config(file_dir):
     else:
         file = open(os.path.join(file_dir, 'meta.txt'), 'rb')
     config.readfp(file)
+    file.seek(0)
+    print('{} read meta.txt:\n{}'.format(strftime("%H:%M:%S"), file.read()))
     print("{} meta.txt contains sections:{}".format(
         strftime("%H:%M:%S"), config.sections()))
     time_step = config.getint('common', 'time_step')
