@@ -18,10 +18,18 @@ file_dir = None
 gcs_client = None
 
 
-@retry(stop_max_attempt_number=7, wait_exponential_multiplier=1000, wait_exponential_max=32000,)
+def print_n_retry(exception):
+    print(exception)
+    return True
+
+
+@retry(retry_on_exception=print_n_retry,
+       stop_max_attempt_number=7,
+       wait_exponential_multiplier=1000,
+       wait_exponential_max=32000,)
 def _file_from_gcs(bucket_name, object_name):
     global gcs_client
-    if gcs_client is not None:
+    if gcs_client is None:
         gcs_client = gcs.Client()
     bucket = gcs_client.get_bucket(bucket_name)
     blob = bucket.blob(object_name)
@@ -105,8 +113,8 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
     test_batch_size = config.getint('test set', 'batch_size')
     test_max_bno = config.getint('test set', 'count')
     # Create dataset for training
-    print("{} Using prefetch: {}".format(
-        strftime("%H:%M:%S"), prefetch))
+    print("{} loading file from: {} Using prefetch: {}".format(
+        strftime("%H:%M:%S"), file_dir, prefetch))
     with tf.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max
         flags = ["TRAIN_{}".format(bno) for bno in range(start, max_bno)]
