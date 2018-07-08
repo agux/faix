@@ -19,7 +19,7 @@ gcs_client = None
 
 
 @retry(stop_max_attempt_number=7, wait_exponential_multiplier=1000, wait_exponential_max=32000,)
-def file_from_gcs(bucket_name, object_name):
+def _file_from_gcs(bucket_name, object_name):
     global gcs_client
     if gcs_client is not None:
         gcs_client = gcs.Client()
@@ -36,7 +36,7 @@ def _loadData(file_dir, flag):
         s = re.search('gs://([^/]+?)/(.+?)', file_dir)
         bn = s.gropu(1)
         on = '{}/{}.json.gz'.format(s.group(2), flag)
-        with gzip.GzipFile(fileobj=file_from_gcs(bn, on), mode='rb') as fin:
+        with gzip.GzipFile(fileobj=_file_from_gcs(bn, on), mode='rb') as fin:
             return json.loads(fin.read().decode('utf-8'))
     else:
         file = os.path.join(file_dir, '{}.json.gz'.format(flag))
@@ -73,6 +73,21 @@ def _loadTrainingData(flag):
     return np.array(data['features'], 'f'), np.array(data['labels'], 'f'), np.array(data['seqlens'], 'i')
 
 
+def _read_meta_config(file_dir):
+    file = None
+    config = ConfigParser.ConfigParser()
+    if file_dir.startswith('gs://'):
+        s = re.search('gs://([^/]+?)/(.+?)', file_dir)
+        bn = s.gropu(1)
+        on = '{}/meta.txt'.format(s.group(2))
+        file = _file_from_gcs(bn, on)
+    else:
+        file = open(os.path.join(file_dir, 'meta.txt'), 'r')
+    config.readfp(file)
+    file.close()
+    return config
+
+
 def getInputs(dir, start=0, prefetch=2, vset=None):
     """Input function for the wcc training dataset.
 
@@ -83,8 +98,7 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
     global file_dir
     file_dir = dir
     # read meta.txt from file_dir
-    config = ConfigParser.ConfigParser()
-    config.readfp(open(os.path.join(file_dir, 'meta.txt'), 'r'))
+    config = _read_meta_config(file_dir)
     time_step = config.getint('common', 'time_step')
     feature_size = config.getint('common', 'feature_size')
     max_bno = config.getint('training set', 'count')
