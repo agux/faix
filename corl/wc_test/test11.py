@@ -210,7 +210,7 @@ def run(args):
                 print("End of Dataset.")
                 break
             bno = bno+1
-            _, max_diff, predict, actual = worst[0], worst[1], worst[2], worst[3]
+            max_diff, predict, actual = worst[0], worst[1], worst[2]
             print('{} bno {} max_diff {:3.4f} predict {} actual {}'.format(
                 strftime("%H:%M:%S"), bno, max_diff, predict, actual))
             train_writer.add_summary(summary_str, bno)
