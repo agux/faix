@@ -624,7 +624,7 @@ class DRnnRegressorV4:
 
 class DRnnRegressorV5:
     '''
-    Deep RNN Regressor using 1-layer GridRNNCell and 3-layer FCN. Internal cell type is BasicLSTMCell.
+    Deep RNN Regressor using 1-layer GridRNNCell and 3-layer FCN. Internal cell type is LSTMBlockCell.
     With selu, layer norm, alpha_dropout, and variance_scaling_initializer. 
     '''
 
