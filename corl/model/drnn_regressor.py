@@ -901,8 +901,7 @@ class DRnnRegressorV6:
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate,
-                                      epsilon=0.1).minimize(
+        return tf.train.AdamOptimizer(self._learning_rate).minimize(
             self.cost, global_step=tf.train.get_or_create_global_step())
 
     @lazy_property
