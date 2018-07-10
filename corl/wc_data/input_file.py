@@ -126,7 +126,7 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
             lambda f: tuple(
                 tf.py_func(_loadTrainingData, [f], [
                            tf.float32, tf.float32, tf.int32])
-            ), prefetch
+            ), multiprocessing.cpu_count()
         ).batch(1).prefetch(prefetch)
         # Create dataset for testing
         test_dataset = tf.data.Dataset.from_tensor_slices(

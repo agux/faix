@@ -114,7 +114,7 @@ def run(args):
         summary, train_writer, test_writer = collect_summary(
             sess, model, training_dir)
         test_summary_str = None
-        decayed_lr = False
+        lr = LEARNING_RATE
         while True:
             # bno = epoch*TEST_INTERVAL
             epoch = bno // TEST_INTERVAL
@@ -125,13 +125,8 @@ def run(args):
                 restored = False
             try:
                 kp = min(1, random.uniform(KEEP_PROB, 1.05))
-                lr = LEARNING_RATE
-                if bno > int(DECAYED_LR_START * bno):
-                    if decayed_lr:
-                        lr = DECAYED_LEARNING_RATE
-                    elif found_better:
-                        decayed_lr = True
-                        lr = DECAYED_LEARNING_RATE
+                if bno > int(DECAYED_LR_START * bno) and lr != DECAYED_LEARNING_RATE and found_better:
+                    lr = DECAYED_LEARNING_RATE
                 print('{} training batch {}, random keep_prob:{}, learning_rate:{}'.format(
                     strftime("%H:%M:%S"), bno+1, kp, lr))
                 summary_str, worst = sess.run(
