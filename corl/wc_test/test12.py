@@ -9,7 +9,7 @@ import tensorflow as tf
 from model import drnn_regressor as drnn
 from wc_data import input_fn, input_bq, input_file
 from time import strftime
-from test11 import validate, bst_saver, bst_score, bst_file, bst_ckpt, parseArgs, feat_cols, LOG_DIR, collect_summary, getInput
+from test11 import parseArgs, feat_cols, LOG_DIR, collect_summary, getInput
 import argparse
 import numpy as np
 import math
@@ -32,6 +32,32 @@ DECAYED_LR_START = 0.7
 SEED = 285139
 
 # pylint: disable-msg=E0601,E1101
+
+bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
+
+
+def validate(sess, model, summary, feed, bno, epoch):
+    global bst_saver, bst_score, bst_file, bst_ckpt
+    print('{} running on test set...'.format(strftime("%H:%M:%S")))
+    mse, worst, test_summary_str = sess.run(
+        [model.cost, model.worst, summary], feed)
+    diff, max_diff, predict, actual = math.sqrt(
+        mse), worst[0], worst[1], worst[2]
+    print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {}'.format(
+        strftime("%H:%M:%S"), epoch, diff, max_diff, predict, actual))
+    found_better = False
+    if diff < bst_score:
+        bst_score = diff
+        bst_file.seek(0)
+        bst_file.truncate()
+        bst_file.write('{}\n{}\n'.format(diff, bno))
+        bst_file.truncate()
+        bst_saver.save(sess, bst_ckpt,
+                       global_step=tf.train.get_global_step())
+        print('{} acquired better model with validation score {}, at batch {}'.format(
+              strftime("%H:%M:%S"), diff, bno))
+        found_better = True
+    return test_summary_str, found_better
 
 
 def run(args):
