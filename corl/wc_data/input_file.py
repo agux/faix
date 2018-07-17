@@ -82,6 +82,18 @@ def _loadTrainingData(flag):
     return np.array(data['features'], 'f'), np.array(data['labels'], 'f'), np.array(data['seqlens'], 'i')
 
 
+def _read_infer_flags(file_dir):
+    if file_dir.startswith('gs://'):
+        s = re.search('gs://([^/]*)/(.*)', file_dir)
+        bn = s.group(1)
+        on = '{}/infer_list.txt.gz'.format(s.group(2))
+        with gzip.GzipFile(fileobj=_file_from_gcs(bn, on), mode='rb') as gz:
+            return gz.read().split()
+    else:
+        with gzip.GzipFile(os.path.join(file_dir, 'infer_list.txt.gz'), mode='rb') as gz:
+            return gz.read().split()
+
+
 def _read_meta_config(file_dir):
     file = None
     config = ConfigParser.RawConfigParser()
@@ -104,7 +116,7 @@ def _read_meta_config(file_dir):
     return time_step, feature_size, max_bno, test_batch_size, test_max_bno
 
 
-def getInputs(dir, start=0, prefetch=2, vset=None):
+def getInputs(path, start=0, prefetch=2, vset=None, infer=False):
     """Input function for the wcc training dataset.
 
     Returns:
@@ -112,7 +124,7 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
         features,labels,seqlens,handle,train_iter,test_iter
     """
     global file_dir
-    file_dir = dir
+    file_dir = path
     print("{} loading file from: {} Start from: {} Using prefetch: {}".format(
         strftime("%H:%M:%S"), file_dir, start, prefetch))
     # read meta.txt from file_dir
@@ -120,8 +132,12 @@ def getInputs(dir, start=0, prefetch=2, vset=None):
         file_dir)
     # Create dataset for training
     with tf.variable_scope("build_inputs"):
-        # query max flag from wcc_trn and fill a slice with flags between start and max
-        flags = ["TRAIN_{}".format(bno) for bno in range(start, max_bno)]
+        flags = None
+        if infer:
+            flags = _read_infer_flags(file_dir)
+        else:
+            # query max flag from wcc_trn and fill a slice with flags between start and max
+            flags = ["TRAIN_{}".format(bno) for bno in range(start, max_bno)]
         train_dataset = tf.data.Dataset.from_tensor_slices(flags).map(
             lambda f: tuple(
                 tf.py_func(_loadTrainingData, [f], [

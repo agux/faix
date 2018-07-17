@@ -17,8 +17,10 @@ def parseArgs():
                         default='avro')
     parser.add_argument('--zip', type=bool, help='compress exported file.',
                         default=False)
-    parser.add_argument('--train', type=bool, help='export relevant materials for training.',
-                        default=False)
+    parser.add_argument('--flags', nargs='+', type=str, help='export sets with the specified flag (TR/TS).',
+                        default=None)
+    parser.add_argument('--start', type=int, help='export sets starting with the specified batch number.',
+                        default=None)
     parser.add_argument('options', nargs=argparse.REMAINDER)
     return parser.parse_args()
 

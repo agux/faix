@@ -157,7 +157,7 @@ def _getSeries(p):
     return batch, val, total
 
 
-def _write_file(flag, file_path, payload):
+def _write_file(file_path, payload):
     print('{} exporting {}'.format(
         strftime("%H:%M:%S"), file_path))
     with gzip.GzipFile(file_path, 'wb') as fout:
@@ -167,9 +167,10 @@ def _write_file(flag, file_path, payload):
 
 def _exp_wctrain(p):
     global cnxpool
-    flag, dest, feat_cols, max_step, time_shift, alt_dirs = p
-
-    file_path = os.path.join(dest, "{}.json.gz".format(flag))
+    flag, bno, dest, feat_cols, max_step, time_shift, alt_dirs = p
+    flag = 'TRAIN' if flag == 'TR' else 'TEST' if flag == 'TS' else flag
+    file_path = os.path.join(dest, "{}_{}.json.gz".format(flag, bno))
+    tmpf_path = os.path.join(dest, "{}_{}.json.tmp".format(flag, bno))
     if os.path.exists(file_path):
         print('{} {} file already exists, skipping'.format(
             strftime("%H:%M:%S"), flag))
@@ -187,7 +188,7 @@ def _exp_wctrain(p):
     try:
         cursor = cnx.cursor(buffered=True)
         cursor.execute(
-            "SELECT code, klid, rcode, corl_stz from wcc_trn where flag = %s", (flag,))
+            "SELECT code, klid, rcode, corl_stz from wcc_trn where flag = %s and bno = %s", (flag, bno,))
         rows = cursor.fetchall()
         cursor.close()
         data, vals, seqlen = [], [], []
@@ -205,7 +206,8 @@ def _exp_wctrain(p):
             'labels': np.array(vals, 'f').tolist(),
             'seqlens': np.array(seqlen, 'i').tolist()
         }
-        _write_file(flag, file_path, payload)
+        _write_file(tmpf_path, payload)
+        os.rename(tmpf_path, file_path)
     except:
         print(sys.exc_info()[0])
         raise
@@ -223,26 +225,26 @@ def getMetaInfo():
         d = {}
         print('{} counting test set...'.format(strftime("%H:%M:%S")))
         cursor.execute(
-            "SELECT count(*) from (select distinct flag from wcc_trn where flag like 'TEST_%') t")
+            "SELECT max(bno) from wcc_trn where flag = 'TS'")
         d['test_count'] = cursor.fetchone()[0]
         print('{} number of test set: {}'.format(
             strftime("%H:%M:%S"), d['test_count']))
         print('{} querying test set batch size...'.format(strftime("%H:%M:%S")))
         cursor.execute(
-            "SELECT count(*) from wcc_trn where flag = 'TEST_1'")
+            "SELECT count(*) from wcc_trn where flag = 'TS' and bno = 1")
         d['test_bsize'] = cursor.fetchone()[0]
         print('{} test set batch size: {}'.format(
             strftime("%H:%M:%S"), d['test_bsize']))
 
         print('{} counting training set...'.format(strftime("%H:%M:%S")))
         cursor.execute(
-            "SELECT count(*) from (select distinct flag from wcc_trn where flag like 'TRAIN_%') t")
+            "SELECT max(bno) from wcc_trn where flag = 'TR'")
         d['train_count'] = cursor.fetchone()[0]
         print('{} number of training set: {}'.format(
             strftime("%H:%M:%S"), d['train_count']))
         print('{} querying training set batch size...'.format(strftime("%H:%M:%S")))
         cursor.execute(
-            "SELECT count(*) from wcc_trn where flag = 'TRAIN_1'")
+            "SELECT count(*) from wcc_trn where flag = 'TR' and bno = 1")
         d['train_bsize'] = cursor.fetchone()[0]
         print('{} training set batch size: {}'.format(
             strftime("%H:%M:%S"), d['train_bsize']))
@@ -263,6 +265,8 @@ class WcTrainExporter:
     def export(self, table, dest, args):
         global cnxpool
         feat_cols = args.fields
+        start = args.start
+        flags = args.flags
         max_step = int(args.options[0])
         time_shift = int(args.options[1])
         alt_dirs = args.options[2:] if len(args.options) > 2 else None
@@ -309,7 +313,13 @@ class WcTrainExporter:
                 with open(meta_file, 'wb+') as f:
                     cfg.write(f)
             print('{} fetching flags...'.format(strftime("%H:%M:%S")))
-            query = "SELECT distinct flag from wcc_trn"
+            query = "SELECT distinct flag, bno from wcc_trn where 1=1"
+            if start is not None:
+                query += " and bno >= {}".format(start)
+            if flags is not None:
+                query += " and flag in ('{}')".format(
+                    "','".join([f for f in flags]))
+            query += " order by bno"
             cursor = cnx.cursor(buffered=True)
             cursor.execute(query)
             rows = cursor.fetchall()
@@ -317,7 +327,7 @@ class WcTrainExporter:
             cursor.close()
             print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
             exc = _getExecutor(max(2, multiprocessing.cpu_count()-1))
-            params = [(row[0], file_dir, feat_cols, max_step, time_shift, alt_dirs)
+            params = [(row[0], row[1], file_dir, feat_cols, max_step, time_shift, alt_dirs)
                       for row in rows]
             set(exc.map(_exp_wctrain, params))
         except:
