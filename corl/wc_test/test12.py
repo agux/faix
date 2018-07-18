@@ -80,6 +80,7 @@ def run(args):
         training_dir = os.path.join(base_dir, 'training')
         checkpoint_file = os.path.join(training_dir, 'model.ckpt')
         bst_ckpt = os.path.join(base_dir, 'best', 'model.ckpt')
+        bst_file_path = os.path.join(base_dir, 'best_score')
         saver = None
         summary_str = None
         d = None
@@ -87,10 +88,22 @@ def run(args):
         bno, epoch, bst_score = 0, 0, sys.maxint
         ckpt = tf.train.get_checkpoint_state(training_dir)
 
+        if tf.gfile.Exists(bst_file_path):
+            bst_file = open(bst_file_path, 'r+')
+            bst_file.seek(0)
+            try:
+                bst_score = float(bst_file.readline().rstrip())
+                print('{} previous best score: {}'.format(
+                    strftime("%H:%M:%S"), bst_score))
+            except Exception:
+                print('{} not able to read best score. best_score file is invalid.'.format(
+                    strftime("%H:%M:%S")))
+            bst_file.seek(0)
+        else:
+            bst_file = open(bst_file_path, 'w+')
+
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
-            bst_file = open(os.path.join(base_dir, 'best_score'), 'r+')
-            bst_file.seek(0)
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
                     strftime("%H:%M:%S"), ckpt.model_checkpoint_path))
@@ -104,14 +117,6 @@ def run(args):
                 saver = tf.train.Saver(name="reg_saver")
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 restored = True
-                try:
-                    bst_score = float(bst_file.readline().rstrip())
-                    print('{} previous best score: {}'.format(
-                        strftime("%H:%M:%S"), bst_score))
-                except Exception:
-                    print('{} not able to read best score. best_score file is invalid.'.format(
-                        strftime("%H:%M:%S")))
-                bst_file.seek(0)
                 rbno = sess.run(tf.train.get_global_step())
                 print('{} check restored global step: {}, previous batch no: {}'.format(
                     strftime("%H:%M:%S"), rbno, bno))
@@ -131,7 +136,6 @@ def run(args):
             saver = tf.train.Saver(name="reg_saver")
             sess.run(tf.global_variables_initializer())
             tf.gfile.MakeDirs(training_dir)
-            bst_file = open(os.path.join(base_dir, 'best_score'), 'w+')
         bst_saver = tf.train.Saver(name="bst_saver")
 
         train_handle, test_handle = sess.run(

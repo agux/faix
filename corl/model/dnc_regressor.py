@@ -130,6 +130,8 @@ class DNCRegressorV1:
     @lazy_property
     def cost(self):
         logits = self.logits
+        print("checking shapes, target:{}, logits:{}".format(
+            self.target.get_shape(), logits.get_shape()))
         with tf.name_scope("cost"):
             return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
 
