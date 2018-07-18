@@ -104,13 +104,9 @@ def run(args):
                 print('{} not able to read best score. best_score file is invalid.'.format(
                     strftime("%H:%M:%S")))
             bst_file.seek(0)
-        else:
-            bst_file = open(bst_file_path, 'w+')
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
-            bst_file = open(os.path.join(base_dir, 'best_score'), 'r+')
-            bst_file.seek(0)
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
                     strftime("%H:%M:%S"), ckpt.model_checkpoint_path))
@@ -120,7 +116,8 @@ def run(args):
                 print('{} resuming from last training, bno = {}'.format(
                     strftime("%H:%M:%S"), bno))
                 d = getInput(bno+1, args)
-                model.setNodes(d['features'], d['labels'], d['seqlens'], d['train_batch_size'])
+                model.setNodes(d['features'], d['labels'],
+                               d['seqlens'], d['train_batch_size'])
                 saver = tf.train.Saver(name="reg_saver")
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 restored = True
@@ -139,10 +136,12 @@ def run(args):
 
         if not restored:
             d = getInput(bno+1, args)
-            model.setNodes(d['features'], d['labels'], d['seqlens'], d['train_batch_size'])
+            model.setNodes(d['features'], d['labels'],
+                           d['seqlens'], d['train_batch_size'])
             saver = tf.train.Saver(name="reg_saver")
             sess.run(tf.global_variables_initializer())
             tf.gfile.MakeDirs(training_dir)
+            bst_file = open(bst_file_path, 'w+')
         bst_saver = tf.train.Saver(name="bst_saver")
 
         train_handle, test_handle = sess.run(

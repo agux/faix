@@ -99,8 +99,6 @@ def run(args):
                 print('{} not able to read best score. best_score file is invalid.'.format(
                     strftime("%H:%M:%S")))
             bst_file.seek(0)
-        else:
-            bst_file = open(bst_file_path, 'w+')
 
         if tf.gfile.Exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
@@ -136,6 +134,7 @@ def run(args):
             saver = tf.train.Saver(name="reg_saver")
             sess.run(tf.global_variables_initializer())
             tf.gfile.MakeDirs(training_dir)
+            bst_file = open(bst_file_path, 'w+')
         bst_saver = tf.train.Saver(name="bst_saver")
 
         train_handle, test_handle = sess.run(
