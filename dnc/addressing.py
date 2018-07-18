@@ -202,7 +202,8 @@ class TemporalLinkage(snt.RNNCore):
           containing the new link graphs for each write head.
         """
         with tf.name_scope('link'):
-            batch_size = prev_link.get_shape()[0].value
+            # batch_size = prev_link.get_shape()[0].value
+            batch_size = tf.shape_n(prev_link.get_shape())[0]
             write_weights_i = tf.expand_dims(write_weights, 3)
             write_weights_j = tf.expand_dims(write_weights, 2)
             prev_precedence_weights_j = tf.expand_dims(
