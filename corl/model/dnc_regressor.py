@@ -63,6 +63,8 @@ class DNCRegressorV1:
                 bias_initializer=tf.constant_initializer(0.1)
             )
             output = tf.squeeze(output)
+            # restoring shape info for the tensor
+            output.set_shape([None])
             return output
 
     @staticmethod
