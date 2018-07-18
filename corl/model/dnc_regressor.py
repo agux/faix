@@ -111,7 +111,7 @@ class DNCRegressorV1:
         # tm_inputs = tf.transpose(inputs, perm=[1, 0, 2])
         output_sequence, _ = tf.nn.dynamic_rnn(
             cell=dnc_core,
-            inputs=tm_inputs,
+            inputs=inputs,
             initial_state=initial_state,
             # time_major=True,
             sequence_length=self.seqlen)
