@@ -34,7 +34,13 @@ def batch_invert_permutation(permutations):
 def batch_gather(values, indices):
     """Returns batched `tf.gather` for every row in the input."""
     with tf.name_scope('batch_gather', values=[values, indices]):
-        return tf.stack(tf.map_fn(lambda x: tf.gather(x[0], x[1]), (values, indices)))
+        return tf.stack(
+            tf.map_fn(lambda x: tf.gather(x[0], x[1]),
+                      (values, indices),
+                      # map returns a structure of Tensors differing from that of elems, dtype is not optional
+                      dtype=tf.float32,
+                      )
+        )
         # unpacked = zip(tf.unstack(values), tf.unstack(indices))
         # result = [tf.gather(value, index) for value, index in unpacked]
         # return tf.stack(result)
