@@ -116,8 +116,7 @@ def run(args):
                 print('{} resuming from last training, bno = {}'.format(
                     strftime("%H:%M:%S"), bno))
                 d = getInput(bno+1, args)
-                model.setNodes(d['features'], d['labels'],
-                               d['seqlens'], d['train_batch_size'])
+                model.setNodes(d['features'], d['labels'], d['seqlens'])
                 saver = tf.train.Saver(name="reg_saver")
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 restored = True
@@ -136,8 +135,7 @@ def run(args):
 
         if not restored:
             d = getInput(bno+1, args)
-            model.setNodes(d['features'], d['labels'],
-                           d['seqlens'], d['train_batch_size'])
+            model.setNodes(d['features'], d['labels'], d['seqlens'])
             saver = tf.train.Saver(name="reg_saver")
             sess.run(tf.global_variables_initializer())
             tf.gfile.MakeDirs(training_dir)
