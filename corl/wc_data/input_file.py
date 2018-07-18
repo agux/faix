@@ -110,10 +110,11 @@ def _read_meta_config(file_dir):
     file.close()
     time_step = config.getint('common', 'time_step')
     feature_size = config.getint('common', 'feature_size')
-    max_bno = config.getint('training set', 'count')
+    train_batch_size = config.getint('training set', 'batch_size')
+    train_max_bno = config.getint('training set', 'count')
     test_batch_size = config.getint('test set', 'batch_size')
     test_max_bno = config.getint('test set', 'count')
-    return time_step, feature_size, max_bno, test_batch_size, test_max_bno
+    return time_step, feature_size, train_batch_size, train_max_bno, test_batch_size, test_max_bno
 
 
 def getInputs(path, start=0, prefetch=2, vset=None, infer=False):
@@ -128,7 +129,7 @@ def getInputs(path, start=0, prefetch=2, vset=None, infer=False):
     print("{} loading file from: {} Start from: {} Using prefetch: {}".format(
         strftime("%H:%M:%S"), file_dir, start, prefetch))
     # read meta.txt from file_dir
-    time_step, feature_size, max_bno, test_batch_size, test_max_bno = _read_meta_config(
+    time_step, feature_size, train_batch_size, max_bno, test_batch_size, test_max_bno = _read_meta_config(
         file_dir)
     # Create dataset for training
     with tf.variable_scope("build_inputs"):
@@ -170,5 +171,6 @@ def getInputs(path, start=0, prefetch=2, vset=None, infer=False):
         # return a dictionary
         inputs = {'features': features, 'labels': labels,
                   'seqlens': seqlens, 'handle': handle,
-                  'train_iter': train_iterator, 'test_iter': test_iterator}
+                  'train_iter': train_iterator, 'test_iter': test_iterator,
+                  'train_batch_size': train_batch_size, 'test_batch_size': test_batch_size}
         return inputs
