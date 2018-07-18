@@ -18,7 +18,7 @@ These modules create a DNC core. They take input, pass parameters to the memory
 access module, and integrate the output of memory to form an output.
 """
 
-from __future__ import absolute_import
+# from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
