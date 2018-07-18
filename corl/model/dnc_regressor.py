@@ -108,7 +108,7 @@ class DNCRegressorV1:
         }
         dnc_core = dnc.DNC(access_config, controller_config,
                            self._layer_width, self._clip_value)
-        initial_state = dnc_core.initial_state(inputs.get_shape()[0])
+        initial_state = dnc_core.initial_state(inputs.get_shape()[0].value)
         # transpose to time major: [time, batch, feature]
         # tm_inputs = tf.transpose(inputs, perm=[1, 0, 2])
         output_sequence, _ = tf.nn.dynamic_rnn(
