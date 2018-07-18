@@ -236,7 +236,7 @@ class TemporalLinkage(snt.RNNCore):
       new precedence weights.
     """
     with tf.name_scope('precedence_weights'):
-      write_sum = tf.reduce_sum(write_weights, 2, keep_dims=True)
+      write_sum = tf.reduce_sum(write_weights, 2, keepdims=True)
       return (1 - write_sum) * prev_precedence_weights + write_weights
 
   @property

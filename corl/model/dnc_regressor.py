@@ -64,7 +64,7 @@ class DNCRegressorV1:
             )
             output = tf.squeeze(output)
             # restoring shape info for the tensor
-            output.set_shape([None])
+            # output.set_shape([None])
             return output
 
     @staticmethod
@@ -110,14 +110,16 @@ class DNCRegressorV1:
                            self._layer_width, self._clip_value)
         initial_state = dnc_core.initial_state(self._train_batch_size)
         # transpose to time major: [time, batch, feature]
-        # tm_inputs = tf.transpose(inputs, perm=[1, 0, 2])
+        tm_inputs = tf.transpose(inputs, perm=[1, 0, 2])
         output_sequence, _ = tf.nn.dynamic_rnn(
             cell=dnc_core,
-            inputs=inputs,
+            inputs=tm_inputs,
             initial_state=initial_state,
-            # time_major=True,
+            time_major=True,
             sequence_length=self.seqlen)
         # layer = tf.concat(layer, 1)
+        # restore to batch major: [batch, time, feature]
+        output_sequence = tf.transpose(output_sequence, perm=[1, 0, 2])
         output = self.last_relevant(output_sequence, self.seqlen)
         return output
 
