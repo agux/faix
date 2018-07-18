@@ -64,7 +64,7 @@ class DNCRegressorV1:
             )
             output = tf.squeeze(output)
             # restoring shape info for the tensor
-            # output.set_shape([None])
+            output.set_shape([None])
             return output
 
     @staticmethod
