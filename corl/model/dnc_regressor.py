@@ -115,6 +115,7 @@ class DNCRegressorV1:
             cell=dnc_core,
             inputs=inputs,
             # initial_state=initial_state,
+            dtype=tf.float32,  # If there is no initial_state, you must give a dtype
             time_major=True,
             sequence_length=self.seqlen)
         # layer = tf.concat(layer, 1)
