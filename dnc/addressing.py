@@ -217,7 +217,7 @@ class TemporalLinkage(snt.RNNCore):
                 link,
                 tf.zeros(
                     [batch_size, self._num_writes, self._memory_size],
-                    dtype=tf.int32))
+                    dtype=link.dtype))
 
     def _precedence_weights(self, prev_precedence_weights, write_weights):
         """Calculates the new precedence weights given the current write weights.
