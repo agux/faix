@@ -28,7 +28,11 @@ def batch_invert_permutation(permutations):
         # unpacked = tf.unstack(permutations)
         # inverses = [tf.invert_permutation(permutation) for permutation in unpacked]
         # return tf.stack(inverses)
-        return tf.map_fn(lambda x: tf.invert_permutation(x), permutations)
+        return tf.map_fn(
+            lambda x: tf.invert_permutation(x),
+            permutations,
+            parallel_iterations=64,
+            swap_memory=True)
 
 
 def batch_gather(values, indices):
@@ -39,6 +43,8 @@ def batch_gather(values, indices):
                       (values, indices),
                       # map returns a structure of Tensors differing from that of elems, dtype is not optional
                       dtype=tf.float32,
+                      parallel_iterations=64,
+                      swap_memory=True
                       )
         )
         # unpacked = zip(tf.unstack(values), tf.unstack(indices))
