@@ -127,6 +127,13 @@ def testInversePerm():
     with tf.Session() as sess:
         print(sess.run([tf.invert_permutation(x)]))
 
+def testNestFlatten():
+    x = tf.constant(
+        [[3, 2, 1, 0], [2, 3, 0, 1]],
+        dtype=tf.int32)
+    with tf.Session() as sess:
+        print(sess.run([tf.contrib.framework.nest.flatten(x)]))
+
 # testGatherND()
 # testGetFileName()
 # print(__file__)
@@ -143,4 +150,5 @@ def testInversePerm():
 
 # testTimeToBatch()
 # testConv1d()
-testInversePerm()
+# testInversePerm()
+testNestFlatten()

@@ -32,11 +32,6 @@ class DNCRegressorV1:
         self._learning_rate = learning_rate
         self._keep_prob = keep_prob
         self._c_recln = 1
-        self.recln_ops = {
-            "selu": lambda layer: tf.nn.selu(layer),
-            "dropout": lambda layer: tf.contrib.nn.alpha_dropout(
-                layer, keep_prob=keep_prob),
-        }
 
     def setNodes(self, features, target, seqlen):
         self.data = features
@@ -68,7 +63,7 @@ class DNCRegressorV1:
 
     @staticmethod
     def fcn(self, inputs):
-        layer = self.recln(self, inputs, ["selu"])
+        layer = tf.nn.selu(inputs)
         fsize = int(inputs.get_shape()[-1])
         with tf.variable_scope("fcn"):
             nlayer = 3
@@ -81,9 +76,10 @@ class DNCRegressorV1:
                     bias_initializer=tf.constant_initializer(0.1)
                 )
                 if i == 1:
-                    layer = self.recln(self, layer, ["dropout"])
+                    layer = tf.contrib.nn.alpha_dropout(
+                        layer, keep_prob=self._keep_prob)
                 fsize = fsize // 2
-        layer = self.recln(self, layer, ["selu"])
+        layer = tf.nn.selu(layer)
         return layer
 
     @staticmethod

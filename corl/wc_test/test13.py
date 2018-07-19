@@ -38,11 +38,12 @@ SEED = 285139
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
 
 
-def validate(sess, model, summary, feed, bno, epoch):
+def validate(sess, model, summary, feed, bno, epoch, run_options, run_metadata):
     global bst_saver, bst_score, bst_file, bst_ckpt
     print('{} running on test set...'.format(strftime("%H:%M:%S")))
     mse, worst, test_summary_str = sess.run(
-        [model.cost, model.worst, summary], feed)
+        [model.cost, model.worst, summary], feed,
+        options=run_options, run_metadata=run_metadata)
     diff, max_diff, predict, actual = math.sqrt(
         mse), worst[0], worst[1], worst[2]
     print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {}'.format(
@@ -150,6 +151,8 @@ def run(args):
         summary, train_writer, test_writer = collect_summary(
             sess, model, training_dir)
         test_summary_str = None
+        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        run_metadata = tf.RunMetadata()
         lr = LEARNING_RATE
         while True:
             # bno = epoch*TEST_INTERVAL
@@ -157,7 +160,9 @@ def run(args):
             found_better = False
             if restored or bno % TEST_INTERVAL == 0:
                 test_summary_str, found_better = validate(
-                    sess, model, summary, {d['handle']: test_handle, keep_prob: 1, learning_rate: LEARNING_RATE}, bno, epoch)
+                    sess, model, summary, {
+                        d['handle']: test_handle, keep_prob: 1, learning_rate: LEARNING_RATE},
+                    bno, epoch, run_options, run_metadata)
                 restored = False
             try:
                 kp = min(1, random.uniform(KEEP_PROB, 1.05))
@@ -166,7 +171,9 @@ def run(args):
                 print('{} training batch {}, random keep_prob:{}, learning_rate:{}'.format(
                     strftime("%H:%M:%S"), bno+1, kp, lr))
                 summary_str, worst = sess.run(
-                    [summary, model.worst, model.optimize], {d['handle']: train_handle, keep_prob: kp, learning_rate: lr})[:-1]
+                    [summary, model.worst, model.optimize],
+                    {d['handle']: train_handle, keep_prob: kp, learning_rate: lr},
+                    options=run_options, run_metadata=run_metadata)[:-1]
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
@@ -176,6 +183,8 @@ def run(args):
                 strftime("%H:%M:%S"), bno, max_diff, predict, actual))
             train_writer.add_summary(summary_str, bno)
             test_writer.add_summary(test_summary_str, bno)
+            train_writer.add_run_metadata(run_metadata, "bno_{}".format(bno))
+            test_writer.add_run_metadata(run_metadata, "test_bno_{}".format(bno))
             train_writer.flush()
             test_writer.flush()
             if bno == 1 or bno % SAVE_INTERVAL == 0:
@@ -183,9 +192,13 @@ def run(args):
                            global_step=tf.train.get_global_step())
         # test last epoch
         test_summary_str, _ = validate(
-            sess, model, summary, {d['handle']: test_handle, keep_prob: 1, learning_rate: LEARNING_RATE}, bno, epoch)
+            sess, model, summary, {d['handle']: test_handle,
+                                   keep_prob: 1, learning_rate: LEARNING_RATE},
+            bno, epoch, run_options, run_metadata)
         train_writer.add_summary(summary_str, bno)
         test_writer.add_summary(test_summary_str, bno)
+        train_writer.add_run_metadata(run_metadata, "bno_{}".format(bno))
+        test_writer.add_run_metadata(run_metadata, "test_bno_{}".format(bno))
         train_writer.flush()
         test_writer.flush()
         saver.save(sess, checkpoint_file,
