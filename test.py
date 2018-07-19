@@ -120,6 +120,13 @@ def testConv1d():
         print(out)
 
 
+def testInversePerm():
+    x = tf.constant(
+        [[3, 2, 1, 0], [2, 3, 0, 1]],
+        dtype=tf.int32)
+    with tf.Session() as sess:
+        print(sess.run([tf.invert_permutation(x)]))
+
 # testGatherND()
 # testGetFileName()
 # print(__file__)
@@ -135,4 +142,5 @@ def testConv1d():
 
 
 # testTimeToBatch()
-testConv1d()
+# testConv1d()
+testInversePerm()

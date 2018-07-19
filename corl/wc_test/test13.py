@@ -68,7 +68,9 @@ def run(args):
     random.seed(SEED)
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
     learning_rate = tf.placeholder(tf.float32, [], name="learning_rate")
-    with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
+    with tf.Session(config=tf.ConfigProto(
+            log_device_placement=True,
+            allow_soft_placement=True)) as sess:
         model = dncr.DNCRegressorV1(
             layer_width=LAYER_WIDTH,
             memory_size=MEMORY_SIZE,

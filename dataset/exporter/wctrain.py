@@ -176,11 +176,12 @@ def _exp_wctrain(p):
             strftime("%H:%M:%S"), flag))
         return os.getpid()
     else:
-        for d in alt_dirs:
-            if os.path.exists(os.path.join(d, "{}.json.gz".format(flag))):
-                print('{} {} file already exists, skipping'.format(
-                    strftime("%H:%M:%S"), flag))
-                return os.getpid()
+        if alt_dirs is not None:
+            for d in alt_dirs:
+                if os.path.exists(os.path.join(d, "{}.json.gz".format(flag))):
+                    print('{} {} file already exists, skipping'.format(
+                        strftime("%H:%M:%S"), flag))
+                    return os.getpid()
 
     print('{} loading {}...'.format(
         strftime("%H:%M:%S"), flag))
