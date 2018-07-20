@@ -31,7 +31,6 @@ class DNCRegressorV1:
         self._max_grad_norm = max_grad_norm
         self._learning_rate = learning_rate
         self._keep_prob = keep_prob
-        self._c_recln = 1
 
     def setNodes(self, features, target, seqlen):
         self.data = features
@@ -47,7 +46,7 @@ class DNCRegressorV1:
 
     @lazy_property
     def logits(self):
-        layer = self.dnc(self, self.data)
+        layer = self.rnn(self, self.data)
         layer = self.fcn(self, layer)
         with tf.variable_scope("output"):
             output = tf.layers.dense(
@@ -83,15 +82,7 @@ class DNCRegressorV1:
         return layer
 
     @staticmethod
-    def recln(self, layer, ops=[]):
-        with tf.variable_scope("rec_linear_{}".format(self._c_recln)):
-            for op in ops:
-                layer = self.recln_ops[op](layer)
-            self._c_recln = self._c_recln + 1
-            return layer
-
-    @staticmethod
-    def dnc(self, inputs):
+    def rnn(self, inputs):
         access_config = {
             "memory_size": self._memory_size,
             "word_size": self._word_size,
@@ -101,24 +92,25 @@ class DNCRegressorV1:
         controller_config = {
             "hidden_size": self._layer_width,
         }
-        dnc_core = dnc.DNC(access_config, controller_config,
-                           self._layer_width, self._clip_value)
-        initial_state = dnc_core.initial_state(tf.shape(inputs)[0])
-        # transpose to time major: [time, batch, feature]
-        # tm_inputs = tf.transpose(inputs, perm=[1, 0, 2])
-        output_sequence, _ = tf.nn.dynamic_rnn(
-            cell=dnc_core,
-            inputs=inputs,
-            initial_state=initial_state,
-            dtype=tf.float32,  # If there is no initial_state, you must give a dtype
-            # time_major=True,
-            swap_memory=True,
-            sequence_length=self.seqlen)
-        # layer = tf.concat(layer, 1)
-        # restore to batch major: [batch, time, feature]
-        # output_sequence = tf.transpose(output_sequence, perm=[1, 0, 2])
-        output = self.last_relevant(output_sequence, self.seqlen)
-        return output
+        with tf.variable_scope("RNN"):
+            dnc_core = dnc.DNC(access_config, controller_config,
+                               self._layer_width, self._clip_value)
+            initial_state = dnc_core.initial_state(tf.shape(inputs)[0])
+            # transpose to time major: [time, batch, feature]
+            # tm_inputs = tf.transpose(inputs, perm=[1, 0, 2])
+            output_sequence, _ = tf.nn.dynamic_rnn(
+                cell=dnc_core,
+                inputs=inputs,
+                initial_state=initial_state,
+                dtype=tf.float32,  # If there is no initial_state, you must give a dtype
+                # time_major=True,
+                swap_memory=True,
+                sequence_length=self.seqlen)
+            # layer = tf.concat(layer, 1)
+            # restore to batch major: [batch, time, feature]
+            # output_sequence = tf.transpose(output_sequence, perm=[1, 0, 2])
+            output = self.last_relevant(output_sequence, self.seqlen)
+            return output
 
     @staticmethod
     def last_relevant(output, length):
