@@ -329,19 +329,18 @@ class Freeness(snt.RNNCore):
               `write_gate`; this scaling must be applied externally.
         """
         with tf.name_scope('write_allocation_weights'):
-            with tf.device("/gpu:0"):
-                # expand gatings over memory locations
-                write_gates = tf.expand_dims(write_gates, -1)
+            # expand gatings over memory locations
+            write_gates = tf.expand_dims(write_gates, -1)
 
-                allocation_weights = []
-                for i in range(num_writes):
-                    allocation_weights.append(self._allocation(usage))
-                    # update usage to take into account writing to this new allocation
-                    usage += ((1 - usage) *
-                              write_gates[:, i, :] * allocation_weights[i])
+            allocation_weights = []
+            for i in range(num_writes):
+                allocation_weights.append(self._allocation(usage))
+                # update usage to take into account writing to this new allocation
+                usage += ((1 - usage) *
+                            write_gates[:, i, :] * allocation_weights[i])
 
-                # Pack the allocation weights for the write heads into one tensor.
-                return tf.stack(allocation_weights, axis=1)
+            # Pack the allocation weights for the write heads into one tensor.
+            return tf.stack(allocation_weights, axis=1)
 
     def _usage_after_write(self, prev_usage, write_weights):
         """Calcualtes the new usage after writing to memory.
@@ -354,10 +353,9 @@ class Freeness(snt.RNNCore):
           New usage, a tensor of shape `[batch_size, memory_size]`.
         """
         with tf.name_scope('usage_after_write'):
-            with tf.device("/gpu:0"):
-                # Calculate the aggregated effect of all write heads
-                write_weights = 1 - tf.reduce_prod(1 - write_weights, [1])
-                return prev_usage + (1 - prev_usage) * write_weights
+            # Calculate the aggregated effect of all write heads
+            write_weights = 1 - tf.reduce_prod(1 - write_weights, [1])
+            return prev_usage + (1 - prev_usage) * write_weights
 
     def _usage_after_read(self, prev_usage, free_gate, read_weights):
         """Calcualtes the new usage after reading and freeing from memory.
@@ -373,11 +371,10 @@ class Freeness(snt.RNNCore):
           New usage, a tensor of shape `[batch_size, memory_size]`.
         """
         with tf.name_scope('usage_after_read'):
-            with tf.device("/gpu:0"):
-                free_gate = tf.expand_dims(free_gate, -1)
-                free_read_weights = free_gate * read_weights
-                phi = tf.reduce_prod(1 - free_read_weights, [1], name='phi')
-                return prev_usage * phi
+            free_gate = tf.expand_dims(free_gate, -1)
+            free_read_weights = free_gate * read_weights
+            phi = tf.reduce_prod(1 - free_read_weights, [1], name='phi')
+            return prev_usage * phi
 
     def _allocation(self, usage):
         r"""Computes allocation by sorting `usage`.

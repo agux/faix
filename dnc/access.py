@@ -50,12 +50,11 @@ def _erase_and_write(memory, address, reset_weights, values):
       3-D tensor of shape `[batch_size, num_writes, word_size]`.
     """
     with tf.name_scope('erase_memory', values=[memory, address, reset_weights]):
-        with tf.device("/gpu:0"):
-            expand_address = tf.expand_dims(address, 3)
-            reset_weights = tf.expand_dims(reset_weights, 2)
-            weighted_resets = expand_address * reset_weights
-            reset_gate = tf.reduce_prod(1 - weighted_resets, [1])
-            memory *= reset_gate
+        expand_address = tf.expand_dims(address, 3)
+        reset_weights = tf.expand_dims(reset_weights, 2)
+        weighted_resets = expand_address * reset_weights
+        reset_gate = tf.reduce_prod(1 - weighted_resets, [1])
+        memory *= reset_gate
 
     with tf.name_scope('additive_write', values=[memory, address, values]):
         add_matrix = tf.matmul(address, values, adjoint_a=True)

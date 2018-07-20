@@ -19,9 +19,10 @@ class DNCRegressorV1:
     A Differentiable Neural Computer (DNC) Regressor.
     '''
 
-    def __init__(self, layer_width=200, memory_size=16, word_size=16,
+    def __init__(self, num_layers=1, layer_width=200, memory_size=16, word_size=16,
                  num_writes=1, num_reads=4, clip_value=20, max_grad_norm=50,
                  keep_prob=None, learning_rate=1e-3):
+        self._num_layers = num_layers
         self._layer_width = layer_width
         self._memory_size = memory_size
         self._word_size = word_size
@@ -90,7 +91,9 @@ class DNCRegressorV1:
             "num_writes": self._num_writes,
         }
         controller_config = {
+            "num_layers": self._num_layers,
             "hidden_size": self._layer_width,
+            "input_size": int(inputs.get_shape()[-1]),
         }
         with tf.variable_scope("RNN"):
             dnc_core = dnc.DNC(access_config, controller_config,

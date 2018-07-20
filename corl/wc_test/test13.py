@@ -20,6 +20,7 @@ import random
 VSET = 9
 TEST_INTERVAL = 50
 SAVE_INTERVAL = 10
+NUM_LAYERS = 2
 LAYER_WIDTH = 512
 MEMORY_SIZE = 32
 WORD_SIZE = 32
@@ -73,6 +74,7 @@ def run(args):
             log_device_placement=True,
             allow_soft_placement=True)) as sess:
         model = dncr.DNCRegressorV1(
+            num_layers=NUM_LAYERS,
             layer_width=LAYER_WIDTH,
             memory_size=MEMORY_SIZE,
             word_size=WORD_SIZE,
