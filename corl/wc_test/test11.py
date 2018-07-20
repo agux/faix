@@ -59,6 +59,8 @@ def parseArgs():
                         default=multiprocessing.cpu_count())
     parser.add_argument('--start', type=int, help='start training at specified batch no',
                         default=None)
+    parser.add_argument('--trace', type=bool, help='record full trace in validation step.',
+                        default=False)
     parser.add_argument(
         '--restart', help='restart training', action='store_true')
     return parser.parse_args()

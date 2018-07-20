@@ -151,9 +151,11 @@ def run(args):
         summary, train_writer, test_writer = collect_summary(
             sess, model, training_dir)
         test_summary_str = None
-        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-        run_metadata = tf.RunMetadata()
         lr = LEARNING_RATE
+        run_options, run_metadata = None, None
+        if args.trace:
+            run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+            run_metadata = tf.RunMetadata()
         while True:
             # bno = epoch*TEST_INTERVAL
             epoch = bno // TEST_INTERVAL
@@ -172,8 +174,7 @@ def run(args):
                     strftime("%H:%M:%S"), bno+1, kp, lr))
                 summary_str, worst = sess.run(
                     [summary, model.worst, model.optimize],
-                    {d['handle']: train_handle, keep_prob: kp, learning_rate: lr},
-                    options=run_options, run_metadata=run_metadata)[:-1]
+                    {d['handle']: train_handle, keep_prob: kp, learning_rate: lr})[:-1]
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
@@ -183,8 +184,9 @@ def run(args):
                 strftime("%H:%M:%S"), bno, max_diff, predict, actual))
             train_writer.add_summary(summary_str, bno)
             test_writer.add_summary(test_summary_str, bno)
-            train_writer.add_run_metadata(run_metadata, "bno_{}".format(bno))
-            test_writer.add_run_metadata(run_metadata, "test_bno_{}".format(bno))
+            if run_metadata is not None:
+                test_writer.add_run_metadata(
+                    run_metadata, "bno_{}".format(bno))
             train_writer.flush()
             test_writer.flush()
             if bno == 1 or bno % SAVE_INTERVAL == 0:
@@ -197,8 +199,8 @@ def run(args):
             bno, epoch, run_options, run_metadata)
         train_writer.add_summary(summary_str, bno)
         test_writer.add_summary(test_summary_str, bno)
-        train_writer.add_run_metadata(run_metadata, "bno_{}".format(bno))
-        test_writer.add_run_metadata(run_metadata, "test_bno_{}".format(bno))
+        if run_metadata is not None:
+            test_writer.add_run_metadata(run_metadata, "bno_{}".format(bno))
         train_writer.flush()
         test_writer.flush()
         saver.save(sess, checkpoint_file,

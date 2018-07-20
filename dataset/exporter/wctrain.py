@@ -165,26 +165,28 @@ def _write_file(file_path, payload):
             payload, separators=(',', ':')).encode('utf-8'))
 
 
-def _exp_wctrain(p):
+def _exp_wctrain(flag, bno, dest, feat_cols, max_step, time_shift, alt_dirs):
     global cnxpool
-    flag, bno, dest, feat_cols, max_step, time_shift, alt_dirs = p
-    flag = 'TRAIN' if flag == 'TR' else 'TEST' if flag == 'TS' else flag
-    file_path = os.path.join(dest, "{}_{}.json.gz".format(flag, bno))
-    tmpf_path = os.path.join(dest, "{}_{}.json.tmp".format(flag, bno))
+    vflag = flag
+    if flag == 'TR':
+        vflag = 'TRAIN'
+    elif flag == 'TS':
+        vflag = 'TEST'
+    file_path = os.path.join(dest, "{}_{}.json.gz".format(vflag, bno))
+    tmpf_path = os.path.join(dest, "{}_{}.json.tmp".format(vflag, bno))
     if os.path.exists(file_path):
-        print('{} {} file already exists, skipping'.format(
-            strftime("%H:%M:%S"), flag))
+        print('{} {} {} file already exists, skipping'.format(
+            strftime("%H:%M:%S"), flag, bno))
         return os.getpid()
     else:
         if alt_dirs is not None:
             for d in alt_dirs:
-                if os.path.exists(os.path.join(d, "{}.json.gz".format(flag))):
-                    print('{} {} file already exists, skipping'.format(
-                        strftime("%H:%M:%S"), flag))
+                if os.path.exists(file_path):
+                    print('{} {} {} file already exists, skipping'.format(
+                        strftime("%H:%M:%S"), flag, bno))
                     return os.getpid()
 
-    print('{} loading {}...'.format(
-        strftime("%H:%M:%S"), flag))
+    print('{} loading {}, {}...'.format(strftime("%H:%M:%S"), flag, bno))
     cnx = cnxpool.get_connection()
     try:
         cursor = cnx.cursor(buffered=True)
@@ -328,9 +330,10 @@ class WcTrainExporter:
             cursor.close()
             print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
             exc = _getExecutor(max(2, multiprocessing.cpu_count()-1))
-            params = [(row[0], row[1], file_dir, feat_cols, max_step, time_shift, alt_dirs)
-                      for row in rows]
-            set(exc.map(_exp_wctrain, params))
+            for flag, bno in rows:
+                exc.submit(_exp_wctrain, flag, bno, file_dir,
+                           feat_cols, max_step, time_shift, alt_dirs)
+            exc.shutdown()
         except:
             print(sys.exc_info()[0])
             raise
