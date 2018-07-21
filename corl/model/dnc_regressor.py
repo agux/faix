@@ -93,7 +93,6 @@ class DNCRegressorV1:
         controller_config = {
             "num_layers": self._num_layers,
             "hidden_size": self._layer_width,
-            "input_size": int(inputs.get_shape()[-1]),
         }
         with tf.variable_scope("RNN"):
             dnc_core = dnc.DNC(access_config, controller_config,
