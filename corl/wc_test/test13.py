@@ -156,6 +156,8 @@ def run(args):
         lr = LEARNING_RATE
         run_options, run_metadata = None, None
         if args.trace:
+            print("{} full trace will be collected every {} run".format(
+                strftime("%H:%M:%S"), TEST_INTERVAL))
             run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
             run_metadata = tf.RunMetadata()
         while True:
