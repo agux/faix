@@ -20,7 +20,7 @@ import random
 VSET = 9
 TEST_INTERVAL = 50
 SAVE_INTERVAL = 10
-# NUM_LAYERS = 2
+NUM_LAYERS = 2
 LAYER_WIDTH = 256
 MEMORY_SIZE = 16
 WORD_SIZE = 16
@@ -71,7 +71,7 @@ def run(args):
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
     learning_rate = tf.placeholder(tf.float32, [], name="learning_rate")
     with tf.Session(config=tf.ConfigProto(
-            log_device_placement=True,
+            log_device_placement=args.log_device,
             allow_soft_placement=True)) as sess:
         model = dncr.DNCRegressorV1(
             num_layers=NUM_LAYERS,
