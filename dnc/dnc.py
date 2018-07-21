@@ -62,13 +62,13 @@ class DNC(snt.RNNCore):
         super(DNC, self).__init__(name=name)
 
         with self._enter_variable_scope():
-            # self._controller = snt.LSTM(**controller_config)
-            self._controller = tf.contrib.cudnn_rnn.CudnnLSTM(
-                num_layers=controller_config["num_layers"],
-                num_units=controller_config["hidden_size"],
-                kernel_initializer=tf.variance_scaling_initializer(),
-                bias_initializer=tf.constant_initializer(0.1)
-            )
+            self._controller = snt.LSTM(**controller_config)
+            # self._controller = tf.contrib.cudnn_rnn.CudnnLSTM(
+            #     num_layers=controller_config["num_layers"],
+            #     num_units=controller_config["hidden_size"],
+            #     kernel_initializer=tf.variance_scaling_initializer(),
+            #     bias_initializer=tf.constant_initializer(0.1)
+            # )
             self._access = access.MemoryAccess(**access_config)
 
         self._access_output_size = np.prod(self._access.output_size.as_list())
