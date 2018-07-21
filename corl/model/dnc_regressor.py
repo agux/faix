@@ -91,7 +91,7 @@ class DNCRegressorV1:
             "num_writes": self._num_writes,
         }
         controller_config = {
-            "num_layers": self._num_layers,
+            # "num_layers": self._num_layers,
             "hidden_size": self._layer_width,
         }
         with tf.variable_scope("RNN"):
