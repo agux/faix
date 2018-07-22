@@ -158,15 +158,15 @@ def run(args):
             try:
                 kp = min(1, random.uniform(KEEP_PROB, 1.05))
                 if bno > DECAYED_LR_START:
-                    dlr = tf.squeeze(tf.train.cosine_decay_restarts(
+                    dlr = tf.train.cosine_decay_restarts(
                         learning_rate=LEARNING_RATE,
                         global_step=bno - DECAYED_LR_START,
                         first_decay_steps=LR_DECAY_STEPS,
                         t_mul=1.0,
                         m_mul=1.0,
                         alpha=LEARNING_RATE_ALPHA
-                    ))
-                    lr = sess.run([dlr])
+                    )
+                    lr = sess.run([dlr])[0]
                 print('{} training batch {}, random keep_prob:{}, learning_rate:{}'.format(
                     strftime("%H:%M:%S"), bno+1, kp, lr))
                 summary_str, worst = sess.run(
