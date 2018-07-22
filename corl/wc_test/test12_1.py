@@ -26,9 +26,10 @@ MAX_STEP = 35
 TIME_SHIFT = 4
 DIM = 3
 KEEP_PROB = 0.5
-LEARNING_RATE = 1e-4
-# DECAYED_LEARNING_RATE = 1e-4
-# DECAYED_LR_START = 0.7
+LEARNING_RATE = 1e-3
+LEARNING_RATE_ALPHA = 0.1
+LR_DECAY_STEPS = 1000
+DECAYED_LR_START = 35000
 SEED = 285139
 
 # pylint: disable-msg=E0601,E1101
@@ -147,17 +148,29 @@ def run(args):
         while True:
             # bno = epoch*TEST_INTERVAL
             epoch = bno // TEST_INTERVAL
-            found_better = False
             if restored or bno % TEST_INTERVAL == 0:
-                test_summary_str, found_better = validate(
-                    sess, model, summary, {d['handle']: test_handle, keep_prob: 1, learning_rate: LEARNING_RATE}, bno, epoch)
+                test_summary_str, _ = validate(
+                    sess, model, summary, 
+                    {d['handle']: test_handle, keep_prob: 1, learning_rate: LEARNING_RATE}, 
+                    bno, epoch)
                 restored = False
             try:
                 kp = min(1, random.uniform(KEEP_PROB, 1.05))
+                if bno > DECAYED_LR_START:
+                    dlr = tf.train.cosine_decay_restarts(
+                        learning_rate=LEARNING_RATE,
+                        global_step=bno - DECAYED_LR_START,
+                        first_decay_steps=LR_DECAY_STEPS,
+                        t_mul=1.0,
+                        m_mul=1.0,
+                        alpha=LEARNING_RATE_ALPHA
+                    )
+                    lr = sess.run([dlr])
                 print('{} training batch {}, random keep_prob:{}, learning_rate:{}'.format(
                     strftime("%H:%M:%S"), bno+1, kp, lr))
                 summary_str, worst = sess.run(
-                    [summary, model.worst, model.optimize], {d['handle']: train_handle, keep_prob: kp, learning_rate: lr})[:-1]
+                    [summary, model.worst, model.optimize], 
+                    {d['handle']: train_handle, keep_prob: kp, learning_rate: lr})[:-1]
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break

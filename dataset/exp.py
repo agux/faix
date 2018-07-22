@@ -39,14 +39,14 @@ exp_dict = {
 
 
 def export(table, args):
-    global cnxpool
     dest = args.dest
-    cnx = cnxpool.get_connection()
-    writer = None
-    try:
-        print('{} exporting table {}...'.format(
-            strftime("%H:%M:%S"), table))
-        if exp_dict[table] is None:
+    print('{} exporting table {}...'.format(
+        strftime("%H:%M:%S"), table))
+    if exp_dict[table] is None:
+        global cnxpool
+        cnx = cnxpool.get_connection()
+        writer = None
+        try:
             query = "SELECT * from {}".format(table)
             cursor = cnx.cursor(dictionary=True)
             cursor.execute(query)
@@ -64,12 +64,12 @@ def export(table, args):
                         strftime("%H:%M:%S"), i))
                 writer.append(row)
             cursor.close()
-        else:
-            exp_dict[table].export(table, dest, args)
-    except:
-        print(sys.exc_info()[0])
-        raise
-    finally:
-        cnx.close()
-        if writer:
-            writer.close()
+        except:
+            print(sys.exc_info()[0])
+            raise
+        finally:
+            cnx.close()
+            if writer:
+                writer.close()
+    else:
+        exp_dict[table].export(table, dest, args)
