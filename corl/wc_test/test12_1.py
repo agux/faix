@@ -67,7 +67,7 @@ def run(args):
     random.seed(SEED)
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
     learning_rate = tf.placeholder(tf.float32, [], name="learning_rate")
-    with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
+    with tf.Session(config=tf.ConfigProto(log_device_placement=args.log_device)) as sess:
         model = drnn.DRnnRegressorV6(
             dim=DIM,
             keep_prob=keep_prob,
@@ -150,26 +150,27 @@ def run(args):
             epoch = bno // TEST_INTERVAL
             if restored or bno % TEST_INTERVAL == 0:
                 test_summary_str, _ = validate(
-                    sess, model, summary, 
-                    {d['handle']: test_handle, keep_prob: 1, learning_rate: LEARNING_RATE}, 
+                    sess, model, summary,
+                    {d['handle']: test_handle, keep_prob: 1,
+                        learning_rate: LEARNING_RATE},
                     bno, epoch)
                 restored = False
             try:
                 kp = min(1, random.uniform(KEEP_PROB, 1.05))
                 if bno > DECAYED_LR_START:
-                    dlr = tf.train.cosine_decay_restarts(
+                    dlr = tf.squeeze(tf.train.cosine_decay_restarts(
                         learning_rate=LEARNING_RATE,
                         global_step=bno - DECAYED_LR_START,
                         first_decay_steps=LR_DECAY_STEPS,
                         t_mul=1.0,
                         m_mul=1.0,
                         alpha=LEARNING_RATE_ALPHA
-                    )
+                    ))
                     lr = sess.run([dlr])
                 print('{} training batch {}, random keep_prob:{}, learning_rate:{}'.format(
                     strftime("%H:%M:%S"), bno+1, kp, lr))
                 summary_str, worst = sess.run(
-                    [summary, model.worst, model.optimize], 
+                    [summary, model.worst, model.optimize],
                     {d['handle']: train_handle, keep_prob: kp, learning_rate: lr})[:-1]
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
