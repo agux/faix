@@ -21,11 +21,14 @@ def parseArgs():
                         default=None)
     parser.add_argument('--start', type=int, help='export sets starting with the specified batch number.',
                         default=None)
+    parser.add_argument('--end', type=int, help='export sets ending with the specified batch number.',
+                        default=None)
     parser.add_argument('options', nargs=argparse.REMAINDER)
     return parser.parse_args()
 
 
 def run(args):
+    print(args)
     args.dest = args.dest or '/Users/jx/ProgramData/mysql/avro'
     table = args.table
     args.table = None

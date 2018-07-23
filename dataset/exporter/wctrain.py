@@ -14,7 +14,9 @@ import json
 import ConfigParser
 
 '''
-example entry command: python main.py --table wctrain --fields lr lr_vol --dest /Users/jx/ProgramData/mysql/dataset 35 4 /Volumes/EXTOS/wc_train
+example entry command: 
+python main.py --table wctrain --fields lr lr_vol --dest /Users/jx/ProgramData/mysql/dataset 35 4 /Volumes/EXTOS/wc_train
+python main.py --table wctrain --fields lr lr_vol --end 55040 --flags TR TS --dest /Volumes/WD-1TB/wcc_train/wc_train 35 4
 '''
 
 _executor = None
@@ -269,6 +271,7 @@ class WcTrainExporter:
         global cnxpool
         feat_cols = args.fields
         start = args.start
+        end = args.end
         flags = args.flags
         max_step = int(args.options[0])
         time_shift = int(args.options[1])
@@ -280,16 +283,15 @@ class WcTrainExporter:
         cnx = cnxpool.get_connection()
         cursor = None
         try:
-            file_dir = os.path.join(dest, "wc_train")
-            if not os.path.exists(file_dir):
+            if not os.path.exists(dest):
                 try:
-                    os.makedirs(file_dir)
+                    os.makedirs(dest)
                 except OSError as exc:  # Guard against race condition
                     if exc.errno != errno.EEXIST:
                         raise
-            print('{} destination: {}'.format(strftime("%H:%M:%S"), file_dir))
+            print('{} destination: {}'.format(strftime("%H:%M:%S"), dest))
             # export meta file if not exists
-            meta_file = os.path.join(file_dir, 'meta.txt')
+            meta_file = os.path.join(dest, 'meta.txt')
             if not os.path.exists(meta_file):
                 print('{} writing meta info to {} ...'.format(
                     strftime("%H:%M:%S"), meta_file))
@@ -319,10 +321,13 @@ class WcTrainExporter:
             query = "SELECT distinct flag, bno from wcc_trn where 1=1"
             if start is not None:
                 query += " and bno >= {}".format(start)
+            if end is not None:
+                query += " and bno <= {}".format(end)
             if flags is not None:
-                query += " and flag in ('{}')".format(
-                    "','".join([f for f in flags]))
+                query += " and flag in ({})".format(
+                    ",".join(["'{}'".format(f) for f in flags]))
             query += " order by bno"
+            print("{} constructed query: {}".format(strftime("%H:%M:%S"), query))
             cursor = cnx.cursor(buffered=True)
             cursor.execute(query)
             rows = cursor.fetchall()
@@ -331,7 +336,7 @@ class WcTrainExporter:
             print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
             exc = _getExecutor(max(2, multiprocessing.cpu_count()-1))
             for flag, bno in rows:
-                exc.submit(_exp_wctrain, flag, bno, file_dir,
+                exc.submit(_exp_wctrain, flag, bno, dest,
                            feat_cols, max_step, time_shift, alt_dirs)
             exc.shutdown()
         except:
