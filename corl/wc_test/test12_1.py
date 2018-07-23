@@ -145,6 +145,15 @@ def run(args):
             sess, model, training_dir)
         test_summary_str = None
         lr = LEARNING_RATE
+        cur_step = tf.placeholder(tf.float32, [], name="current_step")
+        dlr = tf.train.cosine_decay_restarts(
+            learning_rate=LEARNING_RATE,
+            global_step=cur_step,
+            first_decay_steps=LR_DECAY_STEPS,
+            t_mul=1.0,
+            m_mul=1.0,
+            alpha=LEARNING_RATE_ALPHA
+        )
         while True:
             # bno = epoch*TEST_INTERVAL
             epoch = bno // TEST_INTERVAL
@@ -158,15 +167,8 @@ def run(args):
             try:
                 kp = min(1, random.uniform(KEEP_PROB, 1.05))
                 if bno > DECAYED_LR_START:
-                    dlr = tf.train.cosine_decay_restarts(
-                        learning_rate=LEARNING_RATE,
-                        global_step=bno - DECAYED_LR_START,
-                        first_decay_steps=LR_DECAY_STEPS,
-                        t_mul=1.0,
-                        m_mul=1.0,
-                        alpha=LEARNING_RATE_ALPHA
-                    )
-                    lr = sess.run([dlr])[0]
+                    lr = sess.run([dlr], feed_dict={
+                                  cur_step: bno-DECAYED_LR_START})[0]
                 print('{} training batch {}, random keep_prob:{}, learning_rate:{}'.format(
                     strftime("%H:%M:%S"), bno+1, kp, lr))
                 summary_str, worst = sess.run(

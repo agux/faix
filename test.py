@@ -127,6 +127,7 @@ def testInversePerm():
     with tf.Session() as sess:
         print(sess.run([tf.invert_permutation(x)]))
 
+
 def testNestFlatten():
     x = tf.constant(
         [[3, 2, 1, 0], [2, 3, 0, 1]],
@@ -134,6 +135,23 @@ def testNestFlatten():
     with tf.Session() as sess:
         print(sess.run([tf.contrib.framework.nest.flatten(x)]))
 
+
+def testCosDecay():
+    LEARNING_RATE = 1e-3
+    LEARNING_RATE_ALPHA = 0.1
+    LR_DECAY_STEPS = 10
+    step = tf.placeholder(tf.int32, [])
+    dlr = tf.train.cosine_decay_restarts(
+        learning_rate=LEARNING_RATE,
+        global_step=step,
+        first_decay_steps=LR_DECAY_STEPS,
+        t_mul=1.0,
+        m_mul=1.0,
+        alpha=LEARNING_RATE_ALPHA
+    )
+    with tf.Session() as sess:
+        for i in range(100):
+            print(sess.run([dlr], feed_dict={step: i+1000}))
 # testGatherND()
 # testGetFileName()
 # print(__file__)
@@ -151,4 +169,5 @@ def testNestFlatten():
 # testTimeToBatch()
 # testConv1d()
 # testInversePerm()
-testNestFlatten()
+# testNestFlatten()
+testCosDecay()
