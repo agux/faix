@@ -926,7 +926,7 @@ class DRnnRegressorV7:
     incorporated cosine_decay_restarts
     '''
 
-    def __init__(self, rnn_layers=1, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3,
+    def __init__(self, rnn_layer=1, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3,
                  decayed_lr_start=None, lr_decay_steps=None):
         self._rnn_layer = rnn_layer
         self._layer_width = layer_width
