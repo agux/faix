@@ -71,11 +71,12 @@ def reduce_prod(x, axis, name=None):
     on CPU.
     '''
     with tf.variable_scope(name or "c_reduce_prod"):
-        cp = tf.cumprod(x, axis, reverse=True)
-        size = tf.shape(cp)[0]
-        idx1 = tf.range(size)
-        idx2 = tf.zeros([size], tf.int32)
-        r = list(tf.map_fn(lambda p: (
-            p[0], p[1]), (idx1, idx2), dtype=(tf.int32, tf.int32)))
-        indices = tf.stack(r, 1)
-        return tf.gather_nd(cp, indices)
+        with tf.device("/gpu:0"):
+            cp = tf.cumprod(x, axis, reverse=True)
+            size = tf.shape(cp)[0]
+            idx1 = tf.range(size)
+            idx2 = tf.zeros([size], tf.int32)
+            r = list(tf.map_fn(lambda p: (
+                p[0], p[1]), (idx1, idx2), dtype=(tf.int32, tf.int32)))
+            indices = tf.stack(r, 1)
+            return tf.gather_nd(cp, indices)

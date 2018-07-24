@@ -401,7 +401,7 @@ class Freeness(snt.RNNCore):
                 usage = _EPSILON + (1 - _EPSILON) * usage
 
                 nonusage = 1 - usage
-                # top_k runs on CPU in tf v1.9
+                # FIXME top_k runs on CPU in tf v1.9
                 sorted_nonusage, indices = tf.nn.top_k(
                     nonusage, k=self._memory_size, name='sort')
                 sorted_usage = 1 - sorted_nonusage
