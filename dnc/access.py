@@ -53,8 +53,9 @@ def _erase_and_write(memory, address, reset_weights, values):
         expand_address = tf.expand_dims(address, 3)
         reset_weights = tf.expand_dims(reset_weights, 2)
         weighted_resets = expand_address * reset_weights
-        # FIXME: back prob of reduce_prod runs in CPU
-        reset_gate = tf.reduce_prod(1 - weighted_resets, [1])
+        # back prob of reduce_prod runs in CPU
+        # reset_gate = tf.reduce_prod(1 - weighted_resets, [1])
+        reset_gate = util.reduce_prod(1 - weighted_resets, 1)
         memory *= reset_gate
 
     with tf.name_scope('additive_write', values=[memory, address, values]):

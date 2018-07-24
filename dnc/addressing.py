@@ -354,8 +354,9 @@ class Freeness(snt.RNNCore):
         """
         with tf.name_scope('usage_after_write'):
             # Calculate the aggregated effect of all write heads
-            # FIXME: back prob of reduce_prod runs in CPU
-            write_weights = 1 - tf.reduce_prod(1 - write_weights, [1])
+            # back prob of reduce_prod runs in CPU
+            # write_weights = 1 - tf.reduce_prod(1 - write_weights, [1])
+            write_weights = 1 - util.reduce_prod(1 - write_weights, 1)
             return prev_usage + (1 - prev_usage) * write_weights
 
     def _usage_after_read(self, prev_usage, free_gate, read_weights):
@@ -374,8 +375,9 @@ class Freeness(snt.RNNCore):
         with tf.name_scope('usage_after_read'):
             free_gate = tf.expand_dims(free_gate, -1)
             free_read_weights = free_gate * read_weights
-            # FIXME: back prob of reduce_prod runs in CPU
-            phi = tf.reduce_prod(1 - free_read_weights, [1], name='phi')
+            # back prob of reduce_prod runs in CPU
+            # phi = tf.reduce_prod(1 - free_read_weights, [1], name='phi')
+            phi = util.reduce_prod(1 - free_read_weights, 1, name='phi')
             return prev_usage * phi
 
     def _allocation(self, usage):

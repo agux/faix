@@ -45,13 +45,13 @@ def batch_gather(values, indices):
     with tf.name_scope('batch_gather', values=[values, indices]):
         return tf.stack(
             tf.map_fn(gather,
-                        (values, indices),
-                        # map returns a structure of Tensors differing from that of elems, dtype is not optional
-                        dtype=tf.float32,
-                        # back_prop=False,
-                        parallel_iterations=64,
-                        swap_memory=True
-                        )
+                      (values, indices),
+                      # map returns a structure of Tensors differing from that of elems, dtype is not optional
+                      dtype=tf.float32,
+                      # back_prop=False,
+                      parallel_iterations=64,
+                      swap_memory=True
+                      )
         )
         # unpacked = zip(tf.unstack(values), tf.unstack(indices))
         # result = [tf.gather(value, index) for value, index in unpacked]
@@ -63,3 +63,19 @@ def one_hot(length, index):
     result = np.zeros(length)
     result[index] = 1
     return result
+
+
+def reduce_prod(x, axis, name=None):
+    '''
+    Uses tf.cumprod and tf.gather_nd as a workaround to calculating tf.reduce_prod's gradient
+    on CPU.
+    '''
+    with tf.variable_scope(name or "c_reduce_prod"):
+        cp = tf.cumprod(x, axis, reverse=True)
+        size = tf.shape(cp)[0]
+        idx1 = tf.range(size)
+        idx2 = tf.zeros([size], tf.int32)
+        r = list(tf.map_fn(lambda p: (
+            p[0], p[1]), (idx1, idx2), dtype=(tf.int32, tf.int32)))
+        indices = tf.stack(r, 1)
+        return tf.gather_nd(cp, indices)

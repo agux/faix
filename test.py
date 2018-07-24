@@ -136,6 +136,33 @@ def testNestFlatten():
         print(sess.run([tf.contrib.framework.nest.flatten(x)]))
 
 
+def testReduceProdCumprod():
+    x_h = tf.placeholder(tf.int32, [None, 2, 4])
+    x = np.array(
+        [[[3, 2, 1, 4], [2, 3, 4, 1]],
+         [[4, 5, 6, 3], [5, 2, 1, 7]],
+         [[5, 7, 8, 9], [6, 7, 3, 3]]]
+    )
+    with tf.Session() as sess:
+        rp = tf.reduce_prod(x, [1])
+        cp = tf.cumprod(x, 1, reverse=True)
+        size = tf.shape(cp)[0]
+        p1 = tf.range(size)
+        p2 = tf.zeros([size], tf.int32)
+        print("p1:{} p2:{}".format(p1.get_shape(), p2.get_shape()))
+        mr = list(tf.map_fn(lambda p: (
+            p[0], p[1]), (p1, p2), dtype=(tf.int32, tf.int32)))
+        # print("map shape:{}".format(mr.get_shape()))
+        indices = tf.stack(mr, 1)
+        print(indices.get_shape())
+        gcp = tf.gather_nd(cp, indices)
+        r1, r2, r3, idx = sess.run([rp, cp, gcp, indices], feed_dict={x_h: x})
+        print("result of reduce_prod:\n{}".format(r1))
+        print("result of cumprod:\n{}".format(r2))
+        print("result of gathered cumprod:\n{}".format(r3))
+        print("indices:\n{}".format(idx))
+
+
 def testCosDecay():
     LEARNING_RATE = 1e-3
     LEARNING_RATE_ALPHA = 0.1
@@ -170,4 +197,5 @@ def testCosDecay():
 # testConv1d()
 # testInversePerm()
 # testNestFlatten()
-testCosDecay()
+# testCosDecay()
+testReduceProdCumprod()
