@@ -21,7 +21,6 @@ from time import strftime
 from collections import namedtuple
 from tensorflow.contrib import rnn, layers
 from tensorflow import logging, nn
-from tensorflow import variable_scope as vs
 
 
 class GridRNNCell(rnn.RNNCell):
@@ -176,7 +175,7 @@ class GridRNNCell(rnn.RNNCell):
         new_output = [None] * conf.num_dims
         new_state = [None] * conf.num_dims
 
-        with vs.variable_scope(scope or type(self).__name__):  # GridRNNCell
+        with tf.variable_scope(scope or type(self).__name__):  # GridRNNCell
             # project input, populate c_prev and m_prev
             self._project_input(inputs, c_prev, m_prev, cell_output_size > 0)
 
@@ -288,13 +287,13 @@ class GridRNNCell(rnn.RNNCell):
             input_sz = input_splits[0].get_shape().with_rank(2)[1].value
 
             for i, j in enumerate(conf.inputs):
-                input_project_m = vs.get_variable(
+                input_project_m = tf.get_variable(
                     'project_m_{}'.format(j), [input_sz, conf.num_units],
                     dtype=inputs.dtype)
                 m_prev[j] = tf.matmul(input_splits[i], input_project_m)
 
                 if with_c:
-                    input_project_c = vs.get_variable(
+                    input_project_c = tf.get_variable(
                         'project_c_{}'.format(j), [input_sz, conf.num_units],
                         dtype=inputs.dtype)
                     c_prev[j] = tf.matmul(
@@ -404,19 +403,19 @@ def _propagate(dim_indices, conf, cells, c_prev, m_prev, new_output, new_state,
                     [cell_inputs, last_dim_output], 1)
             else:
                 linear_args = last_dim_output
-            with vs.variable_scope('non_recurrent' if conf.tied else
+            with tf.variable_scope('non_recurrent' if conf.tied else
                                    'non_recurrent/cell_{}'.format(i)):
                 if conf.tied and not (first_call and i == dim_indices[0]):
-                    vs.get_variable_scope().reuse_variables()
+                    tf.get_variable_scope().reuse_variables()
 
                 new_output[d.idx] = layers.fully_connected(
                     linear_args,
                     num_outputs=conf.num_units,
                     activation_fn=d.non_recurrent_fn,
-                    weights_initializer=(vs.get_variable_scope().initializer or
+                    weights_initializer=(tf.get_variable_scope().initializer or
                                          tf.variance_scaling_initializer),
                     biases_initializer=tf.constant_initializer(0.1),
-                    weights_regularizer=vs.get_variable_scope().regularizer)
+                    weights_regularizer=tf.get_variable_scope().regularizer)
         else:
             if c_prev[i] is not None:
                 cell_state = (c_prev[i], last_dim_output)
@@ -424,10 +423,10 @@ def _propagate(dim_indices, conf, cells, c_prev, m_prev, new_output, new_state,
                 # for GRU/RNN, the state is just the previous output
                 cell_state = last_dim_output
 
-            with vs.variable_scope('recurrent' if conf.tied else
+            with tf.variable_scope('recurrent' if conf.tied else
                                    'recurrent/cell_{}'.format(i)):
                 if conf.tied and not (first_call and i == dim_indices[0]):
-                    vs.get_variable_scope().reuse_variables()
+                    tf.get_variable_scope().reuse_variables()
                 cell = cells[i]
                 new_output[d.idx], new_state[d.idx] = cell(
                     cell_inputs, cell_state)
