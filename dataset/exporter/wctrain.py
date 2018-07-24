@@ -81,7 +81,7 @@ def _init():
     print("PID %d: initializing mysql connection pool..." % os.getpid())
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
-        pool_size=3,
+        pool_size=1,
         host='127.0.0.1',
         port=3306,
         user='mysql',
@@ -334,7 +334,7 @@ class WcTrainExporter:
             total = cursor.rowcount
             cursor.close()
             print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
-            exc = _getExecutor(max(2, multiprocessing.cpu_count()-1))
+            exc = _getExecutor(int(multiprocessing.cpu_count()*0.8))
             for flag, bno in rows:
                 exc.submit(_exp_wctrain, flag, bno, dest,
                            feat_cols, max_step, time_shift, alt_dirs)

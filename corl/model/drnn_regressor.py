@@ -8,6 +8,7 @@ import tensorflow as tf
 import numpy as np
 import math
 from pstk.model.model import lazy_property, stddev
+from pstk.model.cells import AlphaDropoutWrapper
 
 # pylint: disable-msg=E1101
 
@@ -902,6 +903,171 @@ class DRnnRegressorV6:
     @lazy_property
     def optimize(self):
         return tf.train.AdamOptimizer(self._learning_rate).minimize(
+            self.cost, global_step=tf.train.get_or_create_global_step())
+
+    @lazy_property
+    def worst(self):
+        logits = self.logits
+        with tf.name_scope("worst"):
+            sqd = tf.squared_difference(logits, self.target)
+            bidx = tf.argmax(sqd)
+            max_diff = tf.sqrt(tf.reduce_max(sqd))
+            predict = tf.gather(logits, bidx)
+            actual = tf.gather(self.target, bidx)
+            return max_diff, predict, actual
+
+
+class DRnnRegressorV7:
+    '''
+    Deep RNN Regressor using n-layer GridRNNCell and 3-layer FCN. Internal cell type is LSTMBlockCell.
+    With selu, alpha_dropout, and variance_scaling_initializer. 
+
+    uses MultiRNNCell with LSTMBlockCell in the GridRNNCell fn,
+    incorporated cosine_decay_restarts
+    '''
+
+    def __init__(self, rnn_layers=1, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3,
+                 decayed_lr_start=None, lr_decay_steps=None):
+        self._rnn_layers = rnn_layers
+        self._layer_width = layer_width
+        self._dim = dim
+        self._keep_prob = keep_prob
+        self._learning_rate = learning_rate
+        self._decayed_lr_start = decayed_lr_start
+        self._lr_decay_steps = lr_decay_steps
+        self.learning_rate
+
+    def setNodes(self, features, target, seqlen):
+        self.data = features
+        self.target = target
+        self.seqlen = seqlen
+        self.logits
+        self.optimize
+        self.cost
+        self.worst
+
+    def getName(self):
+        return self.__class__.__name__
+
+    @lazy_property
+    def logits(self):
+        layer = self.rnn(self, self.data)
+        layer = self.fcn(self, layer)
+        with tf.variable_scope("output"):
+            output = tf.layers.dense(
+                inputs=layer,
+                units=1,
+                kernel_initializer=tf.variance_scaling_initializer(),
+                bias_initializer=tf.constant_initializer(0.1)
+            )
+            output = tf.squeeze(output)
+            return output
+
+    @staticmethod
+    def fcn(self, inputs):
+        layer = tf.nn.selu(inputs)
+        fsize = int(inputs.get_shape()[-1])
+        with tf.variable_scope("fcn"):
+            nlayer = 3
+            for i in range(nlayer):
+                i = i+1
+                layer = tf.layers.dense(
+                    inputs=layer,
+                    units=fsize,
+                    kernel_initializer=tf.variance_scaling_initializer(),
+                    bias_initializer=tf.constant_initializer(0.1)
+                )
+                if i == 1:
+                    layer = tf.contrib.nn.alpha_dropout(
+                        layer, keep_prob=self._keep_prob)
+                fsize = fsize // 2
+        layer = tf.nn.selu(layer)
+        return layer
+
+    @staticmethod
+    def newCell(self):
+        _layer = self._rnn_layer
+        width = self._layer_width
+        _dim = self._dim
+
+        def cell_fn(n):
+            cells = []
+            for i in range(_layer):
+                c = tf.contrib.rnn.LSTMBlockCell(
+                    num_units=n*(i+1),
+                    use_peephole=True
+                )
+                if i > 0:
+                    # c = tf.nn.rnn_cell.DropoutWrapper(
+                    c = AlphaDropoutWrapper(
+                        cell=c,
+                        input_keep_prob=self._keep_prob
+                    )
+                cells.append(c)
+            return tf.nn.rnn_cell.MultiRNNCell(cells)
+        grid = tf.contrib.grid_rnn.GridRNNCell(
+            num_units=width,
+            num_dims=_dim,
+            input_dims=0,
+            output_dims=0,
+            priority_dims=0,
+            tied=False,
+            non_recurrent_dims=None,
+            cell_fn=cell_fn,
+            non_recurrent_fn=None,
+            state_is_tuple=True,
+            output_is_tuple=True
+        )
+        return grid
+
+    @staticmethod
+    def rnn(self, inputs):
+        layer = inputs
+        layer, _ = tf.nn.dynamic_rnn(
+            self.newCell(self),
+            layer,
+            dtype=tf.float32,
+            sequence_length=self.seqlen
+        )
+        layer = tf.concat(layer, 1)
+        output = self.last_relevant(layer, self.seqlen)
+        return output
+
+    @staticmethod
+    def last_relevant(output, length):
+        with tf.name_scope("last_relevant"):
+            batch_size = tf.shape(output)[0]
+            relevant = tf.gather_nd(output, tf.stack(
+                [tf.range(batch_size), length-1], axis=1))
+            return relevant
+
+    @lazy_property
+    def cost(self):
+        logits = self.logits
+        with tf.name_scope("cost"):
+            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+
+    @lazy_property
+    def learning_rate(self):
+        with tf.variable_scope("learning_rate"):
+            if self._decayed_lr_start is None:
+                return self._learning_rate
+            else:
+                gstep = tf.train.get_or_create_global_step()
+                return tf.cond(tf.less(gstep, self._decayed_lr_start),
+                               lambda: self._learning_rate,
+                               lambda: tf.train.cosine_decay_restarts(
+                    learning_rate=self._learning_rate,
+                    global_step=gstep-self._decayed_lr_start,
+                    first_decay_steps=self._lr_decay_steps,
+                    t_mul=1.2,
+                    m_mul=0.9,
+                    alpha=0.095
+                ))
+
+    @lazy_property
+    def optimize(self):
+        return tf.train.AdamOptimizer(self.learning_rate).minimize(
             self.cost, global_step=tf.train.get_or_create_global_step())
 
     @lazy_property
