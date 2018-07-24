@@ -18,7 +18,6 @@ VSET = 9
 TEST_BATCH_SIZE = 3000
 TEST_INTERVAL = 50
 SAVE_INTERVAL = 10
-RNN_LAYER = 2
 LAYER_WIDTH = 512
 MAX_STEP = 35
 TIME_SHIFT = 4
@@ -81,7 +80,6 @@ def run(args):
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
     with tf.Session(config=tf.ConfigProto(log_device_placement=args.log_device)) as sess:
         model = drnn.DRnnRegressorV7(
-            rnn_layer=RNN_LAYER,
             layer_width=LAYER_WIDTH,
             dim=DIM,
             keep_prob=keep_prob,
