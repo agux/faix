@@ -932,7 +932,7 @@ class DRnnRegressorV7:
         self._learning_rate = learning_rate
         self._decayed_lr_start = decayed_lr_start
         self._lr_decay_steps = lr_decay_steps
-        
+
         self.learning_rate
 
     def setNodes(self, features, target, seqlen):
@@ -1039,7 +1039,7 @@ class DRnnRegressorV7:
             gstep = tf.train.get_or_create_global_step()
 
             def tslr():
-                return tf.convert_to_tensor([self._learning_rate], dtype=tf.float32)
+                return tf.constant([self._learning_rate], dtype=tf.float32)
 
             def cdr():
                 return tf.train.cosine_decay_restarts(
