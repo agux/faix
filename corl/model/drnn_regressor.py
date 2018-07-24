@@ -920,16 +920,12 @@ class DRnnRegressorV6:
 
 class DRnnRegressorV7:
     '''
-    Deep RNN Regressor using n-layer GridRNNCell and 3-layer FCN. Internal cell type is LSTMBlockCell.
-    With selu, alpha_dropout, and variance_scaling_initializer. 
-
-    uses MultiRNNCell with LSTMBlockCell in the GridRNNCell fn,
-    incorporated cosine_decay_restarts
+    Deep RNN Regressor using 1-layer bespoke GridRNNCell and 3-layer FCN. Internal cell type is LSTMBlockCell.
+    With selu, alpha_dropout, and variance_scaling_initializer, incorporated cosine_decay_restarts
     '''
 
-    def __init__(self, rnn_layer=1, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3,
+    def __init__(self, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3,
                  decayed_lr_start=None, lr_decay_steps=None):
-        self._rnn_layer = rnn_layer
         self._layer_width = layer_width
         self._dim = dim
         self._keep_prob = keep_prob
@@ -987,28 +983,15 @@ class DRnnRegressorV7:
 
     @staticmethod
     def newCell(self):
-        _layer = self._rnn_layer
         width = self._layer_width
-        _dim = self._dim
-
         def cell_fn(n):
-            cells = []
-            for i in range(_layer):
-                c = tf.contrib.rnn.LSTMBlockCell(
-                    num_units=n*(i+1),
-                    use_peephole=True
-                )
-                if i > 0:
-                    # c = tf.nn.rnn_cell.DropoutWrapper(
-                    c = AlphaDropoutWrapper(
-                        cell=c,
-                        input_keep_prob=self._keep_prob
-                    )
-                cells.append(c)
-            return tf.nn.rnn_cell.MultiRNNCell(cells)
+            return tf.contrib.rnn.LSTMBlockCell(
+                num_units=width,
+                use_peephole=True
+            )
         grid = grid_rnn.GridRNNCell(
             num_units=width,
-            num_dims=_dim,
+            num_dims=self._dim,
             input_dims=0,
             output_dims=0,
             priority_dims=0,
