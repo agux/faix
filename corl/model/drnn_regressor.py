@@ -1035,7 +1035,7 @@ class DRnnRegressorV7:
     @lazy_property
     def learning_rate(self):
         with tf.variable_scope("learning_rate"):
-            lr = tf.convert_to_tensor(self._learning_rate, dtype=tf.float32)
+            lr = tf.convert_to_tensor([self._learning_rate], dtype=tf.float32)
             if self._decayed_lr_start is None:
                 return lr
             else:
