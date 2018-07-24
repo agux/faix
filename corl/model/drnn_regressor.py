@@ -929,7 +929,7 @@ class DRnnRegressorV7:
         self._layer_width = layer_width
         self._dim = dim
         self._keep_prob = keep_prob
-        self._learning_rate = learning_rate
+        self._lr = learning_rate
         self._decayed_lr_start = decayed_lr_start
         self._lr_decay_steps = lr_decay_steps
 
@@ -1039,11 +1039,12 @@ class DRnnRegressorV7:
             gstep = tf.train.get_or_create_global_step()
 
             def tslr():
-                return tf.constant([self._learning_rate], dtype=tf.float32)
+                # must return a tensor op?
+                return tf.multiply(self._lr, 1)
 
             def cdr():
                 return tf.train.cosine_decay_restarts(
-                    learning_rate=self._learning_rate,
+                    learning_rate=self._lr,
                     global_step=gstep-self._decayed_lr_start,
                     first_decay_steps=self._lr_decay_steps,
                     t_mul=1.2,

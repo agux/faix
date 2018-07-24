@@ -334,7 +334,7 @@ class WcTrainExporter:
             total = cursor.rowcount
             cursor.close()
             print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
-            exc = _getExecutor(int(multiprocessing.cpu_count()*0.8))
+            exc = _getExecutor(int(multiprocessing.cpu_count()*0.7))
             for flag, bno in rows:
                 exc.submit(_exp_wctrain, flag, bno, dest,
                            feat_cols, max_step, time_shift, alt_dirs)
