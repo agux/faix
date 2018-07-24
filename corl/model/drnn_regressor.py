@@ -9,6 +9,7 @@ import numpy as np
 import math
 from pstk.model.model import lazy_property, stddev
 from pstk.model.cells import AlphaDropoutWrapper
+from rnn import grid_rnn
 
 # pylint: disable-msg=E1101
 
@@ -1005,7 +1006,7 @@ class DRnnRegressorV7:
                     )
                 cells.append(c)
             return tf.nn.rnn_cell.MultiRNNCell(cells)
-        grid = tf.contrib.grid_rnn.GridRNNCell(
+        grid = grid_rnn.GridRNNCell(
             num_units=width,
             num_dims=_dim,
             input_dims=0,
