@@ -928,7 +928,7 @@ class DRnnRegressorV7:
 
     def __init__(self, rnn_layers=1, layer_width=200, dim=3, keep_prob=None, learning_rate=1e-3,
                  decayed_lr_start=None, lr_decay_steps=None):
-        self._rnn_layers = rnn_layers
+        self._rnn_layer = rnn_layer
         self._layer_width = layer_width
         self._dim = dim
         self._keep_prob = keep_prob

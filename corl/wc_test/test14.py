@@ -7,13 +7,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 import tensorflow as tf
 # pylint: disable-msg=E0401
 from model import drnn_regressor as drnn
-from wc_data import input_fn, input_bq, input_file
+from wc_data import input_fn, input_bq, input_file2
 from time import strftime
-from test11 import parseArgs, feat_cols, LOG_DIR, collect_summary, getInput
-import argparse
-import numpy as np
+from test11 import parseArgs, feat_cols, LOG_DIR, collect_summary
 import math
-import multiprocessing
 import shutil
 import random
 
@@ -35,6 +32,22 @@ SEED = 285139
 # pylint: disable-msg=E0601,E1101
 
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
+
+
+def getInput(start, args):
+    ds = args.ds.lower()
+    print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
+    if ds == 'db':
+        return input_fn.getInputs(
+            start, TIME_SHIFT, feat_cols, MAX_STEP, args.parallel,
+            args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
+    elif ds == 'bigquery':
+        return input_bq.getInputs(start, TIME_SHIFT, feat_cols, MAX_STEP, TEST_BATCH_SIZE,
+                                  vset=args.vset or VSET)
+    elif ds == 'file':
+        return input_file2.getInputs(
+            args.dir, start, args.prefetch, args.vset or VSET)
+    return None
 
 
 def validate(sess, model, summary, feed, bno, epoch):
@@ -68,7 +81,7 @@ def run(args):
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
     with tf.Session(config=tf.ConfigProto(log_device_placement=args.log_device)) as sess:
         model = drnn.DRnnRegressorV7(
-            rnn_layers=RNN_LAYER,
+            rnn_layer=RNN_LAYER,
             layer_width=LAYER_WIDTH,
             dim=DIM,
             keep_prob=keep_prob,
