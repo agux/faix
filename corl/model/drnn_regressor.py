@@ -932,6 +932,7 @@ class DRnnRegressorV7:
         self._learning_rate = learning_rate
         self._decayed_lr_start = decayed_lr_start
         self._lr_decay_steps = lr_decay_steps
+        
         self.learning_rate
 
     def setNodes(self, features, target, seqlen):
@@ -1035,21 +1036,24 @@ class DRnnRegressorV7:
     @lazy_property
     def learning_rate(self):
         with tf.variable_scope("learning_rate"):
-            lr = tf.convert_to_tensor([self._learning_rate], dtype=tf.float32)
-            if self._decayed_lr_start is None:
-                return lr
-            else:
-                gstep = tf.train.get_or_create_global_step()
-                return tf.cond(tf.less(gstep, self._decayed_lr_start),
-                               lambda: lr,
-                               lambda: tf.train.cosine_decay_restarts(
+            gstep = tf.train.get_or_create_global_step()
+
+            def tslr():
+                return tf.convert_to_tensor([self._learning_rate], dtype=tf.float32)
+
+            def cdr():
+                return tf.train.cosine_decay_restarts(
                     learning_rate=self._learning_rate,
                     global_step=gstep-self._decayed_lr_start,
                     first_decay_steps=self._lr_decay_steps,
                     t_mul=1.2,
                     m_mul=0.9,
                     alpha=0.095
-                ))
+                )
+            if self._decayed_lr_start is None:
+                return tslr()
+            else:
+                return tf.cond(tf.less(gstep, self._decayed_lr_start), tslr, cdr)
 
     @lazy_property
     def optimize(self):
