@@ -984,6 +984,7 @@ class DRnnRegressorV7:
     @staticmethod
     def newCell(self):
         width = self._layer_width
+
         def cell_fn(n):
             return tf.contrib.rnn.LSTMBlockCell(
                 num_units=width,
@@ -1034,12 +1035,13 @@ class DRnnRegressorV7:
     @lazy_property
     def learning_rate(self):
         with tf.variable_scope("learning_rate"):
+            lr = tf.convert_to_tensor(self._learning_rate, dtype=tf.float32)
             if self._decayed_lr_start is None:
-                return self._learning_rate
+                return lr
             else:
                 gstep = tf.train.get_or_create_global_step()
                 return tf.cond(tf.less(gstep, self._decayed_lr_start),
-                               lambda: self._learning_rate,
+                               lambda: lr,
                                lambda: tf.train.cosine_decay_restarts(
                     learning_rate=self._learning_rate,
                     global_step=gstep-self._decayed_lr_start,
