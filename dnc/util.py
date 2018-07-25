@@ -52,11 +52,10 @@ def batch_gather(values, indices):
         # return tf.stack(result)
 
         # fix performance issue
-        print("values: {}  indices: {}".format(
-            values.get_shape(), indices.get_shape()))
         idxf = tf.cast(indices, tf.float32)
         size = tf.shape(indices)[0]
         idx1 = tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
+        idx1 = tf.reshape(idx1, [-1, 1])
         r = list(tf.map_fn(lambda p: (
             p[0], p[1]), (idx1, idxf), dtype=(tf.float32, tf.float32)))
         gidx = tf.stack(r, 1)
