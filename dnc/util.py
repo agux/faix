@@ -30,13 +30,14 @@ def batch_invert_permutation(permutations):
         # return tf.stack(inverses)
 
         # fix performance issue
-        dim = int(permutations.get_shape()[-1])
-        size = tf.cast(tf.shape(permutations)[0], tf.float32)
-        delta = tf.cast(tf.shape(permutations)[-1], tf.float32)
+        perm = tf.cast(permutations, tf.float32)
+        dim = int(perm.get_shape()[-1])
+        size = tf.cast(tf.shape(perm)[0], tf.float32)
+        delta = tf.cast(tf.shape(perm)[-1], tf.float32)
         rg = tf.range(0, size*delta, delta, dtype=tf.float32)
         rg = tf.reshape(rg, [-1, 1])
         rg = tf.tile(rg, [1, dim])
-        perm = tf.add(permutations, rg)
+        perm = tf.add(perm, rg)
         flat = tf.reshape(perm, [-1])
         perm = tf.invert_permutation(tf.cast(flat, tf.int32))
         perm = tf.reshape(perm, [-1, dim])
@@ -49,7 +50,7 @@ def batch_gather(values, indices):
         # unpacked = zip(tf.unstack(values), tf.unstack(indices))
         # result = [tf.gather(value, index) for value, index in unpacked]
         # return tf.stack(result)
-        
+
         # fix performance issue
         indices_f = tf.cast(indices, tf.float32)
         size = tf.shape(indices)[0]
