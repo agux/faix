@@ -61,6 +61,8 @@ def parseArgs():
                         default=None)
     parser.add_argument('--trace', dest='trace', action='store_true',
                         help='record full trace in validation step.')
+    parser.add_argument('--skip_init_test', dest='skip_init_test', action='store_true',
+                        help='whether to skip the initial test.')
     parser.add_argument('--log_device', dest='log_device', action='store_true',
                         help='record device info such as CPU and GPU in tensorboard.')
     parser.add_argument(

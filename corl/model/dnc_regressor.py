@@ -19,10 +19,9 @@ class DNCRegressorV1:
     A Differentiable Neural Computer (DNC) Regressor.
     '''
 
-    def __init__(self, num_layers=1, layer_width=200, memory_size=16, word_size=16,
+    def __init__(self, layer_width=200, memory_size=16, word_size=16,
                  num_writes=1, num_reads=4, clip_value=20, max_grad_norm=50,
                  keep_prob=None, learning_rate=1e-3):
-        self._num_layers = num_layers
         self._layer_width = layer_width
         self._memory_size = memory_size
         self._word_size = word_size

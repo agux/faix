@@ -17,7 +17,7 @@ import random
 VSET = 9
 TEST_BATCH_SIZE = 3000
 TEST_INTERVAL = 50
-SAVE_INTERVAL = 10
+SAVE_INTERVAL = 20
 LAYER_WIDTH = 512
 MAX_STEP = 35
 TIME_SHIFT = 4
@@ -75,7 +75,7 @@ def validate(sess, model, summary, feed, bno, epoch):
 
 def run(args):
     global bst_saver, bst_score, bst_file, bst_ckpt
-    # tf.logging.set_verbosity(tf.logging.INFO)
+    tf.logging.set_verbosity(tf.logging.INFO)
     random.seed(SEED)
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
     with tf.Session(config=tf.ConfigProto(log_device_placement=args.log_device)) as sess:

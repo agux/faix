@@ -19,8 +19,8 @@ import random
 
 VSET = 9
 TEST_INTERVAL = 50
-SAVE_INTERVAL = 10
-NUM_LAYERS = 2
+TRACE_INTERVAL = 100
+SAVE_INTERVAL = 20
 LAYER_WIDTH = 256
 MEMORY_SIZE = 16
 WORD_SIZE = 16
@@ -39,12 +39,12 @@ SEED = 285139
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
 
 
-def validate(sess, model, summary, feed, bno, epoch, run_options, run_metadata):
+def validate(sess, model, summary, feed, bno, epoch):
     global bst_saver, bst_score, bst_file, bst_ckpt
     print('{} running on test set...'.format(strftime("%H:%M:%S")))
     mse, worst, test_summary_str = sess.run(
-        [model.cost, model.worst, summary], feed,
-        options=run_options, run_metadata=run_metadata)
+        [model.cost, model.worst, summary], feed
+    )
     diff, max_diff, predict, actual = math.sqrt(
         mse), worst[0], worst[1], worst[2]
     print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {}'.format(
@@ -74,7 +74,6 @@ def run(args):
             log_device_placement=args.log_device,
             allow_soft_placement=True)) as sess:
         model = dncr.DNCRegressorV1(
-            num_layers=NUM_LAYERS,
             layer_width=LAYER_WIDTH,
             memory_size=MEMORY_SIZE,
             word_size=WORD_SIZE,
@@ -157,18 +156,18 @@ def run(args):
         run_options, run_metadata = None, None
         if args.trace:
             print("{} full trace will be collected every {} run".format(
-                strftime("%H:%M:%S"), TEST_INTERVAL))
+                strftime("%H:%M:%S"), TRACE_INTERVAL))
             run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
             run_metadata = tf.RunMetadata()
         while True:
             # bno = epoch*TEST_INTERVAL
             epoch = bno // TEST_INTERVAL
             found_better = False
-            if restored or bno % TEST_INTERVAL == 0:
+            if (restored or bno % TEST_INTERVAL == 0) and not (args.skip_init_test and bno == 0):
                 test_summary_str, found_better = validate(
                     sess, model, summary, {
                         d['handle']: test_handle, keep_prob: 1, learning_rate: LEARNING_RATE},
-                    bno, epoch, run_options, run_metadata)
+                    bno, epoch)
                 restored = False
             try:
                 kp = min(1, random.uniform(KEEP_PROB, 1.05))
@@ -176,9 +175,13 @@ def run(args):
                     lr = DECAYED_LEARNING_RATE
                 print('{} training batch {}, random keep_prob:{}, learning_rate:{}'.format(
                     strftime("%H:%M:%S"), bno+1, kp, lr))
+                ro, rm = None, None
+                if run_options is not None and bno % TRACE_INTERVAL == 0:
+                    ro, rm = run_options, run_metadata
                 summary_str, worst = sess.run(
                     [summary, model.worst, model.optimize],
-                    {d['handle']: train_handle, keep_prob: kp, learning_rate: lr})[:-1]
+                    {d['handle']: train_handle, keep_prob: kp, learning_rate: lr},
+                    options=ro, run_metadata=rm)[:-1]
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
@@ -188,9 +191,9 @@ def run(args):
                 strftime("%H:%M:%S"), bno, max_diff, predict, actual))
             train_writer.add_summary(summary_str, bno)
             test_writer.add_summary(test_summary_str, bno)
-            if run_metadata is not None:
-                test_writer.add_run_metadata(
-                    run_metadata, "bno_{}".format(bno))
+            if rm is not None:
+                train_writer.add_run_metadata(
+                    rm, "bno_{}".format(bno))
             train_writer.flush()
             test_writer.flush()
             if bno == 1 or bno % SAVE_INTERVAL == 0:
@@ -200,11 +203,9 @@ def run(args):
         test_summary_str, _ = validate(
             sess, model, summary, {d['handle']: test_handle,
                                    keep_prob: 1, learning_rate: LEARNING_RATE},
-            bno, epoch, run_options, run_metadata)
+            bno, epoch)
         train_writer.add_summary(summary_str, bno)
         test_writer.add_summary(test_summary_str, bno)
-        if run_metadata is not None:
-            test_writer.add_run_metadata(run_metadata, "bno_{}".format(bno))
         train_writer.flush()
         test_writer.flush()
         saver.save(sess, checkpoint_file,

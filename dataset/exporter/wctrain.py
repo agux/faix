@@ -280,43 +280,44 @@ class WcTrainExporter:
         print('{} feat_cols: {}'.format(strftime("%H:%M:%S"), feat_cols))
         print('{} max_step: {}'.format(strftime("%H:%M:%S"), max_step))
         print('{} time_shift: {}'.format(strftime("%H:%M:%S"), time_shift))
+        if not os.path.exists(dest):
+            try:
+                os.makedirs(dest)
+            except OSError as exc:  # Guard against race condition
+                if exc.errno != errno.EEXIST:
+                    raise
+        print('{} destination: {}'.format(strftime("%H:%M:%S"), dest))
+        # export meta file if not exists
+        meta_file = os.path.join(dest, 'meta.txt')
+        if not os.path.exists(meta_file):
+            print('{} writing meta info to {} ...'.format(
+                strftime("%H:%M:%S"), meta_file))
+            d = getMetaInfo()
+            cfg = ConfigParser.ConfigParser()
+            sect_com = 'common'
+            cfg.add_section(sect_com)
+            cfg.set(sect_com, 'target', 'stock correlation analysis')
+            cfg.set(sect_com, 'time_step', str(max_step))
+            cfg.set(sect_com, 'time_shift', str(time_shift))
+            cfg.set(sect_com, 'features', ', '.join(map(str, feat_cols)))
+            feature_size = len(feat_cols) * 2 * (time_shift+1)
+            cfg.set(sect_com, 'feature_size', str(feature_size))
+            cfg.set(sect_com, 'structure',
+                    '[?, {}, {}]'.format(max_step, feature_size))
+            sect_test = 'test set'
+            cfg.add_section(sect_test)
+            cfg.set(sect_test, 'batch_size', str(d['test_bsize']))
+            cfg.set(sect_test, 'count', str(d['test_count']))
+            sect_train = 'training set'
+            cfg.add_section(sect_train)
+            cfg.set(sect_train, 'batch_size', str(d['train_bsize']))
+            cfg.set(sect_train, 'count', str(d['train_count']))
+            with open(meta_file, 'wb+') as f:
+                cfg.write(f)
         cnx = cnxpool.get_connection()
         cursor = None
+        rows = None
         try:
-            if not os.path.exists(dest):
-                try:
-                    os.makedirs(dest)
-                except OSError as exc:  # Guard against race condition
-                    if exc.errno != errno.EEXIST:
-                        raise
-            print('{} destination: {}'.format(strftime("%H:%M:%S"), dest))
-            # export meta file if not exists
-            meta_file = os.path.join(dest, 'meta.txt')
-            if not os.path.exists(meta_file):
-                print('{} writing meta info to {} ...'.format(
-                    strftime("%H:%M:%S"), meta_file))
-                d = getMetaInfo()
-                cfg = ConfigParser.ConfigParser()
-                sect_com = 'common'
-                cfg.add_section(sect_com)
-                cfg.set(sect_com, 'target', 'stock correlation analysis')
-                cfg.set(sect_com, 'time_step', str(max_step))
-                cfg.set(sect_com, 'time_shift', str(time_shift))
-                cfg.set(sect_com, 'features', ', '.join(map(str, feat_cols)))
-                feature_size = len(feat_cols) * 2 * (time_shift+1)
-                cfg.set(sect_com, 'feature_size', str(feature_size))
-                cfg.set(sect_com, 'structure',
-                        '[?, {}, {}]'.format(max_step, feature_size))
-                sect_test = 'test set'
-                cfg.add_section(sect_test)
-                cfg.set(sect_test, 'batch_size', str(d['test_bsize']))
-                cfg.set(sect_test, 'count', str(d['test_count']))
-                sect_train = 'training set'
-                cfg.add_section(sect_train)
-                cfg.set(sect_train, 'batch_size', str(d['train_bsize']))
-                cfg.set(sect_train, 'count', str(d['train_count']))
-                with open(meta_file, 'wb+') as f:
-                    cfg.write(f)
             print('{} fetching flags...'.format(strftime("%H:%M:%S")))
             query = "SELECT distinct flag, bno from wcc_trn where 1=1"
             if start is not None:
@@ -332,15 +333,20 @@ class WcTrainExporter:
             cursor.execute(query)
             rows = cursor.fetchall()
             total = cursor.rowcount
-            cursor.close()
             print('{} num flags: {}'.format(strftime("%H:%M:%S"), total))
-            exc = _getExecutor(int(multiprocessing.cpu_count()*0.7))
-            for flag, bno in rows:
-                exc.submit(_exp_wctrain, flag, bno, dest,
-                           feat_cols, max_step, time_shift, alt_dirs)
-            exc.shutdown()
         except:
             print(sys.exc_info()[0])
             raise
         finally:
-            cnx.close()
+            try:
+                if cursor is not None:
+                    cursor.close()
+                cnx.close()
+            except:
+                print("{} warn: failed to close mysql pool: {}".format(strftime("%H:%M:%S"), sys.exc_info()[0]))
+
+        exc = _getExecutor(int(multiprocessing.cpu_count()*0.7))
+        for flag, bno in rows:
+            exc.submit(_exp_wctrain, flag, bno, dest,
+                        feat_cols, max_step, time_shift, alt_dirs)
+        exc.shutdown()
