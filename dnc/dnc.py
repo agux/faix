@@ -62,7 +62,11 @@ class DNC(snt.RNNCore):
         super(DNC, self).__init__(name=name)
 
         with self._enter_variable_scope():
-            self._controller = snt.LSTM(**controller_config)
+            # self._controller = snt.LSTM(**controller_config)
+            self._controller = tf.contrib.rnn.LSTMBlockCell(
+                num_units=controller_config['hidden_size'],
+                use_peephole=True
+            )
             # self._controller = tf.contrib.cudnn_rnn.CudnnLSTM(
             #     num_layers=controller_config["num_layers"],
             #     num_units=controller_config["hidden_size"],
