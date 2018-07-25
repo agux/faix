@@ -28,34 +28,36 @@ def batch_invert_permutation(permutations):
         # unpacked = tf.unstack(permutations)
         # inverses = [tf.invert_permutation(permutation) for permutation in unpacked]
         # return tf.stack(inverses)
-        return tf.map_fn(
-            tf.invert_permutation,
-            permutations,
-            # back_prop=False,
-            parallel_iterations=64,
-            swap_memory=True)
 
-
-def gather(x):
-    return tf.gather(x[0], x[1])
+        # fix performance issue
+        dim = int(permutations.get_shape()[-1])
+        size = tf.cast(tf.shape(permutations)[0], tf.float32)
+        delta = tf.cast(tf.shape(permutations)[-1], tf.float32)
+        rg = tf.range(0, size*delta, delta, dtype=tf.float32)
+        rg = tf.reshape(rg, [-1, 1])
+        rg = tf.tile(rg, [1, dim])
+        perm = tf.add(permutations, rg)
+        flat = tf.reshape(perm, [-1])
+        perm = tf.invert_permutation(tf.cast(flat, tf.int32))
+        perm = tf.reshape(perm, [-1, dim])
+        return tf.subtract(perm, tf.cast(rg, tf.int32))
 
 
 def batch_gather(values, indices):
     """Returns batched `tf.gather` for every row in the input."""
     with tf.name_scope('batch_gather', values=[values, indices]):
-        return tf.stack(
-            tf.map_fn(gather,
-                      (values, indices),
-                      # map returns a structure of Tensors differing from that of elems, dtype is not optional
-                      dtype=tf.float32,
-                      # back_prop=False,
-                      parallel_iterations=64,
-                      swap_memory=True
-                      )
-        )
         # unpacked = zip(tf.unstack(values), tf.unstack(indices))
         # result = [tf.gather(value, index) for value, index in unpacked]
         # return tf.stack(result)
+        
+        # fix performance issue
+        indices_f = tf.cast(indices, tf.float32)
+        size = tf.shape(indices)[0]
+        idx1 = tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
+        r = list(tf.map_fn(lambda p: (
+            p[0], p[1]), (idx1, indices_f), dtype=(tf.float32, tf.float32)))
+        gidx = tf.stack(r, 1)
+        return tf.gather_nd(values, tf.cast(gidx, tf.int32))
 
 
 def one_hot(length, index):

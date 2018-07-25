@@ -180,6 +180,55 @@ def testCosDecay():
     with tf.Session() as sess:
         for i in range(100):
             print(sess.run([dlr], feed_dict={step: i+1000}))
+
+
+def testFoldl():
+    x_h = tf.placeholder(tf.int32, [None, 5])
+    x = np.array(
+        [[3, 4, 0, 2, 1],
+         [2, 4, 3, 0, 1]]
+    )
+    fd = tf.foldl(
+        lambda a, b: tf.stack(a, tf.invert_permutation(b)), x_h)
+    with tf.Session() as sess:
+        r = sess.run(fd, feed_dict={x_h: x})
+        print(r)
+
+
+def invert_permutation():
+    x_h = tf.placeholder(tf.float32, [None, 5])
+    x = np.array(
+        [[3, 4, 0, 2, 1],
+         [2, 1, 3, 4, 0]],
+        float
+    )
+    dim = int(x_h.get_shape()[-1])
+    size = tf.cast(tf.shape(x_h)[0], tf.float32)
+    delta = tf.cast(tf.shape(x_h)[-1], tf.float32)
+    rg = tf.range(0, size*delta, delta, dtype=tf.float32)
+    rg = tf.reshape(rg, [-1, 1])
+    rg = tf.tile(rg, [1, dim])
+    x_a = tf.add(x_h, rg)
+    flat = tf.reshape(x_a, [-1])
+    iperm = tf.invert_permutation(tf.cast(flat, tf.int32))
+    rs = tf.reshape(iperm, [-1, dim])
+    rs_f = tf.subtract(rs, tf.cast(rg, tf.int32))
+    with tf.Session() as sess:
+        r_rg = sess.run(rg, feed_dict={x_h: x})
+        print("rg:{}".format(r_rg))
+        r = sess.run(flat, feed_dict={x_h: x})
+        print(r)
+        r_rs = sess.run(rs_f, feed_dict={x_h: x})
+        print("final:\n{}".format(r_rs))
+        check = sess.run(tf.invert_permutation([2, 1, 3, 4, 0]))
+        print("check:\n{}".format(check))
+
+
+def dynamicShape():
+    x_h = tf.placeholder(tf.int32, [])
+    x_p = tf.placeholder(tf.int32, [None])
+    x_p.set_shape(tf.TensorShape([x_h]))
+
 # testGatherND()
 # testGetFileName()
 # print(__file__)
@@ -199,4 +248,7 @@ def testCosDecay():
 # testInversePerm()
 # testNestFlatten()
 # testCosDecay()
-testReduceProdCumprod()
+# testReduceProdCumprod()
+# testFoldl()
+# dynamicShape()
+invert_permutation()
