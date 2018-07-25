@@ -224,6 +224,42 @@ def invert_permutation():
         print("check:\n{}".format(check))
 
 
+def batch_gatcher():
+    values = tf.constant(
+        [[1, 2, 3, 4],
+         [5, 6, 7, 8]]
+    )
+    indices = tf.constant(
+        [[2, 3, 0, 1],
+         [3, 1, 2, 0]]
+    )
+    idxf = tf.cast(indices, tf.float32)
+    size = tf.shape(indices)[0]
+    rg = tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
+    rg = tf.expand_dims(rg, -1)
+    rg = tf.tile(rg, [1, int(indices.get_shape()[-1])])
+    rg = tf.expand_dims(rg, -1)
+    print("rg:{}".format(rg.get_shape()))
+    idxf = tf.expand_dims(idxf, -1)
+    print("idxf: {}".format(idxf.get_shape()))
+    gidx = tf.concat([rg, idxf], -1)
+    gidx = tf.cast(gidx, tf.int32)
+    # target gidx: (2,2,2)
+    # [[[0, 2], [0, 3], [0, 0], [0, 1]],
+    #  [[1, 3], [1, 1], [1, 2], [1, 0]]]
+    # target output:
+    # [[3 4 1 2]
+    # [8 6 7 5]]
+
+    gn = tf.gather_nd(values, gidx)
+    with tf.Session() as sess:
+        r_rg, ridx, r = sess.run([rg, gidx, gn])
+
+        print("r_rg:\n{}".format(r_rg))
+        print("ridx:\n{}".format(ridx))
+        print("r:\n{}".format(r))
+
+
 def dynamicShape():
     x_h = tf.placeholder(tf.int32, [])
     x_p = tf.placeholder(tf.int32, [None])
@@ -251,4 +287,5 @@ def dynamicShape():
 # testReduceProdCumprod()
 # testFoldl()
 # dynamicShape()
-invert_permutation()
+# invert_permutation()
+batch_gatcher()

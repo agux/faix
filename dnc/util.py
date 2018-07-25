@@ -52,20 +52,19 @@ def batch_gather(values, indices):
         # return tf.stack(result)
 
         # fix performance issue
-        idxf = tf.cast(indices, tf.float32)
+        idxf = tf.expand_dims(tf.cast(indices, tf.float32), -1)
         size = tf.shape(indices)[0]
-        idx1 = tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
-        idx1 = tf.expand_dims(idx1, -1)
-        r = list(tf.map_fn(lambda p: (
-            p[0], p[1]), (idx1, idxf), dtype=(tf.float32, tf.float32)))
-        gidx = tf.stack(r, 1)
-        return tf.gather_nd(values, tf.cast(gidx, tf.int32))
-
+        rg = tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
+        rg = tf.expand_dims(rg, -1)
+        rg = tf.tile(rg, [1, int(indices.get_shape()[-1])])
+        rg = tf.expand_dims(rg, -1)
+        gidx = tf.cast(tf.concat([rg, idxf], -1), tf.int32)
+        return tf.gather_nd(values, gidx)
 
 def one_hot(length, index):
     """Return an nd array of given `length` filled with 0s and a 1 at `index`."""
-    result = np.zeros(length)
-    result[index] = 1
+    result=np.zeros(length)
+    result[index]=1
     return result
 
 
@@ -75,11 +74,11 @@ def reduce_prod(x, axis, name=None):
     on CPU.
     '''
     with tf.variable_scope(name or "c_reduce_prod"):
-        cp = tf.cumprod(x, axis, reverse=True)
-        size = tf.shape(cp)[0]
-        idx1 = tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
-        idx2 = tf.zeros([size], tf.float32)
-        r = list(tf.map_fn(lambda p: (
+        cp=tf.cumprod(x, axis, reverse=True)
+        size=tf.shape(cp)[0]
+        idx1=tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
+        idx2=tf.zeros([size], tf.float32)
+        r=list(tf.map_fn(lambda p: (
             p[0], p[1]), (idx1, idx2), dtype=(tf.float32, tf.float32)))
-        indices = tf.stack(r, 1)
+        indices=tf.stack(r, 1)
         return tf.gather_nd(cp, tf.cast(indices, tf.int32))
