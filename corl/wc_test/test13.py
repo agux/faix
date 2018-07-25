@@ -190,12 +190,13 @@ def run(args):
             print('{} bno {} max_diff {:3.4f} predict {} actual {}'.format(
                 strftime("%H:%M:%S"), bno, max_diff, predict, actual))
             train_writer.add_summary(summary_str, bno)
-            test_writer.add_summary(test_summary_str, bno)
             if rm is not None:
                 train_writer.add_run_metadata(
                     rm, "bno_{}".format(bno))
             train_writer.flush()
-            test_writer.flush()
+            if test_summary_str is not None:
+                test_writer.add_summary(test_summary_str, bno)
+                test_writer.flush()
             if bno == 1 or bno % SAVE_INTERVAL == 0:
                 saver.save(sess, checkpoint_file,
                            global_step=tf.train.get_global_step())
