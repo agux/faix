@@ -92,6 +92,14 @@ class DNCRegressorV1:
         controller_config = {
             # "num_layers": self._num_layers,
             "hidden_size": self._layer_width,
+            "initializers": {
+                "w_gates": tf.variance_scaling_initializer(),
+                "b_gates": tf.constant_initializer(0.1),
+                "w_f_diag": tf.variance_scaling_initializer(),
+                "w_i_diag": tf.variance_scaling_initializer(),
+                "w_o_diag": tf.variance_scaling_initializer()
+            },
+            "use_peepholes": True
         }
         with tf.variable_scope("RNN"):
             dnc_core = dnc.DNC(access_config, controller_config,
@@ -103,9 +111,10 @@ class DNCRegressorV1:
                 cell=dnc_core,
                 inputs=inputs,
                 initial_state=initial_state,
-                dtype=tf.float32,  # If there is no initial_state, you must give a dtype
+                parallel_iterations=64,
+                # dtype=tf.float32,  # If there is no initial_state, you must give a dtype
                 # time_major=True,
-                swap_memory=True,
+                # swap_memory=True,
                 sequence_length=self.seqlen)
             # layer = tf.concat(layer, 1)
             # restore to batch major: [batch, time, feature]
