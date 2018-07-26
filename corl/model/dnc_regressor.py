@@ -120,7 +120,7 @@ class DNCRegressorV1:
                 cell=dnc_core,
                 inputs=inputs,
                 initial_state=initial_state,
-                parallel_iterations=64,
+                parallel_iterations=256,
                 # dtype=tf.float32,  # If there is no initial_state, you must give a dtype
                 # time_major=True,
                 # swap_memory=True,
