@@ -112,7 +112,8 @@ class DNC(snt.RNNCore):
         prev_access_state = prev_state.access_state
         prev_controller_state = prev_state.controller_state
 
-        batch_flatten = snt.BatchFlatten()
+        # batch_flatten = snt.BatchFlatten()
+        batch_flatten = tf.layers.Flatten()
         controller_input = tf.concat(
             [batch_flatten(inputs), batch_flatten(prev_access_output)], 1)
 

@@ -30,13 +30,13 @@ class DNCRegressorV1:
         self._num_reads = num_reads
         self._clip_value = clip_value
         self._max_grad_norm = max_grad_norm
-        self._keep_prob = keep_prob
+        self._kp = keep_prob
         self._decayed_dropout_start = decayed_dropout_start
         self._dropout_decay_steps = dropout_decay_steps
         self._lr = learning_rate
         self._decayed_lr_start = decayed_lr_start
         self._lr_decay_steps = lr_decay_steps
-        self._seed=seed
+        self._seed = seed
 
         self.keep_prob
         self.learning_rate
@@ -153,18 +153,18 @@ class DNCRegressorV1:
             gstep = tf.train.get_or_create_global_step()
 
             def kp():
-                return self._keep_prob*1.0
+                return tf.multiply(self._kp, 1.0)
 
             def cdr_kp():
-                return 1-tf.train.cosine_decay_restarts(
-                    learning_rate=1.0-self._keep_prob,
+                return 1.0-tf.train.cosine_decay_restarts(
+                    learning_rate=1.0-self._kp,
                     global_step=gstep-self._decayed_dropout_start,
                     first_decay_steps=self._dropout_decay_steps,
                     t_mul=1.05,
                     m_mul=0.98,
                     alpha=0.01
                 )
-            minv = self._keep_prob
+            minv = kp()
             if self._decayed_dropout_start is not None:
                 minv = tf.cond(
                     tf.less(gstep, self._decayed_dropout_start), kp, cdr_kp)
@@ -183,7 +183,7 @@ class DNCRegressorV1:
             gstep = tf.train.get_or_create_global_step()
 
             def tslr():
-                return self._lr*1.0
+                return tf.multiply(self._kp, 1.0)
 
             def cdr():
                 return tf.train.cosine_decay_restarts(
