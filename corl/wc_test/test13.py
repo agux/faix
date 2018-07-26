@@ -7,13 +7,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 import tensorflow as tf
 # pylint: disable-msg=E0401
 from model import dnc_regressor as dncr
-from wc_data import input_fn, input_bq, input_file
+from wc_data import input_fn, input_bq, input_file2
 from time import strftime
-from test11 import parseArgs, feat_cols, LOG_DIR, collect_summary, getInput
-import argparse
-import numpy as np
+from test11 import parseArgs, feat_cols, LOG_DIR, collect_summary
 import math
-import multiprocessing
 import shutil
 import random
 
@@ -30,13 +27,31 @@ MAX_STEP = 35
 TIME_SHIFT = 4
 KEEP_PROB = 0.5
 LEARNING_RATE = 1e-3
-DECAYED_LEARNING_RATE = 1e-4
-DECAYED_LR_START = 0.7
+LR_DECAY_STEPS = 1000
+DECAYED_LR_START = 30000
+DROPOUT_DECAY_STEPS = 1000
+DECAYED_DROPOUT_START = 30000
 SEED = 285139
 
 # pylint: disable-msg=E0601,E1101
 
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
+
+
+def getInput(start, args):
+    ds = args.ds.lower()
+    print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
+    if ds == 'db':
+        return input_fn.getInputs(
+            start, TIME_SHIFT, feat_cols, MAX_STEP, args.parallel,
+            args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
+    elif ds == 'bigquery':
+        return input_bq.getInputs(start, TIME_SHIFT, feat_cols, MAX_STEP, TEST_BATCH_SIZE,
+                                  vset=args.vset or VSET)
+    elif ds == 'file':
+        return input_file2.getInputs(
+            args.dir, start, args.prefetch, args.vset or VSET)
+    return None
 
 
 def validate(sess, model, summary, feed, bno, epoch):
@@ -67,9 +82,7 @@ def validate(sess, model, summary, feed, bno, epoch):
 def run(args):
     global bst_saver, bst_score, bst_file, bst_ckpt
     tf.logging.set_verbosity(tf.logging.INFO)
-    random.seed(SEED)
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
-    learning_rate = tf.placeholder(tf.float32, [], name="learning_rate")
     with tf.Session(config=tf.ConfigProto(
             log_device_placement=args.log_device,
             allow_soft_placement=True)) as sess:
@@ -80,7 +93,12 @@ def run(args):
             num_writes=NUM_WRITES,
             num_reads=NUM_READS,
             keep_prob=keep_prob,
-            learning_rate=learning_rate)
+            decayed_dropout_start=DECAYED_DROPOUT_START,
+            dropout_decay_steps=DROPOUT_DECAY_STEPS,
+            learning_rate=LEARNING_RATE,
+            decayed_lr_start=DECAYED_LR_START,
+            lr_decay_steps=LR_DECAY_STEPS,
+            seed=SEED)
         model_name = model.getName()
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
         f = __file__
@@ -152,7 +170,6 @@ def run(args):
         summary, train_writer, test_writer = collect_summary(
             sess, model, training_dir)
         test_summary_str = None
-        lr = LEARNING_RATE
         run_options, run_metadata = None, None
         if args.trace:
             print("{} full trace will be collected every {} run".format(
@@ -162,33 +179,31 @@ def run(args):
         while True:
             # bno = epoch*TEST_INTERVAL
             epoch = bno // TEST_INTERVAL
-            found_better = False
             if (restored or bno % TEST_INTERVAL == 0) and not (args.skip_init_test and bno == 0):
-                test_summary_str, found_better = validate(
+                test_summary_str, _ = validate(
                     sess, model, summary, {
-                        d['handle']: test_handle, keep_prob: 1, learning_rate: LEARNING_RATE},
+                        d['handle']: test_handle, keep_prob: 1.0},
                     bno, epoch)
                 restored = False
+            lr, kp = None, None
             try:
-                kp = min(1, random.uniform(KEEP_PROB, 1.05))
-                if bno > int(DECAYED_LR_START * bno) and lr != DECAYED_LEARNING_RATE and found_better:
-                    lr = DECAYED_LEARNING_RATE
-                print('{} training batch {}, random keep_prob:{}, learning_rate:{}'.format(
-                    strftime("%H:%M:%S"), bno+1, kp, lr))
+                print('{} training batch {}'.format(
+                    strftime("%H:%M:%S"), bno+1))
                 ro, rm = None, None
                 if run_options is not None and bno % TRACE_INTERVAL == 0:
                     ro, rm = run_options, run_metadata
-                summary_str, worst = sess.run(
-                    [summary, model.worst, model.optimize],
-                    {d['handle']: train_handle, keep_prob: kp, learning_rate: lr},
+                summary_str, kp, lr, worst = sess.run(
+                    [summary, model.keep_prob, model.learning_rate,
+                        model.worst, model.optimize],
+                    {d['handle']: train_handle, keep_prob: KEEP_PROB},
                     options=ro, run_metadata=rm)[:-1]
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
             bno = bno+1
             max_diff, predict, actual = worst[0], worst[1], worst[2]
-            print('{} bno {} max_diff {:3.4f} predict {} actual {}'.format(
-                strftime("%H:%M:%S"), bno, max_diff, predict, actual))
+            print('{} bno {} lr: {:1.6f}, kp: {:1.5f}, max_diff {:3.4f} predict {} actual {}'.format(
+                strftime("%H:%M:%S"), bno, lr, kp, max_diff, predict, actual))
             train_writer.add_summary(summary_str, bno)
             if rm is not None:
                 train_writer.add_run_metadata(
@@ -202,8 +217,8 @@ def run(args):
                            global_step=tf.train.get_global_step())
         # test last epoch
         test_summary_str, _ = validate(
-            sess, model, summary, {d['handle']: test_handle,
-                                   keep_prob: 1, learning_rate: LEARNING_RATE},
+            sess, model, summary,
+            {d['handle']: test_handle, keep_prob: 1.0},
             bno, epoch)
         train_writer.add_summary(summary_str, bno)
         test_writer.add_summary(test_summary_str, bno)

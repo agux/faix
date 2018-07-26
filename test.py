@@ -265,6 +265,8 @@ def dynamicShape():
     x_p = tf.placeholder(tf.int32, [None])
     x_p.set_shape(tf.TensorShape([x_h]))
 
+
+
 # testGatherND()
 # testGetFileName()
 # print(__file__)

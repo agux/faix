@@ -7,9 +7,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 import tensorflow as tf
 # pylint: disable-msg=E0401
 from model import drnn_regressor as drnn
-from wc_data import input_fn, input_bq, input_file2
 from time import strftime
 from test11 import parseArgs, feat_cols, LOG_DIR, collect_summary
+from test13 import getInput
 import math
 import shutil
 import random
@@ -25,28 +25,14 @@ DIM = 3
 KEEP_PROB = 0.5
 LEARNING_RATE = 1e-3
 LR_DECAY_STEPS = 1000
-DECAYED_LR_START = 35000
+DECAYED_LR_START = 30000
+DROPOUT_DECAY_STEPS = 1000
+DECAYED_DROPOUT_START = 30000
 SEED = 285139
 
 # pylint: disable-msg=E0601,E1101
 
 bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
-
-
-def getInput(start, args):
-    ds = args.ds.lower()
-    print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
-    if ds == 'db':
-        return input_fn.getInputs(
-            start, TIME_SHIFT, feat_cols, MAX_STEP, args.parallel,
-            args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset or VSET)
-    elif ds == 'bigquery':
-        return input_bq.getInputs(start, TIME_SHIFT, feat_cols, MAX_STEP, TEST_BATCH_SIZE,
-                                  vset=args.vset or VSET)
-    elif ds == 'file':
-        return input_file2.getInputs(
-            args.dir, start, args.prefetch, args.vset or VSET)
-    return None
 
 
 def validate(sess, model, summary, feed, bno, epoch):
@@ -76,16 +62,18 @@ def validate(sess, model, summary, feed, bno, epoch):
 def run(args):
     global bst_saver, bst_score, bst_file, bst_ckpt
     tf.logging.set_verbosity(tf.logging.INFO)
-    random.seed(SEED)
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
     with tf.Session(config=tf.ConfigProto(log_device_placement=args.log_device)) as sess:
         model = drnn.DRnnRegressorV7(
             layer_width=LAYER_WIDTH,
             dim=DIM,
             keep_prob=keep_prob,
+            decayed_dropout_start=DECAYED_DROPOUT_START,
+            dropout_decay_steps=DROPOUT_DECAY_STEPS,
             learning_rate=LEARNING_RATE,
             decayed_lr_start=DECAYED_LR_START,
-            lr_decay_steps=LR_DECAY_STEPS)
+            lr_decay_steps=LR_DECAY_STEPS,
+            seed=SEED)
         model_name = model.getName()
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
         f = __file__
@@ -163,23 +151,24 @@ def run(args):
             if restored or bno % TEST_INTERVAL == 0:
                 test_summary_str, _ = validate(
                     sess, model, summary,
-                    {d['handle']: test_handle, keep_prob: 1},
+                    {d['handle']: test_handle, keep_prob: 1.0},
                     bno, epoch)
                 restored = False
+            lr, kp = None, None
             try:
-                kp = min(1, random.uniform(KEEP_PROB, 1.05))
-                print('{} training batch {}, random keep_prob:{}'.format(
-                    strftime("%H:%M:%S"), bno+1, kp))
-                summary_str, lr, worst = sess.run(
-                    [summary, model.learning_rate, model.worst, model.optimize],
-                    {d['handle']: train_handle, keep_prob: kp})[:-1]
+                print('{} training batch {}'.format(
+                    strftime("%H:%M:%S"), bno+1))
+                summary_str, kp, lr, worst = sess.run(
+                    [summary, model.keep_prob, model.learning_rate,
+                        model.worst, model.optimize],
+                    {d['handle']: train_handle, keep_prob: KEEP_PROB})[:-1]
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
             bno = bno+1
             max_diff, predict, actual = worst[0], worst[1], worst[2]
-            print('{} bno {} lr: {:3.6f} max_diff {:3.4f} predict {} actual {}'.format(
-                strftime("%H:%M:%S"), bno, lr, max_diff, predict, actual))
+            print('{} bno {} lr: {:1.6f}, kp: {:1.5f}, max_diff {:3.4f} predict {} actual {}'.format(
+                strftime("%H:%M:%S"), bno, lr, kp, max_diff, predict, actual))
             train_writer.add_summary(summary_str, bno)
             test_writer.add_summary(test_summary_str, bno)
             train_writer.flush()
@@ -190,7 +179,8 @@ def run(args):
         # test last epoch
         test_summary_str, _ = validate(
             sess, model, summary,
-            {d['handle']: test_handle, keep_prob: 1}, bno, epoch)
+            {d['handle']: test_handle, keep_prob: 1.0},
+            bno, epoch)
         train_writer.add_summary(summary_str, bno)
         test_writer.add_summary(test_summary_str, bno)
         train_writer.flush()

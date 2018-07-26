@@ -21,7 +21,8 @@ class DNCRegressorV1:
 
     def __init__(self, layer_width=200, memory_size=16, word_size=16,
                  num_writes=1, num_reads=4, clip_value=20, max_grad_norm=50,
-                 keep_prob=None, learning_rate=1e-3):
+                 keep_prob=0.5, decayed_dropout_start=None, dropout_decay_steps=None,
+                 learning_rate=1e-3, decayed_lr_start=None, lr_decay_steps=None, seed=None):
         self._layer_width = layer_width
         self._memory_size = memory_size
         self._word_size = word_size
@@ -29,8 +30,16 @@ class DNCRegressorV1:
         self._num_reads = num_reads
         self._clip_value = clip_value
         self._max_grad_norm = max_grad_norm
-        self._learning_rate = learning_rate
         self._keep_prob = keep_prob
+        self._decayed_dropout_start = decayed_dropout_start
+        self._dropout_decay_steps = dropout_decay_steps
+        self._lr = learning_rate
+        self._decayed_lr_start = decayed_lr_start
+        self._lr_decay_steps = lr_decay_steps
+        self._seed=seed
+
+        self.keep_prob
+        self.learning_rate
 
     def setNodes(self, features, target, seqlen):
         self.data = features
@@ -76,7 +85,7 @@ class DNCRegressorV1:
                 )
                 if i == 1:
                     layer = tf.contrib.nn.alpha_dropout(
-                        layer, keep_prob=self._keep_prob)
+                        layer, keep_prob=self.keep_prob)
                 fsize = fsize // 2
         layer = tf.nn.selu(layer)
         return layer
@@ -139,6 +148,58 @@ class DNCRegressorV1:
             return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
 
     @lazy_property
+    def keep_prob(self):
+        with tf.variable_scope("keep_prob"):
+            gstep = tf.train.get_or_create_global_step()
+
+            def kp():
+                return self._keep_prob*1.0
+
+            def cdr_kp():
+                return 1-tf.train.cosine_decay_restarts(
+                    learning_rate=1.0-self._keep_prob,
+                    global_step=gstep-self._decayed_dropout_start,
+                    first_decay_steps=self._dropout_decay_steps,
+                    t_mul=1.05,
+                    m_mul=0.98,
+                    alpha=0.01
+                )
+            minv = self._keep_prob
+            if self._decayed_dropout_start is not None:
+                minv = tf.cond(
+                    tf.less(gstep, self._decayed_dropout_start), kp, cdr_kp)
+            rdu = tf.random_uniform(
+                [],
+                minval=minv,
+                maxval=1.02,
+                dtype=tf.float32,
+                seed=self._seed
+            )
+            return tf.minimum(1.0, rdu)
+
+    @lazy_property
+    def learning_rate(self):
+        with tf.variable_scope("learning_rate"):
+            gstep = tf.train.get_or_create_global_step()
+
+            def tslr():
+                return self._lr*1.0
+
+            def cdr():
+                return tf.train.cosine_decay_restarts(
+                    learning_rate=self._lr,
+                    global_step=gstep-self._decayed_lr_start,
+                    first_decay_steps=self._lr_decay_steps,
+                    t_mul=1.02,
+                    m_mul=0.95,
+                    alpha=0.095
+                )
+            if self._decayed_lr_start is None:
+                return tslr()
+            else:
+                return tf.cond(tf.less(gstep, self._decayed_lr_start), tslr, cdr)
+
+    @lazy_property
     def optimize(self):
         train_loss = self.cost
         with tf.name_scope("optimize"):
@@ -146,7 +207,7 @@ class DNCRegressorV1:
             trainable_variables = tf.trainable_variables()
             grads, _ = tf.clip_by_global_norm(
                 tf.gradients(train_loss, trainable_variables), self._max_grad_norm)
-            optimizer = tf.train.AdamOptimizer(self._learning_rate)
+            optimizer = tf.train.AdamOptimizer(self.learning_rate)
             train_step = optimizer.apply_gradients(
                 zip(grads, trainable_variables), global_step=tf.train.get_or_create_global_step())
             return train_step
