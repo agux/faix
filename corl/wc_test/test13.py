@@ -15,6 +15,7 @@ import shutil
 import random
 
 VSET = 9
+TEST_BATCH_SIZE = 3000
 TEST_INTERVAL = 50
 TRACE_INTERVAL = 100
 SAVE_INTERVAL = 20
