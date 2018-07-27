@@ -398,13 +398,13 @@ class Freeness(snt.RNNCore):
         with tf.name_scope('allocation'):
             with tf.device("/gpu:0"):
                 # Ensure values are not too small prior to cumprod.
-                usage = _EPSILON + (1 - _EPSILON) * usage
+                usage = _EPSILON + (1.0 - _EPSILON) * usage
 
-                nonusage = 1 - usage
+                nonusage = 1.0 - usage
                 # FIXME top_k runs on CPU in tf v1.9
                 sorted_nonusage, indices = tf.nn.top_k(
                     nonusage, k=self._memory_size, name='sort')
-                sorted_usage = 1 - sorted_nonusage
+                sorted_usage = 1.0 - sorted_nonusage
                 prod_sorted_usage = tf.cumprod(
                     sorted_usage, axis=1, exclusive=True)
                 sorted_allocation = sorted_nonusage * prod_sorted_usage

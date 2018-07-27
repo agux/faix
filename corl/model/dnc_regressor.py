@@ -120,7 +120,7 @@ class DNCRegressorV1:
                 cell=dnc_core,
                 inputs=inputs,
                 initial_state=initial_state,
-                parallel_iterations=256,
+                # parallel_iterations=256,
                 # dtype=tf.float32,  # If there is no initial_state, you must give a dtype
                 # time_major=True,
                 # swap_memory=True,
@@ -183,7 +183,7 @@ class DNCRegressorV1:
             gstep = tf.train.get_or_create_global_step()
 
             def tslr():
-                return tf.multiply(self._kp, 1.0)
+                return tf.multiply(self._lr, 1.0)
 
             def cdr():
                 return tf.train.cosine_decay_restarts(
