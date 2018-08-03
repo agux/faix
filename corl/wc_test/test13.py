@@ -80,7 +80,7 @@ def validate(sess, model, summary, feed, bno, epoch):
     return test_summary_str, found_better
 
 
-def run(args):
+def run(args, pctx=None, profile_opts=None):
     global bst_saver, bst_score, bst_file, bst_ckpt
     tf.logging.set_verbosity(tf.logging.INFO)
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
@@ -193,11 +193,19 @@ def run(args):
                 ro, rm = None, None
                 if run_options is not None and bno % TRACE_INTERVAL == 0:
                     ro, rm = run_options, run_metadata
+                if pctx is not None and bno+1 >= 15 and bno+1 <= 20:
+                    # Enable tracing for next session.run.
+                    pctx.trace_next_step()
+                    if bno+1 == 20:
+                        # Dump the profile to '/tmp/train_dir' after the step.
+                        pctx.dump_next_step()
                 summary_str, kp, lr, worst = sess.run(
                     [summary, model.keep_prob, model.learning_rate,
                         model.worst, model.optimize],
                     {d['handle']: train_handle, keep_prob: KEEP_PROB},
                     options=ro, run_metadata=rm)[:-1]
+                if pctx is not None and bno+1 == 20:
+                    pctx.profiler.profile_operations(options=profile_opts)
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
@@ -242,11 +250,11 @@ if __name__ == '__main__':
     args = parseArgs()
     if args.profile:
         builder = tf.profiler.ProfileOptionBuilder
-        opts = builder(builder.time_and_memory()).order_by('micros').build()
+        profile_opts = builder(builder.time_and_memory()
+                               ).order_by('micros').build()
         with tf.contrib.tfprof.ProfileContext(os.path.join(LOG_DIR, "profile"),
-                                      trace_steps=range(10, 20),
-                                      dump_steps=[20]) as pctx:
-            pctx.add_auto_profiling('op', opts, [15, 18, 20])
-            run(args)
+                                              trace_steps=[],
+                                              dump_steps=[]) as pctx:
+            run(args, pctx, profile_opts)
     else:
         run(args)
