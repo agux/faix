@@ -252,7 +252,9 @@ if __name__ == '__main__':
         builder = tf.profiler.ProfileOptionBuilder
         profile_opts = builder(builder.time_and_memory()
                                ).order_by('micros').build()
-        with tf.contrib.tfprof.ProfileContext(os.path.join(LOG_DIR, "profile"),
+        path = os.path.join(LOG_DIR, "profile")
+        tf.gfile.MakeDirs(path)
+        with tf.contrib.tfprof.ProfileContext(path,
                                               trace_steps=[],
                                               dump_steps=[]) as pctx:
             run(args, pctx, profile_opts)
