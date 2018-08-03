@@ -80,7 +80,7 @@ def validate(sess, model, summary, feed, bno, epoch):
     return test_summary_str, found_better
 
 
-def run(args, pctx=None, profile_opts=None):
+def run(args):
     global bst_saver, bst_score, bst_file, bst_ckpt
     tf.logging.set_verbosity(tf.logging.INFO)
     keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
@@ -104,7 +104,8 @@ def run(args, pctx=None, profile_opts=None):
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
         f = __file__
         testn = f[f.rfind('/')+1:f.rindex('.py')]
-        base_dir = '{}/{}_{}'.format(LOG_DIR, testn, model_name)
+        base_name = "{}_{}".format(testn, model_name)
+        base_dir = '{}/{}'.format(LOG_DIR, base_name)
         training_dir = os.path.join(base_dir, 'training')
         checkpoint_file = os.path.join(training_dir, 'model.ckpt')
         bst_ckpt = os.path.join(base_dir, 'best', 'model.ckpt')
@@ -170,6 +171,8 @@ def run(args, pctx=None, profile_opts=None):
 
         summary, train_writer, test_writer = collect_summary(
             sess, model, training_dir)
+        profiler = None
+        profile_path = None
         test_summary_str = None
         run_options, run_metadata = None, None
         if args.trace:
@@ -177,6 +180,10 @@ def run(args, pctx=None, profile_opts=None):
                 strftime("%H:%M:%S"), TRACE_INTERVAL))
             run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
             run_metadata = tf.RunMetadata()
+        if args.profile:
+            profiler = tf.profiler.Profiler(sess.graph)
+            profile_path = os.path.join(LOG_DIR, "profile")
+            tf.gfile.MakeDirs(profile_path)
         while True:
             # bno = epoch*TEST_INTERVAL
             epoch = bno // TEST_INTERVAL
@@ -193,19 +200,30 @@ def run(args, pctx=None, profile_opts=None):
                 ro, rm = None, None
                 if run_options is not None and bno % TRACE_INTERVAL == 0:
                     ro, rm = run_options, run_metadata
-                if pctx is not None and bno+1 >= 5 and bno+1 <= 10:
-                    # Enable tracing for next session.run.
-                    pctx.trace_next_step()
-                    if bno+1 == 10:
-                        # Dump the profile after the step.
-                        pctx.dump_next_step()
                 summary_str, kp, lr, worst = sess.run(
                     [summary, model.keep_prob, model.learning_rate,
                         model.worst, model.optimize],
                     {d['handle']: train_handle, keep_prob: KEEP_PROB},
                     options=ro, run_metadata=rm)[:-1]
-                if pctx is not None and bno+1 == 10:
-                    pctx.profiler.profile_operations(options=profile_opts)
+                if profiler is not None and bno+1 >= 5 and bno+1 <= 10:
+                    profiler.add_step(bno+1, rm)
+                    if bno+1 == 10:
+                        option_builder = tf.profiler.ProfileOptionBuilder
+                        # profile timing of model operations
+                        opts = (option_builder(option_builder.time_and_memory()).
+                                with_file_output(os.path.join(profile_path, "{}.txt".format(base_name))).
+                                order_by('micros').
+                                build())
+                        profiler.profile_operations(options=opts)
+                        # generate timeline graph
+                        opts = (option_builder.ProfileOptionBuilder(
+                                option_builder.ProfileOptionBuilder.time_and_memory())
+                                .with_step(bno+1)
+                                .with_timeline_output(os.path.join(profile_path, "{}_timeline.json".format(base_name)))
+                                .build())
+                        profiler.profile_graph(options=opts)
+                        # Auto detect problems and generate advice.
+                        profiler.advise()
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
@@ -248,15 +266,4 @@ def run(args, pctx=None, profile_opts=None):
 
 if __name__ == '__main__':
     args = parseArgs()
-    if args.profile:
-        builder = tf.profiler.ProfileOptionBuilder
-        profile_opts = builder(builder.time_and_memory()
-                               ).order_by('micros').build()
-        path = os.path.join(LOG_DIR, "profile")
-        tf.gfile.MakeDirs(path)
-        with tf.contrib.tfprof.ProfileContext(path,
-                                              trace_steps=[],
-                                              dump_steps=[]) as pctx:
-            run(args, pctx, profile_opts)
-    else:
-        run(args)
+    run(args)
