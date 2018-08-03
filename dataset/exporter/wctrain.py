@@ -167,13 +167,18 @@ def _write_file(file_path, payload):
             payload, separators=(',', ':')).encode('utf-8'))
 
 
-def _exp_wctrain(flag, bno, dest, feat_cols, max_step, time_shift, alt_dirs):
+def _exp_wctrain(flag, bno, dest, feat_cols, max_step, time_shift, vol_size, alt_dirs):
     global cnxpool
     vflag = flag
     if flag == 'TR':
         vflag = 'TRAIN'
     elif flag == 'TS':
         vflag = 'TEST'
+    volf = ""
+    if vol_size is not None:
+        volf = "vol_{}".format(bno // vol_size)
+        dest = os.path.join(dest, volf)
+        _makedirs(dest)
     file_path = os.path.join(dest, "{}_{}.json.gz".format(vflag, bno))
     tmpf_path = os.path.join(dest, "{}_{}.json.tmp".format(vflag, bno))
     if os.path.exists(file_path):
@@ -183,9 +188,11 @@ def _exp_wctrain(flag, bno, dest, feat_cols, max_step, time_shift, alt_dirs):
     else:
         if alt_dirs is not None:
             for d in alt_dirs:
-                if os.path.exists(file_path):
-                    print('{} {} {} file already exists, skipping'.format(
-                        strftime("%H:%M:%S"), flag, bno))
+                path = os.path.join(
+                    d, volf, "{}_{}.json.gz".format(vflag, bno))
+                if os.path.exists(path):
+                    print('{} file {} already exists, skipping'.format(
+                        strftime("%H:%M:%S"), path))
                     return os.getpid()
 
     print('{} loading {}, {}...'.format(strftime("%H:%M:%S"), flag, bno))
@@ -261,6 +268,15 @@ def getMetaInfo():
         cnx.close()
 
 
+def _makedirs(dest):
+    if not os.path.exists(dest):
+        try:
+            os.makedirs(dest)
+        except OSError as exc:  # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
+
+
 class WcTrainExporter:
 
     def __init__(self, cpool):
@@ -272,6 +288,7 @@ class WcTrainExporter:
         feat_cols = args.fields
         start = args.start
         end = args.end
+        vol_size = args.vol_size
         flags = args.flags
         max_step = int(args.options[0])
         time_shift = int(args.options[1])
@@ -280,12 +297,7 @@ class WcTrainExporter:
         print('{} feat_cols: {}'.format(strftime("%H:%M:%S"), feat_cols))
         print('{} max_step: {}'.format(strftime("%H:%M:%S"), max_step))
         print('{} time_shift: {}'.format(strftime("%H:%M:%S"), time_shift))
-        if not os.path.exists(dest):
-            try:
-                os.makedirs(dest)
-            except OSError as exc:  # Guard against race condition
-                if exc.errno != errno.EEXIST:
-                    raise
+        _makedirs(dest)
         print('{} destination: {}'.format(strftime("%H:%M:%S"), dest))
         # export meta file if not exists
         meta_file = os.path.join(dest, 'meta.txt')
@@ -328,7 +340,8 @@ class WcTrainExporter:
                 query += " and flag in ({})".format(
                     ",".join(["'{}'".format(f) for f in flags]))
             query += " order by bno"
-            print("{} constructed query: {}".format(strftime("%H:%M:%S"), query))
+            print("{} constructed query: {}".format(
+                strftime("%H:%M:%S"), query))
             cursor = cnx.cursor(buffered=True)
             cursor.execute(query)
             rows = cursor.fetchall()
@@ -343,10 +356,11 @@ class WcTrainExporter:
                     cursor.close()
                 cnx.close()
             except:
-                print("{} warn: failed to close mysql pool: {}".format(strftime("%H:%M:%S"), sys.exc_info()[0]))
+                print("{} warn: failed to close mysql pool: {}".format(
+                    strftime("%H:%M:%S"), sys.exc_info()[0]))
 
         exc = _getExecutor(int(multiprocessing.cpu_count()*0.7))
         for flag, bno in rows:
             exc.submit(_exp_wctrain, flag, bno, dest,
-                        feat_cols, max_step, time_shift, alt_dirs)
+                       feat_cols, max_step, time_shift, vol_size, alt_dirs)
         exc.shutdown()

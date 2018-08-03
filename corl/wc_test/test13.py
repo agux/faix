@@ -17,7 +17,7 @@ import random
 VSET = 9
 TEST_BATCH_SIZE = 3000
 TEST_INTERVAL = 50
-TRACE_INTERVAL = 100
+TRACE_INTERVAL = 20
 SAVE_INTERVAL = 20
 LAYER_WIDTH = 256
 MEMORY_SIZE = 16
@@ -51,7 +51,7 @@ def getInput(start, args):
                                   vset=args.vset or VSET)
     elif ds == 'file':
         return input_file2.getInputs(
-            args.dir, start, args.prefetch, args.vset or VSET)
+            args.dir, start, args.prefetch, args.vset or VSET, args.vol_size)
     return None
 
 
@@ -240,4 +240,13 @@ def run(args):
 
 if __name__ == '__main__':
     args = parseArgs()
-    run(args)
+    if args.profile:
+        builder = tf.profiler.ProfileOptionBuilder
+        opts = builder(builder.time_and_memory()).order_by('micros').build()
+        with tf.contrib.tfprof.ProfileContext(os.path.join(LOG_DIR, "profile"),
+                                      trace_steps=range(10, 20),
+                                      dump_steps=[20]) as pctx:
+            pctx.add_auto_profiling('op', opts, [15, 18, 20])
+            run(args)
+    else:
+        run(args)

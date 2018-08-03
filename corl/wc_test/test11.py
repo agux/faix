@@ -59,10 +59,12 @@ def parseArgs():
                         default=multiprocessing.cpu_count())
     parser.add_argument('--start', type=int, help='start training at specified batch no',
                         default=None)
+    parser.add_argument('--vol_size', type=int, help='volume size for the dataset storage sub-folder',
+                        default=None)
     parser.add_argument('--trace', dest='trace', action='store_true',
                         help='record full trace in validation step.')
-    parser.add_argument('--timeline', dest='timeline', action='store_true',
-                        help='record execution timeline in a json file.')
+    parser.add_argument('--profile', dest='profile', action='store_true',
+                        help='profile CG execution.')
     parser.add_argument('--skip_init_test', dest='skip_init_test', action='store_true',
                         help='whether to skip the initial test.')
     parser.add_argument('--log_device', dest='log_device', action='store_true',

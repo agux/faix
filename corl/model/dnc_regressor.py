@@ -149,9 +149,8 @@ class DNCRegressorV1:
 
     @lazy_property
     def keep_prob(self):
+        gstep = tf.train.get_or_create_global_step()
         with tf.variable_scope("keep_prob"):
-            gstep = tf.train.get_or_create_global_step()
-
             def kp():
                 return tf.multiply(self._kp, 1.0)
 
@@ -179,9 +178,8 @@ class DNCRegressorV1:
 
     @lazy_property
     def learning_rate(self):
+        gstep = tf.train.get_or_create_global_step()
         with tf.variable_scope("learning_rate"):
-            gstep = tf.train.get_or_create_global_step()
-
             def tslr():
                 return tf.multiply(self._lr, 1.0)
 

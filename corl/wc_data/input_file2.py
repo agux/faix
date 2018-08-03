@@ -15,6 +15,7 @@ import ConfigParser
 import tempfile as tmpf
 
 file_dir = None
+vol_size = None
 gcs_client = None
 
 
@@ -63,21 +64,28 @@ def _loadData(file_dir, flag):
 
 
 def _loadTestSet(max_bno, vset=None):
-    global file_dir
+    global file_dir, vol_size
     if vset is None:
         vset = np.random.randint(max_bno)
     flag = 'TEST_{}'.format(vset)
     print('{} selected test set: {}'.format(
         strftime("%H:%M:%S"), flag))
-    data = _loadData(file_dir, flag)
+    path = file_dir
+    if vol_size is not None:
+        path = "{}/vol_{}".format(file_dir, vset//vol_size)
+    data = _loadData(path, flag)
     return np.array(data['features'], 'f'), np.array(data['labels'], 'f'), np.array(data['seqlens'], 'i')
 
 
 def _loadBatchData(flag):
-    global file_dir
+    global file_dir, vol_size
     print("{} loading dataset {}...".format(
         strftime("%H:%M:%S"), flag))
-    data = _loadData(file_dir, flag)
+    path = file_dir
+    if vol_size is not None:
+        bno = int(flag[flag.rfind("_")+1:])
+        path = "{}/vol_{}".format(file_dir, bno//vol_size)
+    data = _loadData(path, flag)
     return np.array(data['features'], 'f'), np.array(data['labels'], 'f'), np.array(data['seqlens'], 'i')
 
 
@@ -110,15 +118,16 @@ def _map_func(flag):
     return tuple(tf.py_func(_loadBatchData, [flag], [tf.float32, tf.float32, tf.int32]))
 
 
-def getInputs(path, start=0, prefetch=2, vset=None):
+def getInputs(path, start=0, prefetch=2, vset=None, volsize=None):
     """Input function for the wcc training dataset.
 
     Returns:
         A dictionary containing:
         features,labels,seqlens,handle,train_iter,test_iter,infer_iter
     """
-    global file_dir
+    global file_dir, vol_size
     file_dir = path
+    vol_size = volsize
     print("{} loading file from: {} Start from: {} Using prefetch: {}".format(
         strftime("%H:%M:%S"), file_dir, start, prefetch))
     # read meta.txt from file_dir
