@@ -17,7 +17,7 @@ import random
 VSET = 9
 TEST_BATCH_SIZE = 3000
 TEST_INTERVAL = 50
-TRACE_INTERVAL = 20
+TRACE_INTERVAL = 1
 SAVE_INTERVAL = 20
 LAYER_WIDTH = 256
 MEMORY_SIZE = 16
@@ -193,18 +193,18 @@ def run(args, pctx=None, profile_opts=None):
                 ro, rm = None, None
                 if run_options is not None and bno % TRACE_INTERVAL == 0:
                     ro, rm = run_options, run_metadata
-                if pctx is not None and bno+1 >= 15 and bno+1 <= 20:
+                if pctx is not None and bno+1 >= 5 and bno+1 <= 10:
                     # Enable tracing for next session.run.
                     pctx.trace_next_step()
-                    if bno+1 == 20:
-                        # Dump the profile to '/tmp/train_dir' after the step.
+                    if bno+1 == 10:
+                        # Dump the profile after the step.
                         pctx.dump_next_step()
                 summary_str, kp, lr, worst = sess.run(
                     [summary, model.keep_prob, model.learning_rate,
                         model.worst, model.optimize],
                     {d['handle']: train_handle, keep_prob: KEEP_PROB},
                     options=ro, run_metadata=rm)[:-1]
-                if pctx is not None and bno+1 == 20:
+                if pctx is not None and bno+1 == 10:
                     pctx.profiler.profile_operations(options=profile_opts)
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
