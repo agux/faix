@@ -223,7 +223,10 @@ def run(args):
                                 .build())
                         profiler.profile_graph(options=opts)
                         # Auto detect problems and generate advice.
-                        profiler.advise()
+                        opts = (option_builder(option_builder.time_and_memory()).
+                                with_file_output(os.path.join(profile_path, "{}_advise.txt".format(base_name))).
+                                build())
+                        profiler.advise(options=opts)
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
