@@ -78,7 +78,8 @@ def reduce_prod(x, axis, name=None):
         size=tf.shape(cp)[0]
         idx1=tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
         idx2=tf.zeros([size], tf.float32)
-        r=list(tf.map_fn(lambda p: (
-            p[0], p[1]), (idx1, idx2), dtype=(tf.float32, tf.float32)))
-        indices=tf.stack(r, 1)
+        # r=list(tf.map_fn(lambda p: (
+        #     p[0], p[1]), (idx1, idx2), dtype=(tf.float32, tf.float32)))
+        # indices=tf.stack(r, 1)
+        indices = tf.stack([idx1, idx2], 1)
         return tf.gather_nd(cp, tf.cast(indices, tf.int32))
