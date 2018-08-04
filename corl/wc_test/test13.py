@@ -210,15 +210,17 @@ def run(args):
                         option_builder = tf.profiler.ProfileOptionBuilder
                         # profile timing of model operations
                         opts = (option_builder(option_builder.time_and_memory())
-                                .with_file_output(os.path.join(profile_path, "{}_ops.txt".format(base_name)))
                                 .with_step(-1)
+                                .with_file_output(os.path.join(profile_path, "{}_ops.txt".format(base_name)))
+                                .select(['micros','bytes','occurrence'])
                                 .order_by('micros')
                                 .build())
                         profiler.profile_operations(options=opts)
                         # profile timing by model name scope
                         opts = (option_builder(option_builder.time_and_memory())
-                                .with_file_output(os.path.join(profile_path, "{}_scope.txt".format(base_name)))
                                 .with_step(-1)
+                                .with_file_output(os.path.join(profile_path, "{}_scope.txt".format(base_name)))
+                                .select(['micros','bytes','occurrence'])
                                 .order_by('micros')
                                 .build())
                         profiler.profile_name_scope(options=opts)
