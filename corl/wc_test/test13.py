@@ -174,12 +174,9 @@ def run(args):
         profiler = None
         profile_path = None
         test_summary_str = None
-        run_options, run_metadata = None, None
         if args.trace:
             print("{} full trace will be collected every {} run".format(
                 strftime("%H:%M:%S"), TRACE_INTERVAL))
-            run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-            run_metadata = tf.RunMetadata()
         if args.profile:
             profiler = tf.profiler.Profiler(sess.graph)
             profile_path = os.path.join(LOG_DIR, "profile")
@@ -198,8 +195,10 @@ def run(args):
                 print('{} training batch {}'.format(
                     strftime("%H:%M:%S"), bno+1))
                 ro, rm = None, None
-                if run_options is not None and bno % TRACE_INTERVAL == 0:
-                    ro, rm = run_options, run_metadata
+                # if run_options is not None and bno % TRACE_INTERVAL == 0:
+                if (args.trace or args.profile) and bno+1 >= 5 and bno+1 <= 10:
+                    ro = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+                    rm = tf.RunMetadata()
                 summary_str, kp, lr, worst = sess.run(
                     [summary, model.keep_prob, model.learning_rate,
                         model.worst, model.optimize],
@@ -210,23 +209,30 @@ def run(args):
                     if bno+1 == 10:
                         option_builder = tf.profiler.ProfileOptionBuilder
                         # profile timing of model operations
-                        opts = (option_builder(option_builder.time_and_memory()).
-                                with_file_output(os.path.join(profile_path, "{}.txt".format(base_name))).
-                                order_by('micros').
-                                build())
+                        opts = (option_builder(option_builder.time_and_memory())
+                                .with_file_output(os.path.join(profile_path, "{}_ops.txt".format(base_name)))
+                                .with_step(-1)
+                                .order_by('micros')
+                                .build())
                         profiler.profile_operations(options=opts)
+                        # profile timing by model name scope
+                        opts = (option_builder(option_builder.time_and_memory())
+                                .with_file_output(os.path.join(profile_path, "{}_scope.txt".format(base_name)))
+                                .with_step(-1)
+                                .order_by('micros')
+                                .build())
+                        profiler.profile_name_scope(options=opts)
                         # generate timeline graph
-                        opts = (option_builder.ProfileOptionBuilder(
-                                option_builder.ProfileOptionBuilder.time_and_memory())
+                        opts = (option_builder(option_builder.time_and_memory())
                                 .with_step(bno+1)
                                 .with_timeline_output(os.path.join(profile_path, "{}_timeline.json".format(base_name)))
                                 .build())
                         profiler.profile_graph(options=opts)
                         # Auto detect problems and generate advice.
-                        opts = (option_builder(option_builder.time_and_memory()).
-                                with_file_output(os.path.join(profile_path, "{}_advise.txt".format(base_name))).
-                                build())
-                        profiler.advise(options=opts)
+                        # opts = (option_builder(option_builder.time_and_memory()).
+                        #         with_file_output(os.path.join(profile_path, "{}_advise.txt".format(base_name))).
+                        #         build())
+                        # profiler.advise(options=opts)
             except tf.errors.OutOfRangeError:
                 print("End of Dataset.")
                 break
