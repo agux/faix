@@ -258,5 +258,6 @@ def run(args):
 
 
 if __name__ == '__main__':
+    print("{} started training, pid:{}".format(strftime("%H:%M:%S"), os.getpid()))
     args = parseArgs()
     run(args)
