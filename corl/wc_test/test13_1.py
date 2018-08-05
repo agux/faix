@@ -66,6 +66,8 @@ def validate(sess, model, summary, feed, bno, epoch):
 
 def run(args):
     global bst_saver, bst_score, bst_file, bst_ckpt
+    print("{} started training, pid:{}".format(
+        strftime("%H:%M:%S"), os.getpid()))
     tf.logging.set_verbosity(tf.logging.INFO)
     keep_prob = tf.placeholder(tf.float32, [], name="kprob")
     with tf.Session(config=tf.ConfigProto(
@@ -194,7 +196,7 @@ def run(args):
                         opts = (option_builder(option_builder.time_and_memory())
                                 .with_step(-1)
                                 .with_file_output(os.path.join(profile_path, "{}_ops.txt".format(base_name)))
-                                .select(['micros','bytes','occurrence'])
+                                .select(['micros', 'bytes', 'occurrence'])
                                 .order_by('micros')
                                 .build())
                         profiler.profile_operations(options=opts)
@@ -202,7 +204,7 @@ def run(args):
                         opts = (option_builder(option_builder.time_and_memory())
                                 .with_step(-1)
                                 .with_file_output(os.path.join(profile_path, "{}_scope.txt".format(base_name)))
-                                .select(['micros','bytes','occurrence'])
+                                .select(['micros', 'bytes', 'occurrence'])
                                 .order_by('micros')
                                 .build())
                         profiler.profile_name_scope(options=opts)
@@ -258,6 +260,5 @@ def run(args):
 
 
 if __name__ == '__main__':
-    print("{} started training, pid:{}".format(strftime("%H:%M:%S"), os.getpid()))
     args = parseArgs()
     run(args)
