@@ -123,7 +123,7 @@ class DNCRegressorV1:
                 # parallel_iterations=256,
                 # dtype=tf.float32,  # If there is no initial_state, you must give a dtype
                 # time_major=True,
-                # swap_memory=True,
+                swap_memory=True,
                 sequence_length=self.seqlen)
             # layer = tf.concat(layer, 1)
             # restore to batch major: [batch, time, feature]
