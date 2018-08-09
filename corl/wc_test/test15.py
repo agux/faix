@@ -74,16 +74,18 @@ def run(args):
         strftime("%H:%M:%S"), os.getpid()))
     tf.logging.set_verbosity(tf.logging.INFO)
     keep_prob = tf.placeholder(tf.float32, [], name="kprob")
-    with tf.Session(config=tf.ConfigProto(
-            log_device_placement=args.log_device,
-            allow_soft_placement=True)) as sess:
+    config = tf.ConfigProto(
+        log_device_placement=args.log_device,
+        allow_soft_placement=True)
+    config.gpu_options.allow_growth = True
+    with tf.Session(config=config) as sess:
         model = dncr.DNCRegressorV2(
             layer_width=LAYER_WIDTH,
             memory_size=MEMORY_SIZE,
             word_size=WORD_SIZE,
             num_writes=NUM_WRITES,
             num_reads=NUM_READS,
-            clip_value=CLIP_VALUE, 
+            clip_value=CLIP_VALUE,
             max_grad_norm=MAX_GRAD_NORM,
             keep_prob=keep_prob,
             decayed_dropout_start=DECAYED_DROPOUT_START,
