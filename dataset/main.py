@@ -24,6 +24,8 @@ def parseArgs():
     parser.add_argument('--end', type=int, help='export sets ending with the specified batch number.',
                         default=None)
     parser.add_argument('--vol_size', type=int, help='volume size of each sub-folder in the destination folder.',
+                        default=None)
+    parser.add_argument('--parallel', type=int, help='parallelization level.',
                         default=None)                        
     parser.add_argument('options', nargs=argparse.REMAINDER)
     return parser.parse_args()

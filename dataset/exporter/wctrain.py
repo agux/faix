@@ -359,7 +359,8 @@ class WcTrainExporter:
                 print("{} warn: failed to close mysql pool: {}".format(
                     strftime("%H:%M:%S"), sys.exc_info()[0]))
 
-        exc = _getExecutor(int(multiprocessing.cpu_count()*0.7))
+        exc = _getExecutor(args.parallel or int(
+            multiprocessing.cpu_count()*0.7))
         for flag, bno in rows:
             exc.submit(_exp_wctrain, flag, bno, dest,
                        feat_cols, max_step, time_shift, vol_size, alt_dirs)

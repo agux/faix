@@ -265,7 +265,18 @@ def dynamicShape():
     x_p = tf.placeholder(tf.int32, [None])
     x_p.set_shape(tf.TensorShape([x_h]))
 
-
+def reshape():
+    c = tf.constant(
+        [[2, 3, 4, 1],
+         [3, 7, 5, 2]]
+    )
+    c = tf.reduce_prod(c)
+    c1 = tf.reshape(c, [1])
+    c2 = [tf.reduce_prod(c)]
+    with tf.Session() as sess:
+        out = sess.run([c1,c2])
+        print(out[0])
+        print(out[1])
 
 # testGatherND()
 # testGetFileName()
@@ -290,4 +301,5 @@ def dynamicShape():
 # testFoldl()
 # dynamicShape()
 # invert_permutation()
-batch_gatcher()
+# batch_gatcher()
+reshape()
