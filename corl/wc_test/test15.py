@@ -21,9 +21,10 @@ TEST_BATCH_SIZE = 3000
 TEST_INTERVAL = 50
 TRACE_INTERVAL = 10
 SAVE_INTERVAL = 20
+PARALLEL_ITERATIONS = 1
 LAYER_WIDTH = 512
-MEMORY_SIZE = 128
-WORD_SIZE = 128
+MEMORY_SIZE = 64
+WORD_SIZE = 64
 NUM_WRITES = 4
 NUM_READS = 16
 CLIP_VALUE = 50
@@ -94,7 +95,7 @@ def run(args):
             decayed_lr_start=DECAYED_LR_START,
             lr_decay_steps=LR_DECAY_STEPS,
             seed=SEED,
-            gdck='speed')
+            parallel_iterations=PARALLEL_ITERATIONS)
         model_name = model.getName()
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
         f = __file__

@@ -225,15 +225,16 @@ class DNCRegressorV1:
 
 class DNCRegressorV2:
     '''
-    A Differentiable Neural Computer (DNC) Regressor with optional gradient-checkpointing.
+    A Differentiable Neural Computer (DNC) Regressor with (deprecated) optional gradient-checkpointing.
     gdck = 'collection' / 'memory' / 'speed'.
-    Currently, gradient-checking does not support dynamic RNN.
+    (Note: currently, gradient-checking does not support dynamic RNN.)
     '''
 
     def __init__(self, layer_width=200, memory_size=16, word_size=16,
                  num_writes=1, num_reads=4, clip_value=20, max_grad_norm=50,
                  keep_prob=0.5, decayed_dropout_start=None, dropout_decay_steps=None,
                  learning_rate=1e-3, decayed_lr_start=None, lr_decay_steps=None, seed=None,
+                 parallel_iterations=2,
                  gdck='memory'):
         self._layer_width = layer_width
         self._memory_size = memory_size
@@ -249,6 +250,7 @@ class DNCRegressorV2:
         self._decayed_lr_start = decayed_lr_start
         self._lr_decay_steps = lr_decay_steps
         self._seed = seed
+        self._parallel_iterations = parallel_iterations
         self._gdck=gdck
 
         self.keep_prob
@@ -330,7 +332,7 @@ class DNCRegressorV2:
             output_sequence, _ = tf.nn.dynamic_rnn(
                 cell=dnc_core,
                 inputs=inputs,
-                parallel_iterations=4,
+                parallel_iterations=self._parallel_iterations,
                 swap_memory=True,
                 initial_state=initial_state,
                 sequence_length=self.seqlen)
