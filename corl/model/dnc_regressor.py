@@ -227,6 +227,7 @@ class DNCRegressorV2:
     '''
     A Differentiable Neural Computer (DNC) Regressor with optional gradient-checkpointing.
     gdck = 'collection' / 'memory' / 'speed'.
+    Currently, gradient-checking does not support dynamic RNN.
     '''
 
     def __init__(self, layer_width=200, memory_size=16, word_size=16,
@@ -409,8 +410,8 @@ class DNCRegressorV2:
             # Set up optimizer with global norm clipping.
             trainable_variables = tf.trainable_variables()
             grads, _ = tf.clip_by_global_norm(
-                gradients(train_loss, trainable_variables, checkpoints=self._gdck),
-                # tf.gradients(train_loss, trainable_variables), 
+                # gradients(train_loss, trainable_variables, checkpoints=self._gdck),
+                tf.gradients(train_loss, trainable_variables), 
                 self._max_grad_norm)
             optimizer = tf.train.AdamOptimizer(self.learning_rate)
             train_step = optimizer.apply_gradients(
