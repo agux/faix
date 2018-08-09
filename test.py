@@ -8,6 +8,7 @@ from pstk import data as dat
 from sqlalchemy import create_engine
 from joblib import Parallel, delayed
 from pstk.model.wavenet import time_to_batch
+import re
 
 
 def testGetFileName():
@@ -278,6 +279,33 @@ def reshape():
         print(out[0])
         print(out[1])
 
+def regex():
+    p = re.compile('((?!while/).)*(conv2d|Conv|MatMul)')
+    print(p.match('this/should/match/MatMul123/asdf'))
+    print(p.match('while/this/should/not/match/MatMul123/asdf'))
+    print(p.match('the/middle/while/should/not/match/MatMul123/asdf'))
+    print(p.match('RNN/rnn/while/dnc/lstm/MatMul'))
+
+def filterTensor():
+    ts = None
+    with tf.name_scope("while"):
+        ts = tf.multiply(1,2)
+    ts1 = None
+    with tf.name_scope("start/while"):
+        ts1 = tf.multiply(3,4)
+    ts2 = tf.multiply(5,6)
+    print(ts.op.name)
+    print(ts1.op.name)
+    print(ts2.op.name)
+    f = tf.contrib.graph_editor.filter_ts_from_regex(
+        [ts.op, ts1.op, ts2.op],
+        '^(?!while)*(conv2d|Conv|MatMul|Mul)'
+        # '(/Mul)'
+    )
+    with tf.Session() as sess:
+        o = sess.run(f)
+        print(o)
+
 # testGatherND()
 # testGetFileName()
 # print(__file__)
@@ -287,19 +315,4 @@ def reshape():
 # testTensorShape()
 
 
-# testJoblib()
-
-# testVariableScope()
-
-
-# testTimeToBatch()
-# testConv1d()
-# testInversePerm()
-# testNestFlatten()
-# testCosDecay()
-# testReduceProdCumprod()
-# testFoldl()
-# dynamicShape()
-# invert_permutation()
-# batch_gatcher()
-reshape()
+filterTensor()
