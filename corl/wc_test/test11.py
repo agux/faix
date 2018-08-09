@@ -61,6 +61,8 @@ def parseArgs():
                         default=None)
     parser.add_argument('--vol_size', type=int, help='volume size for the dataset storage sub-folder',
                         default=None)
+    parser.add_argument('--gpu_grow_mem', dest='gpu_grow_mem', action='store_true',
+                        help='allow gpu to allocate mem dynamically at runtime.')
     parser.add_argument('--trace', dest='trace', action='store_true',
                         help='record full trace in validation step.')
     parser.add_argument('--profile', dest='profile', action='store_true',

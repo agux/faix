@@ -78,7 +78,7 @@ def run(args):
     config = tf.ConfigProto(
         log_device_placement=args.log_device,
         allow_soft_placement=True)
-    config.gpu_options.allow_growth = True
+    config.gpu_options.allow_growth = args.gpu_grow_mem
     with tf.Session(config=config) as sess:
         model = dncr.DNCRegressorV2(
             layer_width=LAYER_WIDTH,
