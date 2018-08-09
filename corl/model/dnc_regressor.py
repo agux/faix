@@ -329,6 +329,8 @@ class DNCRegressorV2:
             output_sequence, _ = tf.nn.dynamic_rnn(
                 cell=dnc_core,
                 inputs=inputs,
+                parallel_iterations=4,
+                swap_memory=True,
                 initial_state=initial_state,
                 sequence_length=self.seqlen)
             output = self.last_relevant(output_sequence, self.seqlen)
