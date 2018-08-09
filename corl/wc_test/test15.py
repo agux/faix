@@ -91,7 +91,8 @@ def run(args):
             learning_rate=LEARNING_RATE,
             decayed_lr_start=DECAYED_LR_START,
             lr_decay_steps=LR_DECAY_STEPS,
-            seed=SEED)
+            seed=SEED,
+            gdck='speed')
         model_name = model.getName()
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
         f = __file__
