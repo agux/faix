@@ -1,5 +1,10 @@
 from __future__ import print_function
 import __main__ as main
+
+import os
+os.environ['https_proxy'] = 'https://localhost:1087'
+
+import fcntl
 import pandas as pd
 import mysql.connector
 import numpy as np
@@ -8,6 +13,8 @@ from pstk import data as dat
 from sqlalchemy import create_engine
 from joblib import Parallel, delayed
 from pstk.model.wavenet import time_to_batch
+from google.cloud import storage as gcs
+from corl.wc_data import input_file2
 import re
 
 
@@ -266,6 +273,7 @@ def dynamicShape():
     x_p = tf.placeholder(tf.int32, [None])
     x_p.set_shape(tf.TensorShape([x_h]))
 
+
 def reshape():
     c = tf.constant(
         [[2, 3, 4, 1],
@@ -275,9 +283,10 @@ def reshape():
     c1 = tf.reshape(c, [1])
     c2 = [tf.reduce_prod(c)]
     with tf.Session() as sess:
-        out = sess.run([c1,c2])
+        out = sess.run([c1, c2])
         print(out[0])
         print(out[1])
+
 
 def regex():
     p = re.compile('((?!while/).)*(conv2d|Conv|MatMul)')
@@ -286,14 +295,15 @@ def regex():
     print(p.match('the/middle/while/should/not/match/MatMul123/asdf'))
     print(p.match('RNN/rnn/while/dnc/lstm/MatMul'))
 
+
 def filterTensor():
     ts = None
     with tf.name_scope("while"):
-        ts = tf.multiply(1,2)
+        ts = tf.multiply(1, 2)
     ts1 = None
     with tf.name_scope("start/while"):
-        ts1 = tf.multiply(3,4)
-    ts2 = tf.multiply(5,6)
+        ts1 = tf.multiply(3, 4)
+    ts2 = tf.multiply(5, 6)
     print(ts.op.name)
     print(ts1.op.name)
     print(ts2.op.name)
@@ -306,13 +316,70 @@ def filterTensor():
         o = sess.run(f)
         print(o)
 
+
+def testGCS():
+    project = "linen-mapper-187215"
+    bucket_name = "carusytes_bucket"
+    prefix = "wcc_infer/vol_0"
+    gcs_client = gcs.Client(project)
+    print("client created")
+    bucket = gcs_client.get_bucket(bucket_name)
+    print("bucket initialized")
+    blobs = bucket.list_blobs(prefix=prefix)
+    print("blobs fetched")
+    for i, b in enumerate(blobs):
+        if i >= 5:
+            break
+        print(b.id[b.id.find('/')+1:b.id.rfind('/')])
+
+def delayed_write_talst(i, talst):
+    sep = ' | '
+    with open(input_file2.tasklist_file, 'rb+') as f:
+        # fcntl.flock(f, fcntl.LOCK_EX)
+        t = talst[i]
+        idx = t['idx']
+        f.seek(idx)
+        ln = f.readline()
+        idx = idx + ln.find(sep)+len(sep)
+        print("readline: {}, idx:{}".format(ln,idx))
+        f.seek(idx)
+        f.write('O')
+        f.flush()
+        # fcntl.flock(f, fcntl.LOCK_UN)
+
+def print_talst_element(i, talst):
+    with open(input_file2.tasklist_file, 'rb+') as f:
+        t = talst[i]
+        idx = idx = t['idx']
+        f.seek(idx)
+        ln = f.readline()
+        print("readline: {}, idx:{}".format(ln,idx))
+
+def testTasklist():
+    project = "linen-mapper-187215"
+    talst = input_file2._get_infer_tasklist(
+        'gs://carusytes_bucket/wcc_infer', project)
+    print('#talst: {}'.format(len(talst)))
+    # for i in range(50):
+    #     print_talst_element(i, talst)
+    # TODO test efficient status update
+    # for i in range(50):
+    #     delayed_write_talst(i, talst)
+    # print("job done")
+    r = Parallel(n_jobs=8)(delayed(delayed_write_talst)(i, talst) for i in range(50))
+    if len(r) == 50:
+        print("job done")
+    
+
+
 # testGatherND()
 # testGetFileName()
 # print(__file__)
 # f = __file__
 # print(f[f.rindex('/')+1:f.rindex('.py')])
 
+
 # testTensorShape()
+testTasklist()
 
-
-filterTensor()
+# filterTensor()
