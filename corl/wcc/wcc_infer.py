@@ -62,7 +62,6 @@ def run(args):
         strftime("%H:%M:%S"), os.getpid()))
     tf.logging.set_verbosity(tf.logging.INFO)
     keep_prob = tf.placeholder(tf.float32, [], name="kprob")
-    refs = tf.placeholder(tf.string, [None], name="refs")
     config = tf.ConfigProto(
         log_device_placement=args.log_device,
         allow_soft_placement=True)
@@ -91,7 +90,7 @@ def run(args):
             print("{} model checkpoint path: {}".format(
                 strftime("%H:%M:%S"), ckpt.model_checkpoint_path))
             d = input_file2.getInferInput(args.rbase, args.prefetch)
-            model.setNodes(d['features'], None, d['seqlens'], refs)
+            model.setNodes(d['features'], None, d['seqlens'], d['refs'])
             saver = tf.train.Saver(name="reg_saver")
             saver.restore(sess, ckpt.model_checkpoint_path)
         else:
@@ -121,8 +120,7 @@ def run(args):
                     ro = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
                     rm = tf.RunMetadata()
                 code, klid, idx, posc, pcorl, negc, ncorl = sess.run([d['code'], d['klid'], d['idx'], model.infer],
-                                                                     {d['handle']: infer_handle,
-                                                                         refs: d['refs'], keep_prob: KEEP_PROB},
+                                                                     {d['handle']: infer_handle, keep_prob: KEEP_PROB},
                                                                      options=ro, run_metadata=rm)
                 print('{} bno {} {}@{}: posc {}, pcorl {}, negc {}, ncorl {}'.format(
                     strftime("%H:%M:%S"), bno, code, klid, posc, pcorl, negc, ncorl))
