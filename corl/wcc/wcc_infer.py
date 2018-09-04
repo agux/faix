@@ -44,7 +44,7 @@ def parseArgs():
                         help='gcs remote directory path for inference result files')
     parser.add_argument('-f', '--prefetch', type=int,
                         help='dataset prefetch batches', default=2)
-    parser.add_argument('-b', '--batch', type=int,
+    parser.add_argument('-b', '--batch', type=int, dest="batch"
                         help='inference result file batch size', default=128)
     parser.add_argument('-g', '--gpu_grow_mem', dest='gpu_grow_mem', default=False,
                         action='store_false', help='allow gpu to allocate mem dynamically at runtime.')

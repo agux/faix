@@ -342,15 +342,15 @@ def check_task_status():
         print("{} #{} scanning unfinished tasks...".format(
             strftime("%H:%M:%S"), i))
         with open(TASKLIST_FILE, 'rb') as f:
-            ln = 0
+            lno = 0
             for ln in f:
-                ln = ln + 1
+                lno = lno + 1
                 # skip header line
-                if ln == 1:
+                if lno == 1:
                     continue
                 fs = [field.strip() for field in ln.split(TALIST_SEP)]
                 if fs[1] == "P":
-                    ptask.append({'path': fs[0], 'ln': ln})
+                    ptask.append({'path': fs[0], 'lno': lno})
         if len(ptask) > 0:
             print("{} #{} scan results: {} tasks pending".format(
                 strftime("%H:%M:%S"), i, len(ptask)))
