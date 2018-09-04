@@ -25,6 +25,7 @@ NUM_WRITES = 2
 NUM_READS = 8
 MAX_STEP = 35
 TIME_SHIFT = 4
+KEEP_PROB = 1.0
 
 # pylint: disable-msg=E0601,E1101
 
