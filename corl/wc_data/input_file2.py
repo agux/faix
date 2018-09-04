@@ -22,6 +22,7 @@ line_size = 0
 
 TASKLIST_FILE = 'wccinfer_tasklist'
 TALIST_SEP = ' | '
+gs_infer_base_path = None
 
 
 def print_n_retry(exception):
@@ -59,7 +60,10 @@ def _scan_gcs(bucket_name, prefix, project=None):
 
 
 def _get_infer_tasklist(rbase, project=None):
-    global header_size, line_size
+    '''
+    Returns string array of [file_id, index]
+    '''
+    global header_size, line_size, gs_infer_base_path
     TALIST_SEP = ' | '
     if os.path.exists(TASKLIST_FILE):
         print('{} tasklist found, parsing...'.format(strftime("%H:%M:%S")))
@@ -70,6 +74,7 @@ def _get_infer_tasklist(rbase, project=None):
             line_size = int(fs[2])
             print('{} base path: {} total: {} header size: {} line size: {}'.format(
                 strftime("%H:%M:%S"), fs[0], fs[1], header_size, line_size))
+            gs_infer_base_path = fs[0]
             print('{} scanning tasklist file...'.format(strftime("%H:%M:%S")))
             lc = 0
             tasklist = []
@@ -77,14 +82,14 @@ def _get_infer_tasklist(rbase, project=None):
                 fs = [field.strip() for field in line.split(TALIST_SEP)]
                 if fs[1] == "P":
                     tasklist.append(
-                        {'path': fs[0], 'idx': header_size+1 + lc*(line_size+1)})
+                        [fs[0], str(header_size+1 + lc*(line_size+1))])
                 lc = lc + 1
             print('{} pending task: {}'.format(
                 strftime("%H:%M:%S"), len(tasklist)))
-            return tasklist
     else:
         print('{} tasklist not present, scanning files in {}...'.format(
             strftime("%H:%M:%S"), rbase))
+        gs_infer_base_path = rbase
         s = re.search('gs://([^/]*)/(.*)', rbase)
         bn = s.group(1)
         folder = s.group(2)
@@ -110,11 +115,11 @@ def _get_infer_tasklist(rbase, project=None):
             f.write(header + '\n')
             for i, p in enumerate(relpaths):
                 f.write('{}{}P'.format(p, TALIST_SEP).ljust(line_size) + '\n')
-                tasklist.append(
-                    {'path': p, 'idx': header_size+1 + i*(line_size+1)})
+                tasklist.append([p, str(header_size+1 + i*(line_size+1))])
             f.flush()
         print('{} tasklist file generated'.format(strftime("%H:%M:%S")))
-        return tasklist
+
+    return np.array(tasklist, 's')
 
 
 def _loadData(file_dir, file_name):
@@ -169,13 +174,15 @@ def _loadBatchData(flag):
 
 
 def _load_infer_data(task):
-    path, name = os.path.split(task['path'])
-    print("{} loading dataset {}...".format(
-        strftime("%H:%M:%S"), name))
+    global gs_infer_base_path
+    v, bname = os.path.split(task[0])
+    path = '{}/vol_{}'.format(gs_infer_base_path, v)
+    name = '{}.json.gz'.format(bname)
+    print("{} loading infer file {}/{}...".format(strftime("%H:%M:%S"), path, name))
     data = _loadData(path, name)
     # features, seqlens, code, klid, refs, idx
     return np.array(data['features'], 'f'), np.array(data['seqlens'], 'i'), data['code'], \
-        data['klid'], np.array(data['refs'], 's'), task['idx']
+        data['klid'], np.array(data['refs'], 's'), int(task[1])
 
 
 def _read_meta_config(file_dir):
