@@ -119,10 +119,11 @@ def run(args):
                 if (args.trace or args.profile) and bno+1 >= 5 and bno+1 <= 10:
                     ro = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
                     rm = tf.RunMetadata()
-                code, klid, idx, posc, pcorl, negc, ncorl = sess.run([d['code'], d['klid'], d['idx'], model.infer],
-                                                                     {d['handle']: infer_handle,
-                                                                         keep_prob: KEEP_PROB},
-                                                                     options=ro, run_metadata=rm)
+                code, klid, idx, r = sess.run([d['code'], d['klid'], d['idx'], model.infer],
+                                              {d['handle']: infer_handle,
+                                               keep_prob: KEEP_PROB},
+                                              options=ro, run_metadata=rm)
+                posc, pcorl, negc, ncorl = r[0], r[1], r[2], r[3]
                 print('{} bno {} {}@{}: posc {}, pcorl {}, negc {}, ncorl {}'.format(
                     strftime("%H:%M:%S"), bno, code, klid, posc, pcorl, negc, ncorl))
                 indices.append(idx)
