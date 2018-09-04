@@ -119,7 +119,7 @@ def _get_infer_tasklist(rbase, project=None):
             f.flush()
         print('{} tasklist file generated'.format(strftime("%H:%M:%S")))
 
-    return np.array(tasklist, 's')
+    return np.array(tasklist, 'U')
 
 
 def _loadData(file_dir, file_name):
@@ -182,7 +182,7 @@ def _load_infer_data(task):
     data = _loadData(path, name)
     # features, seqlens, code, klid, refs, idx
     return np.array(data['features'], 'f'), np.array(data['seqlens'], 'i'), data['code'], \
-        data['klid'], np.array(data['refs'], 's'), int(task[1])
+        data['klid'], np.array(data['refs'], 'U'), int(task[1])
 
 
 def _read_meta_config(file_dir):
