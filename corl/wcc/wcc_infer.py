@@ -99,7 +99,7 @@ def run(args):
             sys.exit(1)
 
         infer_handle = sess.run(d['infer_iter'].string_handle())
-
+        profiler = None
         if args.trace:
             print("{} full trace will be collected every {} run".format(
                 strftime("%H:%M:%S"), TRACE_INTERVAL))
