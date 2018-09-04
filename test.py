@@ -359,16 +359,17 @@ def testTasklist():
     project = "linen-mapper-187215"
     talst = input_file2._get_infer_tasklist(
         'gs://carusytes_bucket/wcc_infer', project)
-    print('#talst: {}'.format(len(talst)))
+    print(talst)
+    # print('#talst: {}'.format(len(talst)))
     # for i in range(50):
     #     print_talst_element(i, talst)
     # TODO test efficient status update
     # for i in range(50):
     #     delayed_write_talst(i, talst)
     # print("job done")
-    r = Parallel(n_jobs=8)(delayed(delayed_write_talst)(i, talst) for i in range(50))
-    if len(r) == 50:
-        print("job done")
+    # r = Parallel(n_jobs=8)(delayed(delayed_write_talst)(i, talst) for i in range(50))
+    # if len(r) == 50:
+    #     print("job done")
     
 
 

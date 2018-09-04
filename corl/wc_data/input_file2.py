@@ -176,10 +176,9 @@ def _loadBatchData(flag):
 
 def _load_infer_data(task):
     global gs_infer_base_path
-    v, bname = os.path.split(task[0])
+    v, name = os.path.split(task[0])
     path = '{}/vol_{}'.format(gs_infer_base_path, v)
-    name = '{}.json.gz'.format(bname)
-    print("{} loading infer file {}/{}...".format(strftime("%H:%M:%S"), path, name))
+    print("{} loading infer file {}/{}.json.gz ...".format(strftime("%H:%M:%S"), path, name))
     data = _loadData(path, name)
     # features, seqlens, code, klid, refs, idx
     return np.array(data['features'], 'f'), np.array(data['seqlens'], 'i'), data['code'], \
