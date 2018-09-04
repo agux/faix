@@ -65,6 +65,7 @@ def _get_infer_tasklist(rbase, project=None):
     '''
     global header_size, line_size, gs_infer_base_path
     TALIST_SEP = ' | '
+    tasklist = []
     if os.path.exists(TASKLIST_FILE):
         print('{} tasklist found, parsing...'.format(strftime("%H:%M:%S")))
         with open(TASKLIST_FILE, 'rb') as f:

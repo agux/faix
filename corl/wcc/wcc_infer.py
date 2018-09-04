@@ -116,6 +116,7 @@ def run(args):
                 bno = bno + 1
                 print('{} infering batch {}'.format(
                     strftime("%H:%M:%S"), bno))
+                ro, rm = None, None
                 if (args.trace or args.profile) and bno+1 >= 5 and bno+1 <= 10:
                     ro = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
                     rm = tf.RunMetadata()
