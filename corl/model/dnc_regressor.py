@@ -48,11 +48,11 @@ class DNCRegressorV1:
         self.seqlen = seqlen
         self.refs = refs
         self.logits
-        if target:
+        if target is not None:
             self.optimize
             self.cost
             self.worst
-        if refs:
+        if refs is not None:
             self.infer
 
     def getName(self):
@@ -281,11 +281,11 @@ class DNCRegressorV2:
         self.seqlen = seqlen
         self.refs = refs
         self.logits
-        if target:
+        if target is not None:
             self.optimize
             self.cost
             self.worst
-        if refs:
+        if refs is not None:
             self.infer
 
     def getName(self):
