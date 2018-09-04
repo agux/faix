@@ -48,9 +48,12 @@ class DNCRegressorV1:
         self.seqlen = seqlen
         self.refs = refs
         self.logits
-        self.optimize
-        self.cost
-        self.worst
+        if target:
+            self.optimize
+            self.cost
+            self.worst
+        if refs:
+            self.infer
 
     def getName(self):
         return self.__class__.__name__
