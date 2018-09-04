@@ -158,9 +158,9 @@ class DNCRegressorV1:
         with tf.variable_scope("infer"):
             pos_idx = tf.argmax(logits)
             neg_idx = tf.argmin(logits)
-            posc = tf.gather(self.refs, pos_idx) 
+            posc = tf.gather(self.refs, pos_idx)
             pcorl = tf.gather(logits, pos_idx)
-            negc = tf.gather(self.refs, neg_idx) 
+            negc = tf.gather(self.refs, neg_idx)
             ncorl = tf.gather(logits, neg_idx)
             return posc, pcorl, negc, ncorl
 
@@ -267,7 +267,7 @@ class DNCRegressorV2:
         self._lr_decay_steps = lr_decay_steps
         self._seed = seed
         self._parallel_iterations = parallel_iterations
-        self._gdck=gdck
+        self._gdck = gdck
 
         self.keep_prob
         self.learning_rate
@@ -278,10 +278,12 @@ class DNCRegressorV2:
         self.seqlen = seqlen
         self.refs = refs
         self.logits
-        self.optimize
-        self.cost
-        self.worst
-        self.infer
+        if target:
+            self.optimize
+            self.cost
+            self.worst
+        if refs:
+            self.infer
 
     def getName(self):
         return self.__class__.__name__
@@ -382,9 +384,9 @@ class DNCRegressorV2:
         with tf.variable_scope("infer"):
             pos_idx = tf.argmax(logits)
             neg_idx = tf.argmin(logits)
-            posc = tf.gather(self.refs, pos_idx) 
+            posc = tf.gather(self.refs, pos_idx)
             pcorl = tf.gather(logits, pos_idx)
-            negc = tf.gather(self.refs, neg_idx) 
+            negc = tf.gather(self.refs, neg_idx)
             ncorl = tf.gather(logits, neg_idx)
             return posc, pcorl, negc, ncorl
 
@@ -446,7 +448,7 @@ class DNCRegressorV2:
             trainable_variables = tf.trainable_variables()
             grads, _ = tf.clip_by_global_norm(
                 # gradients(train_loss, trainable_variables, checkpoints=self._gdck),
-                tf.gradients(train_loss, trainable_variables), 
+                tf.gradients(train_loss, trainable_variables),
                 self._max_grad_norm)
             optimizer = tf.train.AdamOptimizer(self.learning_rate)
             train_step = optimizer.apply_gradients(
