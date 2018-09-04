@@ -334,7 +334,7 @@ def testGCS():
 
 def delayed_write_talst(i, talst):
     sep = ' | '
-    with open(input_file2.tasklist_file, 'rb+') as f:
+    with open(input_file2.TASKLIST_FILE, 'rb+') as f:
         # fcntl.flock(f, fcntl.LOCK_EX)
         t = talst[i]
         idx = t['idx']
@@ -348,7 +348,7 @@ def delayed_write_talst(i, talst):
         # fcntl.flock(f, fcntl.LOCK_UN)
 
 def print_talst_element(i, talst):
-    with open(input_file2.tasklist_file, 'rb+') as f:
+    with open(input_file2.TASKLIST_FILE, 'rb+') as f:
         t = talst[i]
         idx = idx = t['idx']
         f.seek(idx)

@@ -20,7 +20,8 @@ gcs_client = None
 header_size = 0
 line_size = 0
 
-tasklist_file = 'wccinfer_tasklist'
+TASKLIST_FILE = 'wccinfer_tasklist'
+TALIST_SEP = ' | '
 
 
 def print_n_retry(exception):
@@ -59,13 +60,13 @@ def _scan_gcs(bucket_name, prefix, project=None):
 
 def _get_infer_tasklist(rbase, project=None):
     global header_size, line_size
-    sep = ' | '
-    if os.path.exists(tasklist_file):
+    TALIST_SEP = ' | '
+    if os.path.exists(TASKLIST_FILE):
         print('{} tasklist found, parsing...'.format(strftime("%H:%M:%S")))
-        with open(tasklist_file, 'rb') as f:
+        with open(TASKLIST_FILE, 'rb') as f:
             h = f.readline()[:-1]  # strip line break
             header_size = len(h)
-            fs = [field.strip() for field in h.split(sep)]
+            fs = [field.strip() for field in h.split(TALIST_SEP)]
             line_size = int(fs[2])
             print('{} base path: {} total: {} header size: {} line size: {}'.format(
                 strftime("%H:%M:%S"), fs[0], fs[1], header_size, line_size))
@@ -73,7 +74,7 @@ def _get_infer_tasklist(rbase, project=None):
             lc = 0
             tasklist = []
             for line in f:
-                fs = [field.strip() for field in line.split(sep)]
+                fs = [field.strip() for field in line.split(TALIST_SEP)]
                 if fs[1] == "P":
                     tasklist.append(
                         {'path': fs[0], 'idx': header_size+1 + lc*(line_size+1)})
@@ -97,17 +98,18 @@ def _get_infer_tasklist(rbase, project=None):
             # strip bucket name and generation number
             rp = b.id[idx:b.id.rfind('.json.gz/')]
             relpaths.append(rp)
-            line_size = max(line_size, len(rp+sep+'P'))
+            line_size = max(line_size, len(rp+TALIST_SEP+'P'))
         total = len(relpaths)
-        header = '{}{}{}{}{}'.format(rbase, sep, total, sep, line_size)
+        header = '{}{}{}{}{}'.format(
+            rbase, TALIST_SEP, total, TALIST_SEP, line_size)
         header_size = len(header)
         print('{} base path: {} total: {} header size: {} line size: {}'.format(
             strftime("%H:%M:%S"), rbase, total, header_size, line_size))
         tasklist = []
-        with open(tasklist_file, 'wb') as f:
+        with open(TASKLIST_FILE, 'wb') as f:
             f.write(header + '\n')
             for i, p in enumerate(relpaths):
-                f.write('{}{}P'.format(p, sep).ljust(line_size) + '\n')
+                f.write('{}{}P'.format(p, TALIST_SEP).ljust(line_size) + '\n')
                 tasklist.append(
                     {'path': p, 'idx': header_size+1 + i*(line_size+1)})
             f.flush()
@@ -325,3 +327,34 @@ def getInputs(path, start=0, prefetch=2, vset=None, volsize=None):
                   'train_iter': train_iterator, 'test_iter': test_iterator, 'infer_iter': infer_iterator,
                   'train_batch_size': train_batch_size, 'test_batch_size': test_batch_size}
         return inputs
+
+
+def check_task_status():
+    for i in range(5):
+        ptask = []
+        print("{} #{} scanning unfinished tasks...".format(
+            strftime("%H:%M:%S"), i))
+        with open(TASKLIST_FILE, 'rb') as f:
+            ln = 0
+            for ln in f:
+                ln = ln + 1
+                # skip header line
+                if ln == 1:
+                    continue
+                fs = [field.strip() for field in ln.split(TALIST_SEP)]
+                if fs[1] == "P":
+                    ptask.append({'path': fs[0], 'ln': ln})
+        if len(ptask) > 0:
+            print("{} #{} scan results: {} tasks pending".format(
+                strftime("%H:%M:%S"), i, len(ptask)))
+        else:
+            # no more pending tasks
+            print("{} all tasks have completed".format(strftime("%H:%M:%S")))
+            return
+    # if ptask is not empty, print them individually
+    if len(ptask) > 0:
+        for t in ptask:
+            print(t)
+    else:
+        # no more pending tasks
+        print("{} all tasks have completed".format(strftime("%H:%M:%S")))

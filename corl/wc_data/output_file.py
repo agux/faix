@@ -67,7 +67,7 @@ def _write_result(path, indices, records):
     print('{} result file uploaded to {}'.format(strftime("%H:%M:%S"), objn))
     # update tasklist item status
     sep = ' | '
-    with open(input_file2.tasklist_file, 'rb+') as f:
+    with open(input_file2.TASKLIST_FILE, 'rb+') as f:
         for idx in indices:
             f.seek(idx)
             ln = f.readline()
