@@ -46,13 +46,13 @@ def parseArgs():
                         help='dataset prefetch batches', default=2)
     parser.add_argument('-b', '--batch', type=int,
                         help='inference result file batch size', default=128)
-    parser.add_argument('-g', '--gpu_grow_mem', dest='gpu_grow_mem',
+    parser.add_argument('-g', '--gpu_grow_mem', dest='gpu_grow_mem', default=False,
                         action='store_false', help='allow gpu to allocate mem dynamically at runtime.')
-    parser.add_argument('--trace', dest='trace', action='store_false',
+    parser.add_argument('--trace', dest='trace', action='store_false', default=False,
                         help='record full trace in validation step.')
-    parser.add_argument('--profile', dest='profile', action='store_false',
+    parser.add_argument('--profile', dest='profile', action='store_false', default=False,
                         help='profile CG execution.')
-    parser.add_argument('--log_device', dest='log_device', action='store_false',
+    parser.add_argument('--log_device', dest='log_device', action='store_false', default=False,
                         help='record device info such as CPU and GPU in tensorboard.')
     return parser.parse_args()
 
@@ -120,7 +120,8 @@ def run(args):
                     ro = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
                     rm = tf.RunMetadata()
                 code, klid, idx, posc, pcorl, negc, ncorl = sess.run([d['code'], d['klid'], d['idx'], model.infer],
-                                                                     {d['handle']: infer_handle, keep_prob: KEEP_PROB},
+                                                                     {d['handle']: infer_handle,
+                                                                         keep_prob: KEEP_PROB},
                                                                      options=ro, run_metadata=rm)
                 print('{} bno {} {}@{}: posc {}, pcorl {}, negc {}, ncorl {}'.format(
                     strftime("%H:%M:%S"), bno, code, klid, posc, pcorl, negc, ncorl))
