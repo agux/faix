@@ -73,16 +73,14 @@ def run(args):
             strftime("%H:%M:%S"), args.model))
         sys.exit(1)
     with tf.Session(config=config) as sess:
-        model = dncr.DNCRegressorV2(
+        model = dncr.DNCRegressorV1(
             layer_width=LAYER_WIDTH,
             memory_size=MEMORY_SIZE,
             word_size=WORD_SIZE,
             num_writes=NUM_WRITES,
             num_reads=NUM_READS,
-            clip_value=CLIP_VALUE,
-            max_grad_norm=MAX_GRAD_NORM,
-            keep_prob=keep_prob,
-            parallel_iterations=PARALLEL_ITERATIONS)
+            keep_prob=keep_prob
+        )
         model_name = model.getName()
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
         f = __file__

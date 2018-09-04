@@ -42,10 +42,11 @@ class DNCRegressorV1:
         self.keep_prob
         self.learning_rate
 
-    def setNodes(self, features, target, seqlen):
+    def setNodes(self, features, target, seqlen, refs=None):
         self.data = features
         self.target = target
         self.seqlen = seqlen
+        self.refs = refs
         self.logits
         self.optimize
         self.cost
@@ -147,6 +148,21 @@ class DNCRegressorV1:
             self.target.get_shape(), logits.get_shape()))
         with tf.name_scope("cost"):
             return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+
+    @lazy_property
+    def infer(self):
+        '''
+        Returns positive code, positive corl, negative code, negative corl
+        '''
+        logits = self.logits
+        with tf.variable_scope("infer"):
+            pos_idx = tf.argmax(logits)
+            neg_idx = tf.argmin(logits)
+            posc = tf.gather(self.refs, pos_idx) 
+            pcorl = tf.gather(logits, pos_idx)
+            negc = tf.gather(self.refs, neg_idx) 
+            ncorl = tf.gather(logits, neg_idx)
+            return posc, pcorl, negc, ncorl
 
     @lazy_property
     def keep_prob(self):
