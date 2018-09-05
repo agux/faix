@@ -127,15 +127,15 @@ def run(args):
                 posc, pcorl, negc, ncorl = r[0], r[1], r[2], r[3]
                 print('{} bno {} {}@{}: posc {}, pcorl {}, negc {}, ncorl {}'.format(
                     strftime("%H:%M:%S"), bno, code, klid, posc, pcorl, negc, ncorl))
-                indices.append(idx)
+                indices.append(int(idx))
                 records.append(
                     {
-                        'code': code,
-                        'klid': klid,
-                        'positive': posc,
-                        'pcorl': pcorl,
-                        'negative': negc,
-                        'ncorl': ncorl
+                        'code': str(code),
+                        'klid': int(klid),
+                        'positive': str(posc),
+                        'pcorl': float(pcorl),
+                        'negative': str(negc),
+                        'ncorl': float(ncorl)
                     }
                 )
                 if len(records) >= args.batch:
