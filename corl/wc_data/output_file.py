@@ -48,7 +48,7 @@ def _upload_gcs(file, bucket_name, object_name):
 
 
 def _write_file(fileobj, payload):
-    with gzip.GzipFile(fileobj=fileobj, 'wb') as fout:
+    with gzip.GzipFile(fileobj=fileobj, mode='wb') as fout:
         fout.write(json.dumps(
             payload, separators=(',', ':')).encode('utf-8'))
         fout.flush()
