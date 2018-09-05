@@ -138,8 +138,6 @@ def run(args):
                     }
                 )
                 if len(records) >= args.batch:
-                    print('{} writing result file...'.format(
-                        strftime("%H:%M:%S")))
                     output_file.write_result(args.path, indices, records)
                     indices, records = [], []
                 if profiler is not None and bno+1 >= 5 and bno+1 <= 10:

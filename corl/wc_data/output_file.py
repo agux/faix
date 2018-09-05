@@ -63,6 +63,8 @@ def _write_result(path, indices, records):
     s = re.search('gs://([^/]*)/(.*)', path)
     bn = s.group(1)
     objn = '{}/r_{}.json.gz'.format(s.group(2), strftime("%Y%m%d_%H%M%S_%f"))
+    print('{} writing result file {}...'.format(
+        strftime("%H:%M:%S"), objn))
     _upload_gcs(tmp, bn, objn)
     print('{} result file uploaded to {}'.format(strftime("%H:%M:%S"), objn))
     # update tasklist item status
@@ -80,8 +82,7 @@ def _write_result(path, indices, records):
 
 
 def write_result(path, indices, records):
-    exc = _getExecutor()
-    exc.submit(_write_result, path, indices, records)
+    return _getExecutor().submit(_write_result, path, indices, records)
 
 
 def shutdown():
