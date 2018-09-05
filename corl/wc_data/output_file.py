@@ -47,8 +47,8 @@ def _upload_gcs(file, bucket_name, object_name):
         blob.upload_from_file(f, content_type='application/json')
 
 
-def _write_file(file, payload):
-    with gzip.GzipFile(file, 'wb') as fout:
+def _write_file(fileobj, payload):
+    with gzip.GzipFile(fileobj=fileobj, 'wb') as fout:
         fout.write(json.dumps(
             payload, separators=(',', ':')).encode('utf-8'))
         fout.flush()
@@ -63,7 +63,8 @@ def _write_result(path, indices, records):
         # upload to gcs (overwrite)
         s = re.search('gs://([^/]*)/(.*)', path)
         bn = s.group(1)
-        objn = '{}/r_{}.json.gz'.format(s.group(2), strftime("%Y%m%d_%H%M%S_%f"))
+        objn = '{}/r_{}.json.gz'.format(s.group(2),
+                                        strftime("%Y%m%d_%H%M%S_%f"))
         print('{} writing result file {}...'.format(
             strftime("%H:%M:%S"), objn))
         _upload_gcs(tmp, bn, objn)
@@ -86,8 +87,8 @@ def _write_result(path, indices, records):
 
 
 def write_result(path, indices, records):
-    # return _getExecutor().submit(_write_result, path, indices, records)
-    return _write_result(path, indices, records)
+    return _getExecutor().submit(_write_result, path, indices, records)
+    # return _write_result(path, indices, records)
 
 
 def shutdown():
