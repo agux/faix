@@ -86,7 +86,8 @@ def _write_result(path, indices, records):
 
 
 def write_result(path, indices, records):
-    return _getExecutor().submit(_write_result, path, indices, records)
+    # return _getExecutor().submit(_write_result, path, indices, records)
+    return _write_result(path, indices, records)
 
 
 def shutdown():
