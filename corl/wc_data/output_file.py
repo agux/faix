@@ -1,4 +1,5 @@
 from time import strftime
+from datetime import datetime
 from google.cloud import storage as gcs
 from loky import get_reusable_executor
 from retrying import retry
@@ -44,7 +45,7 @@ def _upload_gcs(file, bucket_name, object_name):
     bucket = gcs_client.get_bucket(bucket_name)
     blob = bucket.blob(object_name)
     # with open(file, 'rb') as f:
-    blob.upload_from_file(file, rewind=True,content_type='application/json')
+    blob.upload_from_file(file, rewind=True, content_type='application/json')
 
 
 def _write_file(fileobj, payload):
@@ -65,7 +66,7 @@ def _write_result(path, indices, records):
             s = re.search('gs://([^/]*)/(.*)', path)
             bn = s.group(1)
             objn = '{}/r_{}.json.gz'.format(s.group(2),
-                                            strftime("%Y%m%d_%H%M%S_%f"))
+                                            datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")[:-3])
             print('{} writing result file {}...'.format(
                 strftime("%H:%M:%S"), objn))
             _upload_gcs(tmp, bn, objn)
