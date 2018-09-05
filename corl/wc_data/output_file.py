@@ -76,6 +76,7 @@ def _write_result(path, indices, records):
             f.seek(idx)
             f.write('O')
         f.flush()
+    return os.getpid()
 
 
 def write_result(path, indices, records):
