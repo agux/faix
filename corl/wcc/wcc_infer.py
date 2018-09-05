@@ -110,6 +110,7 @@ def run(args):
         bno = 0
         records = []
         indices = []
+        last_rw = None
         while True:
             try:
                 bno = bno + 1
@@ -138,7 +139,11 @@ def run(args):
                     }
                 )
                 if len(records) >= args.batch:
-                    output_file.write_result(args.path, indices, records)
+                    if last_rw is not None:
+                        # wait for last write to complete
+                        len(last_rw)
+                    last_rw = output_file.write_result(
+                        args.path, indices, records)
                     indices, records = [], []
                 if profiler is not None and bno+1 >= 5 and bno+1 <= 10:
                     profiler.add_step(bno+1, rm)
@@ -176,7 +181,9 @@ def run(args):
                 break
 
         if len(records) > 0:
-            output_file.write_result(args.path, indices, records)
+            if last_rw is not None:
+                len(last_rw)
+            len(output_file.write_result(args.path, indices, records))
 
         output_file.shutdown()
 
