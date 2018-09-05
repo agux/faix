@@ -44,7 +44,7 @@ def _upload_gcs(file, bucket_name, object_name):
     bucket = gcs_client.get_bucket(bucket_name)
     blob = bucket.blob(object_name)
     # with open(file, 'rb') as f:
-    blob.upload_from_file(file, content_type='application/json')
+    blob.upload_from_file(file, rewind=True,content_type='application/json')
 
 
 def _write_file(fileobj, payload):
