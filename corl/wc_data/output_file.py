@@ -43,8 +43,8 @@ def _upload_gcs(file, bucket_name, object_name):
         gcs_client = gcs.Client()
     bucket = gcs_client.get_bucket(bucket_name)
     blob = bucket.blob(object_name)
-    with open(file, 'rb') as f:
-        blob.upload_from_file(f, content_type='application/json')
+    # with open(file, 'rb') as f:
+    blob.upload_from_file(f, content_type='application/json')
 
 
 def _write_file(fileobj, payload):
@@ -58,16 +58,17 @@ def _write_result(path, indices, records):
     result = {'records': records}
     try:
         # generate result file in memory
-        tmp = tmpf.SpooledTemporaryFile(max_size=1024*1024*100)
-        _write_file(tmp, result)
-        # upload to gcs (overwrite)
-        s = re.search('gs://([^/]*)/(.*)', path)
-        bn = s.group(1)
-        objn = '{}/r_{}.json.gz'.format(s.group(2),
-                                        strftime("%Y%m%d_%H%M%S_%f"))
-        print('{} writing result file {}...'.format(
-            strftime("%H:%M:%S"), objn))
-        _upload_gcs(tmp, bn, objn)
+        # tmp = tmpf.SpooledTemporaryFile(max_size=1024*1024*100)
+        with tmpf.TemporaryFile(mode='wb+') as tmp:
+            _write_file(tmp, result)
+            # upload to gcs (overwrite)
+            s = re.search('gs://([^/]*)/(.*)', path)
+            bn = s.group(1)
+            objn = '{}/r_{}.json.gz'.format(s.group(2),
+                                            strftime("%Y%m%d_%H%M%S_%f"))
+            print('{} writing result file {}...'.format(
+                strftime("%H:%M:%S"), objn))
+            _upload_gcs(tmp, bn, objn)
         print('{} result file uploaded to {}'.format(strftime("%H:%M:%S"), objn))
         # update tasklist item status
         sep = input_file2.TALIST_SEP
