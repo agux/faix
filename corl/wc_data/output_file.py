@@ -56,28 +56,32 @@ def _write_file(file, payload):
 
 def _write_result(path, indices, records):
     result = {'records': records}
-    # generate result file in memory
-    tmp = tmpf.SpooledTemporaryFile(max_size=1024*1024*100)
-    _write_file(tmp, result)
-    # upload to gcs (overwrite)
-    s = re.search('gs://([^/]*)/(.*)', path)
-    bn = s.group(1)
-    objn = '{}/r_{}.json.gz'.format(s.group(2), strftime("%Y%m%d_%H%M%S_%f"))
-    print('{} writing result file {}...'.format(
-        strftime("%H:%M:%S"), objn))
-    _upload_gcs(tmp, bn, objn)
-    print('{} result file uploaded to {}'.format(strftime("%H:%M:%S"), objn))
-    # update tasklist item status
-    sep = ' | '
-    with open(input_file2.TASKLIST_FILE, 'rb+') as f:
-        for idx in indices:
-            f.seek(idx)
-            ln = f.readline()
-            # locate position of status code
-            idx = idx + ln.find(sep)+len(sep)
-            f.seek(idx)
-            f.write('O')
-        f.flush()
+    try:
+        # generate result file in memory
+        tmp = tmpf.SpooledTemporaryFile(max_size=1024*1024*100)
+        _write_file(tmp, result)
+        # upload to gcs (overwrite)
+        s = re.search('gs://([^/]*)/(.*)', path)
+        bn = s.group(1)
+        objn = '{}/r_{}.json.gz'.format(s.group(2), strftime("%Y%m%d_%H%M%S_%f"))
+        print('{} writing result file {}...'.format(
+            strftime("%H:%M:%S"), objn))
+        _upload_gcs(tmp, bn, objn)
+        print('{} result file uploaded to {}'.format(strftime("%H:%M:%S"), objn))
+        # update tasklist item status
+        sep = input_file2.TALIST_SEP
+        with open(input_file2.TASKLIST_FILE, 'rb+') as f:
+            for idx in indices:
+                f.seek(idx)
+                ln = f.readline()
+                # locate position of status code
+                idx = idx + ln.find(sep)+len(sep)
+                f.seek(idx)
+                f.write('O')
+            f.flush()
+    except:
+        print(sys.exc_info()[0])
+        raise
     return os.getpid()
 
 
