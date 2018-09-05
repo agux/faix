@@ -141,7 +141,7 @@ def run(args):
                 if len(records) >= args.batch:
                     if last_rw is not None:
                         # wait for last write to complete
-                        len(last_rw)
+                        last_rw.result()
                     last_rw = output_file.write_result(
                         args.path, indices, records)
                     indices, records = [], []
@@ -182,8 +182,8 @@ def run(args):
 
         if len(records) > 0:
             if last_rw is not None:
-                len(last_rw)
-            len(output_file.write_result(args.path, indices, records))
+                last_rw.result()
+            output_file.write_result(args.path, indices, records).result()
 
         output_file.shutdown()
 
