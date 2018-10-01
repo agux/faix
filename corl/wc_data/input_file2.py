@@ -3,6 +3,7 @@
 from time import strftime
 from google.cloud import storage as gcs
 from retrying import retry
+from collections import deque
 import tensorflow as tf
 import sys
 import os
@@ -11,6 +12,7 @@ import multiprocessing
 import numpy as np
 import gzip
 import json
+import fileinput
 import ConfigParser
 import tempfile as tmpf
 
@@ -59,6 +61,27 @@ def _scan_gcs(bucket_name, prefix, project=None):
     return bucket.list_blobs(prefix=prefix)
 
 
+def _scan_gcs_infer_task(project, rbase):
+    global TALIST_SEP
+    print('{} scanning files in {}...'.format(
+        strftime("%H:%M:%S"), rbase))
+    s = re.search('gs://([^/]*)/(.*)', rbase)
+    bn = s.group(1)
+    folder = s.group(2)
+    prefix = '{}/vol_'.format(folder)
+    blobs = _scan_gcs(bn, prefix, project)
+    print('{} constructing tasklist...'.format(strftime("%H:%M:%S")))
+    idx = len('{}/{}'.format(bn, prefix))
+    relpaths = []
+    line_size = 0
+    for b in blobs:
+        # strip bucket name and generation number
+        rp = b.id[idx:b.id.rfind('.json.gz/')]
+        relpaths.append(rp)
+        line_size = max(line_size, len(rp+TALIST_SEP+'P'))
+    return relpaths, line_size
+
+
 def _get_infer_tasklist(rbase, project=None):
     '''
     Returns string array of [file_id, index]
@@ -66,52 +89,64 @@ def _get_infer_tasklist(rbase, project=None):
     global header_size, line_size, gs_infer_base_path
     TALIST_SEP = ' | '
     tasklist = []
+    relpaths, line_size = _scan_gcs_infer_task(project, rbase)
     if os.path.exists(TASKLIST_FILE):
         print('{} tasklist found, parsing...'.format(strftime("%H:%M:%S")))
         with open(TASKLIST_FILE, 'rb') as f:
             h = f.readline()[:-1]  # strip line break
             header_size = len(h)
             fs = [field.strip() for field in h.split(TALIST_SEP)]
-            line_size = int(fs[2])
-            print('{} base path: {} total: {} header size: {} line size: {}'.format(
-                strftime("%H:%M:%S"), fs[0], fs[1], header_size, line_size))
+            line_size = max(int(fs[2]), line_size)
             gs_infer_base_path = fs[0]
+            total = fs[1]
+            print('{} base path: {} total: {} header size: {} line size: {}'.format(
+                strftime("%H:%M:%S"), gs_infer_base_path, total, header_size, line_size))
             print('{} scanning tasklist file...'.format(strftime("%H:%M:%S")))
             lc = 0
-            tasklist = []
+            tkrelps = {}
             for line in f:
                 fs = [field.strip() for field in line.split(TALIST_SEP)]
                 if fs[1] == "P":
                     tasklist.append(
                         [fs[0], str(header_size+1 + lc*(line_size+1))])
+                tkrelps[fs[0]] = fs[1]
                 lc = lc + 1
-            print('{} pending task: {}'.format(
-                strftime("%H:%M:%S"), len(tasklist)))
+            print('{} filtering new tasks from gcs...'.format(strftime("%H:%M:%S")))
+            ntask = frozenset(relpaths) - frozenset(tkrelps.keys())
+            print('{} new tasks: {}'.format(strftime("%H:%M:%S"), len(ntask)))
+            if len(ntask) > 0:
+                # recreate tasklist
+                tasklist = []
+                total += len(ntask)
+                all_task = list(tkrelps.keys()).extend(ntask)
+                all_task.sort()
+                lc = 0
+                header = '{}{}{}{}{}'.format(
+                        rbase, TALIST_SEP, total, TALIST_SEP, line_size)
+                header_size = len(header)
+                print('{} rewriting tasklist file. base path: {} total: {} header size: {} line size: {}'.format(
+                    strftime("%H:%M:%S"), rbase, total, header_size, line_size))
+                #rewrite tasklist file
+                with open(TASKLIST_FILE, 'wb') as f:
+                    f.write(header + '\n')
+                    for i, p in enumerate(all_task):
+                        status = tkrelps.get(p, "P")
+                        f.write('{}{}{}'.format(p, TALIST_SEP, status).ljust(line_size) + '\n')
+                        if "P" == status:
+                            tasklist.append([p, str(header_size+1 + i*(line_size+1))])
+                    f.flush()
+        print('{} pending task: {}'.format(
+            strftime("%H:%M:%S"), len(tasklist)))
     else:
-        print('{} tasklist not present, scanning files in {}...'.format(
-            strftime("%H:%M:%S"), rbase))
+        print('{} tasklist not present, generating new file...'.format(
+            strftime("%H:%M:%S")))
         gs_infer_base_path = rbase
-        s = re.search('gs://([^/]*)/(.*)', rbase)
-        bn = s.group(1)
-        folder = s.group(2)
-        prefix = '{}/vol_'.format(folder)
-        blobs = _scan_gcs(bn, prefix, project)
-        print('{} constructing tasklist...'.format(strftime("%H:%M:%S")))
-        idx = len('{}/{}'.format(bn, prefix))
-        relpaths = []
-        line_size = 0
-        for b in blobs:
-            # strip bucket name and generation number
-            rp = b.id[idx:b.id.rfind('.json.gz/')]
-            relpaths.append(rp)
-            line_size = max(line_size, len(rp+TALIST_SEP+'P'))
         total = len(relpaths)
         header = '{}{}{}{}{}'.format(
             rbase, TALIST_SEP, total, TALIST_SEP, line_size)
         header_size = len(header)
         print('{} base path: {} total: {} header size: {} line size: {}'.format(
             strftime("%H:%M:%S"), rbase, total, header_size, line_size))
-        tasklist = []
         with open(TASKLIST_FILE, 'wb') as f:
             f.write(header + '\n')
             for i, p in enumerate(relpaths):
