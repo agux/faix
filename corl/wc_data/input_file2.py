@@ -118,7 +118,8 @@ def _get_infer_tasklist(rbase, project=None):
                 # recreate tasklist
                 tasklist = []
                 total += len(ntask)
-                all_task = list(tkrelps.keys()).extend(ntask)
+                all_task = list(tkrelps.keys())
+                all_task.extend(ntask)
                 all_task.sort()
                 lc = 0
                 header = '{}{}{}{}{}'.format(
