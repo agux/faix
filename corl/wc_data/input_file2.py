@@ -98,7 +98,7 @@ def _get_infer_tasklist(rbase, project=None):
             fs = [field.strip() for field in h.split(TALIST_SEP)]
             line_size = max(int(fs[2]), line_size)
             gs_infer_base_path = fs[0]
-            total = fs[1]
+            total = int(fs[1])
             print('{} base path: {} total: {} header size: {} line size: {}'.format(
                 strftime("%H:%M:%S"), gs_infer_base_path, total, header_size, line_size))
             print('{} scanning tasklist file...'.format(strftime("%H:%M:%S")))
