@@ -10,7 +10,7 @@ fi
 
 echo 'syncing file system...'
 sync
-tar -xvf nohup.tar.gz nohup.log
+tar -zcvf nohup.tar.gz nohup.log
 gsutil cp "nohup.tar.gz" gs://carusytes_bucket/
 echo 'shutting down vm...'
 sudo shutdown -h now
