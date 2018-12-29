@@ -39,7 +39,9 @@ def parseArgs():
                      help='gcs remote directory path for inference file', required=True)
     req.add_argument('-p', '--path', type=str,
                      help='gcs remote directory path for inference result files', required=True)
-
+    
+    parser.add_argument('-d', '--del_used', dest='del_used', default=False,
+                        action='store_false', help='delete used inference files.')
     parser.add_argument('--project', dest='project', type=str,
                         help='gcs remote directory path for inference result files')
     parser.add_argument('-f', '--prefetch', type=int,
@@ -58,7 +60,7 @@ def parseArgs():
 
 
 def run(args):
-    print("{} started training, pid:{}".format(
+    print("{} started inference, pid:{}".format(
         strftime("%H:%M:%S"), os.getpid()))
     tf.logging.set_verbosity(tf.logging.INFO)
     keep_prob = tf.placeholder(tf.float32, [], name="kprob")
@@ -110,6 +112,7 @@ def run(args):
         bno = 0
         records = []
         indices = []
+        rpaths  = []
         last_rw = None
         while True:
             try:
@@ -120,7 +123,7 @@ def run(args):
                 if (args.trace or args.profile) and bno+1 >= 5 and bno+1 <= 10:
                     ro = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
                     rm = tf.RunMetadata()
-                code, klid, idx, r = sess.run([d['code'], d['klid'], d['idx'], model.infer],
+                code, klid, idx, rpath, r = sess.run([d['code'], d['klid'], d['idx'], d['rel_path'], model.infer],
                                               {d['handle']: infer_handle,
                                                keep_prob: KEEP_PROB},
                                               options=ro, run_metadata=rm)
@@ -138,13 +141,14 @@ def run(args):
                         'ncorl': float(ncorl)
                     }
                 )
+                rpaths.append(str(rpath))
                 if len(records) >= args.batch:
                     if last_rw is not None:
                         # wait for last write to complete
                         last_rw.result()
                     last_rw = output_file.write_result(
-                        args.path, indices, records)
-                    indices, records = [], []
+                        args.path, indices, records, args.del_used, rpaths)
+                    indices, records, rpaths = [], [], []
                 if profiler is not None and bno+1 >= 5 and bno+1 <= 10:
                     profiler.add_step(bno+1, rm)
                     if bno+1 == 10:
@@ -178,7 +182,7 @@ def run(args):
         if len(records) > 0:
             if last_rw is not None:
                 last_rw.result()
-            output_file.write_result(args.path, indices, records).result()
+            output_file.write_result(args.path, indices, records, args.del_used, rpaths).result()
 
         output_file.shutdown()
 

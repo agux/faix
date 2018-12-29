@@ -123,18 +123,20 @@ def _get_infer_tasklist(rbase, project=None):
                 all_task.sort()
                 lc = 0
                 header = '{}{}{}{}{}'.format(
-                        rbase, TALIST_SEP, total, TALIST_SEP, line_size)
+                    rbase, TALIST_SEP, total, TALIST_SEP, line_size)
                 header_size = len(header)
                 print('{} rewriting tasklist file. base path: {} total: {} header size: {} line size: {}'.format(
                     strftime("%H:%M:%S"), rbase, total, header_size, line_size))
-                #rewrite tasklist file
+                # rewrite tasklist file
                 with open(TASKLIST_FILE, 'wb') as f:
                     f.write(header + '\n')
                     for i, p in enumerate(all_task):
                         status = tkrelps.get(p, "P")
-                        f.write('{}{}{}'.format(p, TALIST_SEP, status).ljust(line_size) + '\n')
+                        f.write('{}{}{}'.format(p, TALIST_SEP,
+                                                status).ljust(line_size) + '\n')
                         if "P" == status:
-                            tasklist.append([p, str(header_size+1 + i*(line_size+1))])
+                            tasklist.append(
+                                [p, str(header_size+1 + i*(line_size+1))])
                     f.flush()
         print('{} pending task: {}'.format(
             strftime("%H:%M:%S"), len(tasklist)))
@@ -163,7 +165,7 @@ def _loadData(file_dir, file_name):
     '''
     Load json data from local or remote gz file
 
-    Returned dict structure:
+    Returned dict structure for the loaded data:
     features = [None, max_step, feature*time_shift]
     labels = [None] # for training and test set
     seqlens = [None]
@@ -177,11 +179,11 @@ def _loadData(file_dir, file_name):
         bn = s.group(1)
         on = '{}/{}.json.gz'.format(s.group(2), file_name)
         with gzip.GzipFile(fileobj=_file_from_gcs(bn, on), mode='rb') as fin:
-            return json.loads(fin.read().decode('utf-8'))
+            return json.loads(fin.read().decode('utf-8')), on
     else:
         file = os.path.join(file_dir, '{}.json.gz'.format(file_name))
         with gzip.GzipFile(file, 'rb') as fin:
-            return json.loads(fin.read().decode('utf-8'))
+            return json.loads(fin.read().decode('utf-8')), file
 
 
 def _loadTestSet(max_bno, vset=None):
@@ -194,7 +196,7 @@ def _loadTestSet(max_bno, vset=None):
     path = file_dir
     if vol_size is not None:
         path = "{}/vol_{}".format(file_dir, vset//vol_size)
-    data = _loadData(path, flag)
+    data, _ = _loadData(path, flag)
     return np.array(data['features'], 'f'), np.array(data['labels'], 'f'), np.array(data['seqlens'], 'i')
 
 
@@ -206,7 +208,7 @@ def _loadBatchData(flag):
     if vol_size is not None:
         bno = int(flag[flag.rfind("_")+1:])
         path = "{}/vol_{}".format(file_dir, bno//vol_size)
-    data = _loadData(path, flag)
+    data, _ = _loadData(path, flag)
     return np.array(data['features'], 'f'), np.array(data['labels'], 'f'), np.array(data['seqlens'], 'i')
 
 
@@ -215,10 +217,10 @@ def _load_infer_data(task):
     v, name = os.path.split(task[0])
     path = '{}/vol_{}'.format(gs_infer_base_path, v)
     print("{} loading infer file {}/{}.json.gz ...".format(strftime("%H:%M:%S"), path, name))
-    data = _loadData(path, name)
-    # features, seqlens, code, klid, refs, idx
+    data, rel_path = _loadData(path, name)
+    # features, seqlens, code, klid, refs, idx, rel_path
     return np.array(data['features'], 'f'), np.array(data['seqlens'], 'i'), data['code'], \
-        np.int32(data['klid']), np.array(data['refs'], 'U'), np.int32(task[1])
+        np.int32(data['klid']), np.array(data['refs'], 'U'), np.int32(task[1]), np.str(rel_path)
 
 
 def _read_meta_config(file_dir):
@@ -247,8 +249,9 @@ def _read_meta_config(file_dir):
 
 
 def _infer_map_func(task):
-    # features, seqlens, code, klid, refs, idx
-    return tuple(tf.py_func(_load_infer_data, [task], [tf.float32, tf.int32, tf.string, tf.int32, tf.string, tf.int32]))
+    # features, seqlens, code, klid, refs, idx, rel_path
+    return tuple(tf.py_func(_load_infer_data, [task],
+                            [tf.float32, tf.int32, tf.string, tf.int32, tf.string, tf.int32, tf.string]))
 
 
 def _map_func(flag):
@@ -277,14 +280,15 @@ def getInferInput(rbase, prefetch=2):
         infer_iterator = infer_dataset.make_one_shot_iterator()
 
         handle = tf.placeholder(tf.string, shape=[])
-        # features, seqlens, code, klid, refs, idx
+        # features, seqlens, code, klid, refs, idx, rel_path
         types = (tf.float32, tf.int32, tf.string,
-                 tf.int32, tf.string, tf.int32)
+                 tf.int32, tf.string, tf.int32, tf.string)
         shapes = (tf.TensorShape([None, time_step, feature_size]),
                   tf.TensorShape([None]),
                   tf.TensorShape([]),
                   tf.TensorShape([]),
                   tf.TensorShape([None]),
+                  tf.TensorShape([]),
                   tf.TensorShape([]))
         iter = tf.data.Iterator.from_string_handle(
             handle, types, infer_iterator.output_shapes)
@@ -302,9 +306,12 @@ def getInferInput(rbase, prefetch=2):
         refs.set_shape(shapes[4])
         idx = tf.squeeze(next_el[5])
         idx.set_shape(shapes[5])
+        rel_path = tf.squeeze(next_el[6])
+        rel_path.set_shape(shapes[6])
         # return a dictionary
         inputs = {'features': features, 'seqlens': seqlens, 'handle': handle,
-                  'infer_iter': infer_iterator, 'code': code, 'klid': klid, 'refs': refs, 'idx': idx}
+                  'infer_iter': infer_iterator, 'code': code, 'klid': klid,
+                  'refs': refs, 'idx': idx, 'rel_path': rel_path}
         return inputs
 
 

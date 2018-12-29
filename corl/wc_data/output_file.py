@@ -47,6 +47,19 @@ def _upload_gcs(file, bucket_name, object_name):
     # with open(file, 'rb') as f:
     blob.upload_from_file(file, rewind=True, content_type='application/json')
 
+@retry(retry_on_exception=print_n_retry,
+       stop_max_attempt_number=7,
+       wait_exponential_multiplier=1000,
+       wait_exponential_max=32000)
+def _delete_blobs(bucket_name, blob_names):
+    """Deletes blobs from the bucket."""
+    global gcs_client
+    if gcs_client is None:
+        gcs_client = gcs.Client()
+    bucket = gcs_client.get_bucket(bucket_name)
+    for bn in blob_names:
+        blob = bucket.blob(bn)
+        blob.delete()
 
 def _write_file(fileobj, payload):
     with gzip.GzipFile(fileobj=fileobj, mode='wb') as fout:
@@ -54,19 +67,18 @@ def _write_file(fileobj, payload):
             payload, separators=(',', ':')).encode('utf-8'))
         fout.flush()
 
-
-def _write_result(path, indices, records):
+def _write_result(path, indices, records, del_used, rpaths):
     result = {'records': records}
+    s = re.search('gs://([^/]*)/(.*)', path)
+    bucket = s.group(1)
     # generate result file in memory
     # tmp = tmpf.SpooledTemporaryFile(max_size=1024*1024*100)
     with tmpf.TemporaryFile(mode='wb+') as tmp:
         _write_file(tmp, result)
         # upload to gcs (overwrite)
-        s = re.search('gs://([^/]*)/(.*)', path)
-        bn = s.group(1)
         objn = '{}/r_{}.json.gz'.format(s.group(2),
                                         datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")[:-3])
-        _upload_gcs(tmp, bn, objn)
+        _upload_gcs(tmp, bucket, objn)
     print('{} result file uploaded to {}'.format(strftime("%H:%M:%S"), objn))
     # update tasklist item status
     sep = input_file2.TALIST_SEP
@@ -79,11 +91,15 @@ def _write_result(path, indices, records):
             f.seek(idx)
             f.write('O')
         f.flush()
+    # delete used inference file if needed
+    if del_used:
+        _delete_blobs(bucket, rpaths)
+
     return os.getpid()
 
 
-def write_result(path, indices, records):
-    return _getExecutor().submit(_write_result, path, indices, records)
+def write_result(path, indices, records, del_used, rpaths):
+    return _getExecutor().submit(_write_result, path, indices, records, del_used, rpaths)
     # return _write_result(path, indices, records)
 
 
