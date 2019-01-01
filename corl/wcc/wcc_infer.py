@@ -39,7 +39,7 @@ def parseArgs():
                      help='gcs remote directory path for inference file', required=True)
     req.add_argument('-p', '--path', type=str,
                      help='gcs remote directory path for inference result files', required=True)
-    
+
     parser.add_argument('-d', '--del_used', dest='del_used', default=False,
                         action='store_false', help='delete used inference files.')
     parser.add_argument('--project', dest='project', type=str,
@@ -60,8 +60,8 @@ def parseArgs():
 
 
 def run(args):
-    print("{} started inference, pid:{}".format(
-        strftime("%H:%M:%S"), os.getpid()))
+    print("{} started inference, pid:{}, del_used: {}".format(
+        strftime("%H:%M:%S"), os.getpid(), args.del_used))
     tf.logging.set_verbosity(tf.logging.INFO)
     keep_prob = tf.placeholder(tf.float32, [], name="kprob")
     config = tf.ConfigProto(
@@ -112,7 +112,7 @@ def run(args):
         bno = 0
         records = []
         indices = []
-        rpaths  = []
+        rpaths = []
         last_rw = None
         while True:
             try:
@@ -124,9 +124,9 @@ def run(args):
                     ro = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
                     rm = tf.RunMetadata()
                 code, klid, idx, rpath, r = sess.run([d['code'], d['klid'], d['idx'], d['rel_path'], model.infer],
-                                              {d['handle']: infer_handle,
-                                               keep_prob: KEEP_PROB},
-                                              options=ro, run_metadata=rm)
+                                                     {d['handle']: infer_handle,
+                                                      keep_prob: KEEP_PROB},
+                                                     options=ro, run_metadata=rm)
                 posc, pcorl, negc, ncorl = r[0], r[1], r[2], r[3]
                 print('{} bno {} {}@{}: posc {}, pcorl {}, negc {}, ncorl {}'.format(
                     strftime("%H:%M:%S"), bno, code, klid, posc, pcorl, negc, ncorl))
@@ -182,7 +182,8 @@ def run(args):
         if len(records) > 0:
             if last_rw is not None:
                 last_rw.result()
-            output_file.write_result(args.path, indices, records, args.del_used, rpaths).result()
+            output_file.write_result(
+                args.path, indices, records, args.del_used, rpaths).result()
 
         output_file.shutdown()
 

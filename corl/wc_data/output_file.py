@@ -47,6 +47,7 @@ def _upload_gcs(file, bucket_name, object_name):
     # with open(file, 'rb') as f:
     blob.upload_from_file(file, rewind=True, content_type='application/json')
 
+
 @retry(retry_on_exception=print_n_retry,
        stop_max_attempt_number=7,
        wait_exponential_multiplier=1000,
@@ -58,14 +59,17 @@ def _delete_blobs(bucket_name, blob_names):
         gcs_client = gcs.Client()
     bucket = gcs_client.get_bucket(bucket_name)
     for bn in blob_names:
+        print('{} deleting {}'.format(strftime("%H:%M:%S"), bn))
         blob = bucket.blob(bn)
         blob.delete()
+
 
 def _write_file(fileobj, payload):
     with gzip.GzipFile(fileobj=fileobj, mode='wb') as fout:
         fout.write(json.dumps(
             payload, separators=(',', ':')).encode('utf-8'))
         fout.flush()
+
 
 def _write_result(path, indices, records, del_used, rpaths):
     result = {'records': records}
