@@ -59,7 +59,7 @@ def _delete_blobs(bucket_name, blob_names):
         gcs_client = gcs.Client()
     bucket = gcs_client.get_bucket(bucket_name)
     for bn in blob_names:
-        print('{} deleting {}'.format(strftime("%H:%M:%S"), bn))
+        # print('{} deleting {}'.format(strftime("%H:%M:%S"), bn))
         blob = bucket.blob(bn)
         blob.delete()
 
