@@ -41,7 +41,7 @@ def parseArgs():
                      help='gcs remote directory path for inference result files', required=True)
 
     parser.add_argument('-d', '--del_used', dest='del_used', default=False,
-                        action='store_false', help='delete used inference files.')
+                        action='store_true', help='delete used inference files.')
     parser.add_argument('--project', dest='project', type=str,
                         help='gcs remote directory path for inference result files')
     parser.add_argument('-f', '--prefetch', type=int,
@@ -49,12 +49,12 @@ def parseArgs():
     parser.add_argument('-b', '--batch', type=int, dest="batch",
                         help='inference result file batch size', default=128)
     parser.add_argument('-g', '--gpu_grow_mem', dest='gpu_grow_mem', default=False,
-                        action='store_false', help='allow gpu to allocate mem dynamically at runtime.')
-    parser.add_argument('--trace', dest='trace', action='store_false', default=False,
+                        action='store_true', help='allow gpu to allocate mem dynamically at runtime.')
+    parser.add_argument('--trace', dest='trace', action='store_true', default=False,
                         help='record full trace in validation step.')
-    parser.add_argument('--profile', dest='profile', action='store_false', default=False,
+    parser.add_argument('--profile', dest='profile', action='store_true', default=False,
                         help='profile CG execution.')
-    parser.add_argument('--log_device', dest='log_device', action='store_false', default=False,
+    parser.add_argument('--log_device', dest='log_device', action='store_true', default=False,
                         help='record device info such as CPU and GPU in tensorboard.')
     return parser.parse_args()
 
