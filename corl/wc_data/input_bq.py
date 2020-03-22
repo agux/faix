@@ -237,12 +237,12 @@ def getInputs(start=0, shift=0, cols=None, step=30, test_batch_size=None,
     print("{} Using parallel: {}, prefetch: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch))
     init_fs_stats()
-    with tf.variable_scope("build_inputs"):
+    with tf.compat.v1.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max
         flags = ["TRAIN_{}".format(bno) for bno in range(start, MAX_BNO)]
         train_dataset = tf.data.Dataset.from_tensor_slices(flags).map(
             lambda f: tuple(
-                tf.py_func(_loadTrainingData, [f], [
+                tf.compat.v1.py_func(_loadTrainingData, [f], [
                            tf.float32, tf.float32, tf.int32])
             ), _prefetch
         ).batch(1).prefetch(_prefetch)
@@ -250,14 +250,14 @@ def getInputs(start=0, shift=0, cols=None, step=30, test_batch_size=None,
         test_dataset = tf.data.Dataset.from_tensor_slices(
             _loadTestSet(step, MAX_TEST_SET+1, vset)).batch(test_batch_size).repeat()
 
-        train_iterator = train_dataset.make_one_shot_iterator()
-        test_iterator = test_dataset.make_one_shot_iterator()
+        train_iterator = tf.compat.v1.data.make_one_shot_iterator(train_dataset)
+        test_iterator = tf.compat.v1.data.make_one_shot_iterator(test_dataset)
 
-        handle = tf.placeholder(tf.string, shape=[])
+        handle = tf.compat.v1.placeholder(tf.string, shape=[])
         types = (tf.float32, tf.float32, tf.int32)
         shapes = (tf.TensorShape([None, step, feat_size]),
                   tf.TensorShape([None]), tf.TensorShape([None]))
-        iter = tf.data.Iterator.from_string_handle(
+        iter = tf.compat.v1.data.Iterator.from_string_handle(
             handle, types, train_dataset.output_shapes)
 
         next_el = iter.get_next()

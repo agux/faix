@@ -27,26 +27,26 @@ LOG_DIR = 'logdir'
 
 
 def collect_summary(sess, model, base_dir):
-    train_writer = tf.summary.FileWriter(base_dir + "/train", sess.graph)
-    test_writer = tf.summary.FileWriter(base_dir + "/test", sess.graph)
-    with tf.name_scope("Basic"):
-        tf.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
-    summary = tf.summary.merge_all()
+    train_writer = tf.compat.v1.summary.FileWriter(base_dir + "/train", sess.graph)
+    test_writer = tf.compat.v1.summary.FileWriter(base_dir + "/test", sess.graph)
+    with tf.compat.v1.name_scope("Basic"):
+        tf.compat.v1.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
+    summary = tf.compat.v1.summary.merge_all()
     return summary, train_writer, test_writer
 
 
 def run():
-    tf.logging.set_verbosity(tf.logging.INFO)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
     loader = data0.DataLoader(TIME_SHIFT)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     tuuids, tdata, tvals, tseqlen = loader.loadTestSet(MAX_STEP, N_TEST)
     print('input shape: {}'.format(tdata.shape))
     print('target shape: {}'.format(tvals.shape))
     featSize = tdata.shape[2]
-    data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
-    target = tf.placeholder(tf.float32, [None], "target")
-    seqlen = tf.placeholder(tf.int32, [None], "seqlen")
-    with tf.Session() as sess:
+    data = tf.compat.v1.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
+    target = tf.compat.v1.placeholder(tf.float32, [None], "target")
+    seqlen = tf.compat.v1.placeholder(tf.int32, [None], "seqlen")
+    with tf.compat.v1.Session() as sess:
         model = model0.SRnnRegressorV2(
             data=data,
             target=target,
@@ -62,13 +62,13 @@ def run():
         base_dir = '{}/{}_{}/{}'.format(LOG_DIR, fbase,
                                         model_name, strftime("%Y%m%d_%H%M%S"))
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
-        if tf.gfile.Exists(base_dir):
-            tf.gfile.DeleteRecursively(base_dir)
-        tf.gfile.MakeDirs(base_dir)
-        sess.run(tf.global_variables_initializer())
+        if tf.io.gfile.exists(base_dir):
+            tf.io.gfile.rmtree(base_dir)
+        tf.io.gfile.makedirs(base_dir)
+        sess.run(tf.compat.v1.global_variables_initializer())
         summary, train_writer, test_writer = collect_summary(
             sess, model, base_dir)
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
         bno = 0
         epoch = 0
         while True:

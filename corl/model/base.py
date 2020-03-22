@@ -51,12 +51,12 @@ class SRnnRegressor:
     @lazy_property
     def logits(self):
         layer = self.rnn(self, self.data)
-        output = tf.layers.dense(
+        output = tf.compat.v1.layers.dense(
             inputs=layer,
             units=1,
-            kernel_initializer=tf.truncated_normal_initializer(
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                 stddev=stddev(1.0, int(layer.get_shape()[-1]))),
-            bias_initializer=tf.constant_initializer(0.1),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             activation=tf.nn.tanh,
             name="output"
         )
@@ -68,7 +68,7 @@ class SRnnRegressor:
         c = None
         _cell = self._cell.lower()
         if _cell == 'gru':
-            c = tf.nn.rnn_cell.GRUCell(
+            c = tf.compat.v1.nn.rnn_cell.GRUCell(
                 num_units=self._layer_width
             )
         elif _cell == 'grublock':
@@ -76,12 +76,12 @@ class SRnnRegressor:
                 num_units=self._layer_width
             )
         elif _cell == 'lstm':
-            c = tf.nn.rnn_cell.LSTMCell(
+            c = tf.compat.v1.nn.rnn_cell.LSTMCell(
                 num_units=self._layer_width,
                 use_peepholes=self._use_peepholes
             )
         elif _cell == 'basiclstm':
-            c = tf.nn.rnn_cell.BasicLSTMCell(
+            c = tf.compat.v1.nn.rnn_cell.BasicLSTMCell(
                 num_units=self._layer_width
             )
         elif _cell == 'layernormbasiclstm':
@@ -144,7 +144,7 @@ class SRnnRegressor:
             )
         else:
             raise ValueError('unrecognized cell type:{}'.format(_cell))
-        output, _ = tf.nn.dynamic_rnn(
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             # output, _ = tf.nn.dynamic_rnn(
             c,
             inputs,
@@ -157,8 +157,8 @@ class SRnnRegressor:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
@@ -166,22 +166,22 @@ class SRnnRegressor:
     @lazy_property
     def cost(self):
         logits = self.logits
-        with tf.name_scope("cost"):
-            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+        with tf.compat.v1.name_scope("cost"):
+            return tf.compat.v1.losses.mean_squared_error(labels=self.target, predictions=logits)
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate,
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate,
                                       epsilon=1e-7).minimize(
-            self.cost, global_step=tf.train.get_global_step())
+            self.cost, global_step=tf.compat.v1.train.get_global_step())
 
     @lazy_property
     def worst(self):
         logits = self.logits
-        with tf.name_scope("worst"):
-            sqd = tf.squared_difference(logits, self.target)
-            bidx = tf.argmax(sqd)
-            max_diff = tf.sqrt(tf.reduce_max(sqd))
+        with tf.compat.v1.name_scope("worst"):
+            sqd = tf.math.squared_difference(logits, self.target)
+            bidx = tf.argmax(input=sqd)
+            max_diff = tf.sqrt(tf.reduce_max(input_tensor=sqd))
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
             return bidx, max_diff, predict, actual
@@ -226,11 +226,11 @@ class SRnnRegressorV2:
     def logits(self):
         layer = self.rnn(self, self.data)
         layer = tf.nn.relu(layer)
-        output = tf.layers.dense(
+        output = tf.compat.v1.layers.dense(
             inputs=layer,
             units=1,
-            kernel_initializer=tf.variance_scaling_initializer(),
-            bias_initializer=tf.constant_initializer(0.1),
+            kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             # activation=tf.nn.tanh,
             name="output"
         )
@@ -242,7 +242,7 @@ class SRnnRegressorV2:
         c = None
         _cell = self._cell.lower()
         if _cell == 'gru':
-            c = tf.nn.rnn_cell.GRUCell(
+            c = tf.compat.v1.nn.rnn_cell.GRUCell(
                 num_units=self._layer_width
             )
         elif _cell == 'grublock':
@@ -250,12 +250,12 @@ class SRnnRegressorV2:
                 num_units=self._layer_width
             )
         elif _cell == 'lstm':
-            c = tf.nn.rnn_cell.LSTMCell(
+            c = tf.compat.v1.nn.rnn_cell.LSTMCell(
                 num_units=self._layer_width,
                 use_peepholes=self._use_peepholes
             )
         elif _cell == 'basiclstm':
-            c = tf.nn.rnn_cell.BasicLSTMCell(
+            c = tf.compat.v1.nn.rnn_cell.BasicLSTMCell(
                 num_units=self._layer_width
             )
         elif _cell == 'layernormbasiclstm':
@@ -318,7 +318,7 @@ class SRnnRegressorV2:
             )
         else:
             raise ValueError('unrecognized cell type:{}'.format(_cell))
-        output, _ = tf.nn.dynamic_rnn(
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             # output, _ = tf.nn.dynamic_rnn(
             c,
             inputs,
@@ -331,8 +331,8 @@ class SRnnRegressorV2:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
@@ -340,22 +340,22 @@ class SRnnRegressorV2:
     @lazy_property
     def cost(self):
         logits = self.logits
-        with tf.name_scope("cost"):
-            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+        with tf.compat.v1.name_scope("cost"):
+            return tf.compat.v1.losses.mean_squared_error(labels=self.target, predictions=logits)
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate,
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate,
                                       epsilon=1e-7).minimize(
-            self.cost, global_step=tf.train.get_global_step())
+            self.cost, global_step=tf.compat.v1.train.get_global_step())
 
     @lazy_property
     def worst(self):
         logits = self.logits
-        with tf.name_scope("worst"):
-            sqd = tf.squared_difference(logits, self.target)
-            bidx = tf.argmax(sqd)
-            max_diff = tf.sqrt(tf.reduce_max(sqd))
+        with tf.compat.v1.name_scope("worst"):
+            sqd = tf.math.squared_difference(logits, self.target)
+            bidx = tf.argmax(input=sqd)
+            max_diff = tf.sqrt(tf.reduce_max(input_tensor=sqd))
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
             return bidx, max_diff, predict, actual
@@ -395,13 +395,13 @@ class SRnnRegressorV3:
     @lazy_property
     def logits(self):
         layer = self.rnn(self, self.data)
-        with tf.variable_scope("output"):
+        with tf.compat.v1.variable_scope("output"):
             layer = tf.nn.selu(layer)
-            output = tf.layers.dense(
+            output = tf.compat.v1.layers.dense(
                 inputs=layer,
                 units=1,
-                kernel_initializer=tf.variance_scaling_initializer(),
-                bias_initializer=tf.constant_initializer(0.1)
+                kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             )
             output = tf.squeeze(output)
             return output
@@ -430,7 +430,7 @@ class SRnnRegressorV3:
 
     @staticmethod
     def rnn(self, inputs):
-        output, _ = tf.nn.dynamic_rnn(
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             self.newCell(self._layer_width, self._dim),
             inputs,
             dtype=tf.float32,
@@ -442,8 +442,8 @@ class SRnnRegressorV3:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
@@ -451,22 +451,22 @@ class SRnnRegressorV3:
     @lazy_property
     def cost(self):
         logits = self.logits
-        with tf.name_scope("cost"):
-            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+        with tf.compat.v1.name_scope("cost"):
+            return tf.compat.v1.losses.mean_squared_error(labels=self.target, predictions=logits)
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate,
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate,
                                       epsilon=1e-7).minimize(
-            self.cost, global_step=tf.train.get_or_create_global_step())
+            self.cost, global_step=tf.compat.v1.train.get_or_create_global_step())
 
     @lazy_property
     def worst(self):
         logits = self.logits
-        with tf.name_scope("worst"):
-            sqd = tf.squared_difference(logits, self.target)
-            bidx = tf.argmax(sqd)
-            max_diff = tf.sqrt(tf.reduce_max(sqd))
+        with tf.compat.v1.name_scope("worst"):
+            sqd = tf.math.squared_difference(logits, self.target)
+            bidx = tf.argmax(input=sqd)
+            max_diff = tf.sqrt(tf.reduce_max(input_tensor=sqd))
             uuid = tf.gather(self.uuids, bidx)
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
@@ -510,13 +510,13 @@ class SRnnRegressorV4:
     def logits(self):
         layer = self.rnn(self, self.data)
         layer = self.fcn(self, layer)
-        with tf.variable_scope("output"):
-            output = tf.layers.dense(
+        with tf.compat.v1.variable_scope("output"):
+            output = tf.compat.v1.layers.dense(
                 inputs=layer,
                 units=1,
                 # kernel_initializer=tf.variance_scaling_initializer(),
-                kernel_initializer=tf.keras.initializers.lecun_normal(),
-                bias_initializer=tf.constant_initializer(0.1)
+                kernel_initializer=tf.compat.v1.keras.initializers.lecun_normal(),
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             )
             output = tf.squeeze(output)
             return output
@@ -524,13 +524,13 @@ class SRnnRegressorV4:
     @staticmethod
     def fcn(self, inputs):
         layer = inputs
-        with tf.variable_scope("fcn"):
+        with tf.compat.v1.variable_scope("fcn"):
             layer = tf.contrib.nn.alpha_dropout(layer, keep_prob=1.0-self._dropout)
-            layer = tf.layers.dense(
+            layer = tf.compat.v1.layers.dense(
                     inputs=layer,
                     units=self._layer_width,
-                    kernel_initializer=tf.keras.initializers.lecun_normal(),
-                    bias_initializer=tf.constant_initializer(0.1),
+                    kernel_initializer=tf.compat.v1.keras.initializers.lecun_normal(),
+                    bias_initializer=tf.compat.v1.constant_initializer(0.1),
                     activation=tf.nn.selu
             )
         return layer
@@ -559,7 +559,7 @@ class SRnnRegressorV4:
 
     @staticmethod
     def rnn(self, inputs):
-        output, _ = tf.nn.dynamic_rnn(
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             self.newCell(self._layer_width, self._dim),
             inputs,
             dtype=tf.float32,
@@ -571,8 +571,8 @@ class SRnnRegressorV4:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
@@ -580,22 +580,22 @@ class SRnnRegressorV4:
     @lazy_property
     def cost(self):
         logits = self.logits
-        with tf.name_scope("cost"):
-            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+        with tf.compat.v1.name_scope("cost"):
+            return tf.compat.v1.losses.mean_squared_error(labels=self.target, predictions=logits)
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate,
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate,
                                       epsilon=1e-7).minimize(
-            self.cost, global_step=tf.train.get_or_create_global_step())
+            self.cost, global_step=tf.compat.v1.train.get_or_create_global_step())
 
     @lazy_property
     def worst(self):
         logits = self.logits
-        with tf.name_scope("worst"):
-            sqd = tf.squared_difference(logits, self.target)
-            bidx = tf.argmax(sqd)
-            max_diff = tf.sqrt(tf.reduce_max(sqd))
+        with tf.compat.v1.name_scope("worst"):
+            sqd = tf.math.squared_difference(logits, self.target)
+            bidx = tf.argmax(input=sqd)
+            max_diff = tf.sqrt(tf.reduce_max(input_tensor=sqd))
             uuid = tf.gather(self.uuids, bidx)
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
@@ -639,12 +639,12 @@ class SRnnRegressorV5:
     def logits(self):
         layer = self.rnn(self, self.data)
         layer = self.fcn(self, layer)
-        with tf.variable_scope("output"):
-            output = tf.layers.dense(
+        with tf.compat.v1.variable_scope("output"):
+            output = tf.compat.v1.layers.dense(
                 inputs=layer,
                 units=1,
-                kernel_initializer=tf.variance_scaling_initializer(),
-                bias_initializer=tf.constant_initializer(0.1)
+                kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             )
             output = tf.squeeze(output)
             return output
@@ -652,13 +652,13 @@ class SRnnRegressorV5:
     @staticmethod
     def fcn(self, inputs):
         layer = inputs
-        with tf.variable_scope("fcn"):
-            layer = tf.nn.dropout(layer, keep_prob=1.0-self._dropout)
-            layer = tf.layers.dense(
+        with tf.compat.v1.variable_scope("fcn"):
+            layer = tf.nn.dropout(layer, rate=1 - (1.0-self._dropout))
+            layer = tf.compat.v1.layers.dense(
                     inputs=layer,
                     units=self._layer_width,
-                    kernel_initializer=tf.variance_scaling_initializer(),
-                    bias_initializer=tf.constant_initializer(0.1),
+                    kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                    bias_initializer=tf.compat.v1.constant_initializer(0.1),
                     activation=tf.nn.relu
             )
         return layer
@@ -666,7 +666,7 @@ class SRnnRegressorV5:
     @staticmethod
     def newCell(width, _dim):
         def cell_fn(n):
-            return tf.nn.rnn_cell.BasicLSTMCell(
+            return tf.compat.v1.nn.rnn_cell.BasicLSTMCell(
                 num_units=n
             )
         c = tf.contrib.grid_rnn.GridRNNCell(
@@ -686,7 +686,7 @@ class SRnnRegressorV5:
 
     @staticmethod
     def rnn(self, inputs):
-        output, _ = tf.nn.dynamic_rnn(
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             self.newCell(self._layer_width, self._dim),
             inputs,
             dtype=tf.float32,
@@ -698,8 +698,8 @@ class SRnnRegressorV5:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
@@ -707,22 +707,22 @@ class SRnnRegressorV5:
     @lazy_property
     def cost(self):
         logits = self.logits
-        with tf.name_scope("cost"):
-            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+        with tf.compat.v1.name_scope("cost"):
+            return tf.compat.v1.losses.mean_squared_error(labels=self.target, predictions=logits)
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate,
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate,
                                       epsilon=1e-7).minimize(
-            self.cost, global_step=tf.train.get_or_create_global_step())
+            self.cost, global_step=tf.compat.v1.train.get_or_create_global_step())
 
     @lazy_property
     def worst(self):
         logits = self.logits
-        with tf.name_scope("worst"):
-            sqd = tf.squared_difference(logits, self.target)
-            bidx = tf.argmax(sqd)
-            max_diff = tf.sqrt(tf.reduce_max(sqd))
+        with tf.compat.v1.name_scope("worst"):
+            sqd = tf.math.squared_difference(logits, self.target)
+            bidx = tf.argmax(input=sqd)
+            max_diff = tf.sqrt(tf.reduce_max(input_tensor=sqd))
             uuid = tf.gather(self.uuids, bidx)
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
@@ -765,12 +765,12 @@ class SRnnRegressorV6:
     def logits(self):
         layer = self.rnn(self, self.data)
         layer = self.fcn(self, layer)
-        with tf.variable_scope("output"):
-            output = tf.layers.dense(
+        with tf.compat.v1.variable_scope("output"):
+            output = tf.compat.v1.layers.dense(
                 inputs=layer,
                 units=1,
-                kernel_initializer=tf.variance_scaling_initializer(),
-                bias_initializer=tf.constant_initializer(0.1)
+                kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             )
             output = tf.squeeze(output)
             return output
@@ -778,28 +778,28 @@ class SRnnRegressorV6:
     @staticmethod
     def fcn(self, inputs):
         layer = inputs
-        with tf.variable_scope("fcn"):
+        with tf.compat.v1.variable_scope("fcn"):
             layer = tf.contrib.layers.batch_norm(
                 inputs=layer,
                 is_training=self._training,
                 updates_collections=None
             )
-            layer = tf.layers.dense(
+            layer = tf.compat.v1.layers.dense(
                     inputs=layer,
                     units=self._layer_width,
-                    kernel_initializer=tf.variance_scaling_initializer(),
-                    bias_initializer=tf.constant_initializer(0.1),
+                    kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                    bias_initializer=tf.compat.v1.constant_initializer(0.1),
                     activation=tf.nn.relu
             )
-            layer = tf.layers.dropout(
+            layer = tf.compat.v1.layers.dropout(
                 inputs=layer, 
                 rate=0.5,
                 training=self._training)
-            layer = tf.layers.dense(
+            layer = tf.compat.v1.layers.dense(
                     inputs=layer,
                     units=self._layer_width,
-                    kernel_initializer=tf.variance_scaling_initializer(),
-                    bias_initializer=tf.constant_initializer(0.1),
+                    kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                    bias_initializer=tf.compat.v1.constant_initializer(0.1),
                     activation=tf.nn.relu
             )
         return layer
@@ -807,7 +807,7 @@ class SRnnRegressorV6:
     @staticmethod
     def newCell(width, _dim):
         def cell_fn(n):
-            return tf.nn.rnn_cell.BasicLSTMCell(
+            return tf.compat.v1.nn.rnn_cell.BasicLSTMCell(
                 num_units=n
             )
         c = tf.contrib.grid_rnn.GridRNNCell(
@@ -827,7 +827,7 @@ class SRnnRegressorV6:
 
     @staticmethod
     def rnn(self, inputs):
-        output, _ = tf.nn.dynamic_rnn(
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             self.newCell(self._layer_width, self._dim),
             inputs,
             dtype=tf.float32,
@@ -839,8 +839,8 @@ class SRnnRegressorV6:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
@@ -848,22 +848,22 @@ class SRnnRegressorV6:
     @lazy_property
     def cost(self):
         logits = self.logits
-        with tf.name_scope("cost"):
-            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+        with tf.compat.v1.name_scope("cost"):
+            return tf.compat.v1.losses.mean_squared_error(labels=self.target, predictions=logits)
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate,
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate,
                                       epsilon=1e-7).minimize(
-            self.cost, global_step=tf.train.get_or_create_global_step())
+            self.cost, global_step=tf.compat.v1.train.get_or_create_global_step())
 
     @lazy_property
     def worst(self):
         logits = self.logits
-        with tf.name_scope("worst"):
-            sqd = tf.squared_difference(logits, self.target)
-            bidx = tf.argmax(sqd)
-            max_diff = tf.sqrt(tf.reduce_max(sqd))
+        with tf.compat.v1.name_scope("worst"):
+            sqd = tf.math.squared_difference(logits, self.target)
+            bidx = tf.argmax(input=sqd)
+            max_diff = tf.sqrt(tf.reduce_max(input_tensor=sqd))
             uuid = tf.gather(self.uuids, bidx)
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)

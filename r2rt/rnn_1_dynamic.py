@@ -74,8 +74,8 @@ def gen_epochs(n, num_steps):
 Placeholders
 """
 
-x = tf.placeholder(tf.int32, [batch_size, num_steps], name='input_placeholder')
-y = tf.placeholder(tf.int32, [batch_size, num_steps],
+x = tf.compat.v1.placeholder(tf.int32, [batch_size, num_steps], name='input_placeholder')
+y = tf.compat.v1.placeholder(tf.int32, [batch_size, num_steps],
                    name='labels_placeholder')
 init_state = tf.zeros([batch_size, state_size])
 
@@ -89,8 +89,8 @@ rnn_inputs = tf.one_hot(x, num_classes)
 Definition of rnn_cell
 
 """
-cell = tf.contrib.rnn.BasicRNNCell(state_size)
-rnn_outputs, final_state = tf.nn.dynamic_rnn(cell, rnn_inputs, initial_state=init_state)
+cell = tf.compat.v1.nn.rnn_cell.BasicRNNCell(state_size)
+rnn_outputs, final_state = tf.compat.v1.nn.dynamic_rnn(cell, rnn_inputs, initial_state=init_state)
 
 """
 Predictions, loss, training step
@@ -100,17 +100,17 @@ function from Tensorflow's API, except that here we are using a list of 2D tenso
 https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/seq2seq/python/ops/loss.py#L30
 """
 
-with tf.variable_scope('softmax'):
-    W = tf.get_variable('W', [state_size, num_classes])
-    b = tf.get_variable('b', [num_classes], initializer=tf.constant_initializer(0.0))
+with tf.compat.v1.variable_scope('softmax'):
+    W = tf.compat.v1.get_variable('W', [state_size, num_classes])
+    b = tf.compat.v1.get_variable('b', [num_classes], initializer=tf.compat.v1.constant_initializer(0.0))
 logits = tf.reshape(
             tf.matmul(tf.reshape(rnn_outputs, [-1, state_size]), W) + b,
             [batch_size, num_steps, num_classes])
 predictions = tf.nn.softmax(logits)
 
 losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits)
-total_loss = tf.reduce_mean(losses)
-train_step = tf.train.AdagradOptimizer(learning_rate).minimize(total_loss)
+total_loss = tf.reduce_mean(input_tensor=losses)
+train_step = tf.compat.v1.train.AdagradOptimizer(learning_rate).minimize(total_loss)
 
 """
 Train the network
@@ -118,8 +118,8 @@ Train the network
 
 
 def train_network(num_epochs, num_steps, state_size=4, verbose=True):
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session() as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
         training_losses = []
         for idx, epoch in enumerate(gen_epochs(num_epochs, num_steps)):
             training_loss = 0

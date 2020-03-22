@@ -20,8 +20,8 @@ print(flag)
 
 
 def length(sequence):
-    used = tf.sign(tf.reduce_max(tf.abs(sequence), 2))
-    length = tf.reduce_sum(used, 1)
+    used = tf.sign(tf.reduce_max(input_tensor=tf.abs(sequence), axis=2))
+    length = tf.reduce_sum(input_tensor=used, axis=1)
     length = tf.cast(length, tf.int32)
     return length
 
@@ -42,7 +42,7 @@ def f(p1, p2, p3, p4, ph):
     return "{}+{}".format(p1, p2), p2
 
 
-with tf.Session() as sess:
+with tf.compat.v1.Session() as sess:
     # l = sess.run(le)
     # print(l)
     # print(ts)
@@ -52,11 +52,11 @@ with tf.Session() as sess:
     print(st.get_shape())
     print(st.eval())
     print(t.get_shape())
-    px1 = tf.placeholder(tf.string, [None, 3, 1])
+    px1 = tf.compat.v1.placeholder(tf.string, [None, 3, 1])
     x1 = np.array([[['a'], ['b'], ['c']],
                    [['1'], ['2'], ['3']]])
     x2 = np.array([5, 6])
-    ph = tf.placeholder(tf.float32)
+    ph = tf.compat.v1.placeholder(tf.float32)
 
     # input = tf.Variable([[1.0, 2.0], [3.0, 4.0]])
     elems = (np.array([1, 2, 3]), np.array([-1, 1, -1]))

@@ -23,7 +23,7 @@ LOG_DIR = 'logdir'
 
 
 def run():
-    tf.logging.set_verbosity(tf.logging.INFO)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
     loader = data12.DataLoader(TIME_SHIFT)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     tuuids, tdata, tlabels, tseqlen = loader.loadTestSet(MAX_STEP)
@@ -32,10 +32,10 @@ def run():
     featSize = tdata.shape[2]
     nclass = tlabels.shape[1]
     classes = [i-nclass//2 for i in range(nclass)]
-    data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
-    target = tf.placeholder(tf.float32, [None, nclass], "labels")
-    seqlen = tf.placeholder(tf.int32, [None], "seqlen")
-    with tf.Session() as sess:
+    data = tf.compat.v1.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
+    target = tf.compat.v1.placeholder(tf.float32, [None, nclass], "labels")
+    seqlen = tf.compat.v1.placeholder(tf.int32, [None], "seqlen")
+    with tf.compat.v1.Session() as sess:
         model = model7_1.SRnnPredictorV2(
             data=data,
             target=target,
@@ -51,20 +51,20 @@ def run():
         base_dir = '{}/{}_{}/{}'.format(LOG_DIR, fbase,
                                         model_name, strftime("%Y%m%d_%H%M%S"))
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
-        if tf.gfile.Exists(base_dir):
-            tf.gfile.DeleteRecursively(base_dir)
-        tf.gfile.MakeDirs(base_dir)
+        if tf.io.gfile.exists(base_dir):
+            tf.io.gfile.rmtree(base_dir)
+        tf.io.gfile.makedirs(base_dir)
         # Isolate the variables stored behind the scenes by the metric operation
-        metric_local_vars = tf.get_collection(
-            tf.GraphKeys.LOCAL_VARIABLES, scope="Precisions") + tf.get_collection(
-            tf.GraphKeys.LOCAL_VARIABLES, scope="Recalls")
-        metric_vars_initializer = tf.variables_initializer(
+        metric_local_vars = tf.compat.v1.get_collection(
+            tf.compat.v1.GraphKeys.LOCAL_VARIABLES, scope="Precisions") + tf.compat.v1.get_collection(
+            tf.compat.v1.GraphKeys.LOCAL_VARIABLES, scope="Recalls")
+        metric_vars_initializer = tf.compat.v1.variables_initializer(
             var_list=metric_local_vars)
-        sess.run(tf.group(tf.global_variables_initializer(),
+        sess.run(tf.group(tf.compat.v1.global_variables_initializer(),
                           metric_vars_initializer))
         summary, train_writer, test_writer = collect_summary(
             sess, model, base_dir)
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
         bno = 0
         for epoch in range(EPOCH_SIZE):
             bno = epoch*50

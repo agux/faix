@@ -250,12 +250,12 @@ def _read_meta_config(file_dir):
 
 def _infer_map_func(task):
     # features, seqlens, code, klid, refs, idx, rel_path
-    return tuple(tf.py_func(_load_infer_data, [task],
+    return tuple(tf.compat.v1.py_func(_load_infer_data, [task],
                             [tf.float32, tf.int32, tf.string, tf.int32, tf.string, tf.int32, tf.string]))
 
 
 def _map_func(flag):
-    return tuple(tf.py_func(_loadBatchData, [flag], [tf.float32, tf.float32, tf.int32]))
+    return tuple(tf.compat.v1.py_func(_loadBatchData, [flag], [tf.float32, tf.float32, tf.int32]))
 
 
 def getInferInput(rbase, prefetch=2):
@@ -271,15 +271,15 @@ def getInferInput(rbase, prefetch=2):
     time_step = mc[0]
     feature_size = mc[1]
     cpu = multiprocessing.cpu_count()
-    with tf.variable_scope("build_inputs"):
+    with tf.compat.v1.variable_scope("build_inputs"):
         # Create dataset for inference
         infer_dataset = tf.data.Dataset.from_tensor_slices(
             _get_infer_tasklist(rbase)
         ).map(_infer_map_func, cpu).batch(1).prefetch(prefetch)
 
-        infer_iterator = infer_dataset.make_one_shot_iterator()
+        infer_iterator = tf.compat.v1.data.make_one_shot_iterator(infer_dataset)
 
-        handle = tf.placeholder(tf.string, shape=[])
+        handle = tf.compat.v1.placeholder(tf.string, shape=[])
         # features, seqlens, code, klid, refs, idx, rel_path
         types = (tf.float32, tf.int32, tf.string,
                  tf.int32, tf.string, tf.int32, tf.string)
@@ -290,7 +290,7 @@ def getInferInput(rbase, prefetch=2):
                   tf.TensorShape([None]),
                   tf.TensorShape([]),
                   tf.TensorShape([]))
-        iter = tf.data.Iterator.from_string_handle(
+        iter = tf.compat.v1.data.Iterator.from_string_handle(
             handle, types, infer_iterator.output_shapes)
 
         next_el = iter.get_next()
@@ -337,7 +337,7 @@ def getInputs(path, start=0, prefetch=2, vset=None, volsize=None):
     test_max_bno = mc[5]
     infer_flags = mc[6]
     cpu = multiprocessing.cpu_count()
-    with tf.variable_scope("build_inputs"):
+    with tf.compat.v1.variable_scope("build_inputs"):
         # Create dataset for training
         train_dataset = tf.data.Dataset.from_tensor_slices(
             ["TRAIN_{}".format(bno) for bno in range(start, max_bno)]
@@ -351,15 +351,15 @@ def getInputs(path, start=0, prefetch=2, vset=None, volsize=None):
             _loadTestSet(test_max_bno, vset)
         ).batch(test_batch_size).repeat()
 
-        train_iterator = train_dataset.make_one_shot_iterator()
-        infer_iterator = infer_dataset.make_one_shot_iterator()
-        test_iterator = test_dataset.make_one_shot_iterator()
+        train_iterator = tf.compat.v1.data.make_one_shot_iterator(train_dataset)
+        infer_iterator = tf.compat.v1.data.make_one_shot_iterator(infer_dataset)
+        test_iterator = tf.compat.v1.data.make_one_shot_iterator(test_dataset)
 
-        handle = tf.placeholder(tf.string, shape=[])
+        handle = tf.compat.v1.placeholder(tf.string, shape=[])
         types = (tf.float32, tf.float32, tf.int32)
         shapes = (tf.TensorShape([None, time_step, feature_size]),
                   tf.TensorShape([None]), tf.TensorShape([None]))
-        iter = tf.data.Iterator.from_string_handle(
+        iter = tf.compat.v1.data.Iterator.from_string_handle(
             handle, types, train_dataset.output_shapes)
 
         next_el = iter.get_next()

@@ -32,8 +32,8 @@ class VariableSequenceLabelling:
 
     @lazy_property
     def length(self):
-        used = tf.sign(tf.reduce_max(tf.abs(self.data), reduction_indices=2))
-        length = tf.reduce_sum(used, reduction_indices=1)
+        used = tf.sign(tf.reduce_max(input_tensor=tf.abs(self.data), axis=2))
+        length = tf.reduce_sum(input_tensor=used, axis=1)
         length = tf.cast(length, tf.int32)
         return length
 
@@ -59,36 +59,36 @@ class VariableSequenceLabelling:
     @lazy_property
     def cost(self):
         # Compute cross entropy for each frame.
-        cross_entropy = self.target * tf.log(self.prediction)
-        cross_entropy = -tf.reduce_sum(cross_entropy, reduction_indices=2)
-        mask = tf.sign(tf.reduce_max(tf.abs(self.target), reduction_indices=2))
+        cross_entropy = self.target * tf.math.log(self.prediction)
+        cross_entropy = -tf.reduce_sum(input_tensor=cross_entropy, axis=2)
+        mask = tf.sign(tf.reduce_max(input_tensor=tf.abs(self.target), axis=2))
         cross_entropy *= mask
         # Average over actual sequence lengths.
-        cross_entropy = tf.reduce_sum(cross_entropy, reduction_indices=1)
+        cross_entropy = tf.reduce_sum(input_tensor=cross_entropy, axis=1)
         cross_entropy /= tf.cast(self.length, tf.float32)
-        return tf.reduce_mean(cross_entropy)
+        return tf.reduce_mean(input_tensor=cross_entropy)
 
     @lazy_property
     def optimize(self):
         learning_rate = 0.0003
-        optimizer = tf.train.AdamOptimizer(learning_rate)
+        optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate)
         return optimizer.minimize(self.cost)
 
     @lazy_property
     def error(self):
         mistakes = tf.not_equal(
-            tf.argmax(self.target, 2), tf.argmax(self.prediction, 2))
+            tf.argmax(input=self.target, axis=2), tf.argmax(input=self.prediction, axis=2))
         mistakes = tf.cast(mistakes, tf.float32)
-        mask = tf.sign(tf.reduce_max(tf.abs(self.target), reduction_indices=2))
+        mask = tf.sign(tf.reduce_max(input_tensor=tf.abs(self.target), axis=2))
         mistakes *= mask
         # Average over actual sequence lengths.
-        mistakes = tf.reduce_sum(mistakes, reduction_indices=1)
+        mistakes = tf.reduce_sum(input_tensor=mistakes, axis=1)
         mistakes /= tf.cast(self.length, tf.float32)
-        return tf.reduce_mean(mistakes)
+        return tf.reduce_mean(input_tensor=mistakes)
 
     @staticmethod
     def _weight_and_bias(in_size, out_size):
-        weight = tf.truncated_normal([in_size, out_size], stddev=0.01)
+        weight = tf.random.truncated_normal([in_size, out_size], stddev=0.01)
         bias = tf.constant(0.1, shape=[out_size])
         return tf.Variable(weight), tf.Variable(bias)
 
@@ -107,11 +107,11 @@ if __name__ == '__main__':
     train, test = get_dataset()
     _, length, image_size = train.data.shape
     num_classes = train.target.shape[2]
-    data = tf.placeholder(tf.float32, [None, length, image_size])
-    target = tf.placeholder(tf.float32, [None, length, num_classes])
+    data = tf.compat.v1.placeholder(tf.float32, [None, length, image_size])
+    target = tf.compat.v1.placeholder(tf.float32, [None, length, num_classes])
     model = VariableSequenceLabelling(data, target)
-    sess = tf.Session()
-    sess.run(tf.initialize_all_variables())
+    sess = tf.compat.v1.Session()
+    sess.run(tf.compat.v1.initialize_all_variables())
     for epoch in range(10):
         for _ in range(100):
             batch = train.sample(10)

@@ -28,7 +28,7 @@ def factorize(feature_size):
 
 
 def last_relevant(output, length):
-    batch_size = tf.shape(output)[0]
+    batch_size = tf.shape(input=output)[0]
     max_length = int(output.get_shape()[1])
     output_size = int(output.get_shape()[2])
     index = tf.range(0, batch_size) * max_length + (length - 1)
@@ -56,19 +56,19 @@ class RnnPredictorV1:
     @lazy_property
     def prediction(self):
         rnn = self.rnn(self, self.data)
-        dense = tf.layers.dense(
+        dense = tf.compat.v1.layers.dense(
             inputs=rnn,
             units=self._num_hidden * 3,
-            kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1),
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(stddev=0.01),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             activation=tf.nn.relu6)
-        dropout = tf.layers.dropout(
+        dropout = tf.compat.v1.layers.dropout(
             inputs=dense, rate=0.5, training=self.training)
-        output = tf.layers.dense(
+        output = tf.compat.v1.layers.dense(
             inputs=dropout,
             units=int(self.target.get_shape()[1]),
-            kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1),
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(stddev=0.01),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             activation=tf.nn.elu)
         return output
 
@@ -77,11 +77,11 @@ class RnnPredictorV1:
         # Recurrent network.
         cells = []
         for _ in range(self._num_layers):
-            cell = tf.nn.rnn_cell.GRUCell(
+            cell = tf.compat.v1.nn.rnn_cell.GRUCell(
                 self._num_hidden,
-                kernel_initializer=tf.truncated_normal_initializer(
+                kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                     stddev=0.01),
-                bias_initializer=tf.constant_initializer(0.1))
+                bias_initializer=tf.compat.v1.constant_initializer(0.1))
             cells.append(cell)
             cell = tf.contrib.rnn.LayerNormBasicLSTMCell(
                 self._num_hidden,
@@ -99,9 +99,9 @@ class RnnPredictorV1:
             # cell = tf.nn.rnn_cell.DropoutWrapper(
             #     cell, output_keep_prob=1.0 - self.dropout)
 
-        cell = tf.nn.rnn_cell.MultiRNNCell(cells)
+        cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell(cells)
 
-        output, self.training_state = tf.nn.dynamic_rnn(
+        output, self.training_state = tf.compat.v1.nn.dynamic_rnn(
             cell,
             input,
             dtype=tf.float32,
@@ -114,25 +114,25 @@ class RnnPredictorV1:
 
     @lazy_property
     def cost(self):
-        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
+        cross_entropy = tf.reduce_mean(input_tensor=tf.nn.softmax_cross_entropy_with_logits(
             labels=self.target, logits=self.prediction))
         # cross_entropy = -tf.reduce_sum(self.target * tf.log(self.prediction))
         return cross_entropy
 
     @lazy_property
     def optimize(self):
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
         optimizer = None
         with tf.control_dependencies(update_ops):
-            optimizer = tf.train.AdamOptimizer(self._learning_rate).minimize(
-                self.cost, global_step=tf.train.get_global_step())
+            optimizer = tf.compat.v1.train.AdamOptimizer(self._learning_rate).minimize(
+                self.cost, global_step=tf.compat.v1.train.get_global_step())
         return optimizer
 
     @lazy_property
     def accuracy(self):
         accuracy = tf.equal(
-            tf.argmax(self.target, 1), tf.argmax(self.prediction, 1))
-        return tf.reduce_mean(tf.cast(accuracy, tf.float32))
+            tf.argmax(input=self.target, axis=1), tf.argmax(input=self.prediction, axis=1))
+        return tf.reduce_mean(input_tensor=tf.cast(accuracy, tf.float32))
 
 
 class RnnPredictorV2:
@@ -155,19 +155,19 @@ class RnnPredictorV2:
     @lazy_property
     def prediction(self):
         rnn = self.rnn(self, self.data)
-        dense = tf.layers.dense(
+        dense = tf.compat.v1.layers.dense(
             inputs=rnn,
             units=self._num_hidden * 3,
-            kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1),
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(stddev=0.01),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             activation=tf.nn.relu6)
-        dropout = tf.layers.dropout(
+        dropout = tf.compat.v1.layers.dropout(
             inputs=dense, rate=0.5, training=self.training)
-        output = tf.layers.dense(
+        output = tf.compat.v1.layers.dense(
             inputs=dropout,
             units=int(self.target.get_shape()[1]),
-            kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1),
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(stddev=0.01),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             activation=tf.nn.elu)
         return output
 
@@ -191,9 +191,9 @@ class RnnPredictorV2:
             initializers=None
         )
 
-        cell = tf.nn.rnn_cell.MultiRNNCell([clc] * self._num_layers)
+        cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell([clc] * self._num_layers)
 
-        output, self.training_state = tf.nn.dynamic_rnn(
+        output, self.training_state = tf.compat.v1.nn.dynamic_rnn(
             cell,
             input,
             dtype=tf.float32,
@@ -207,29 +207,29 @@ class RnnPredictorV2:
 
     @staticmethod
     def last_relevant(output, length):
-        batch_size = tf.shape(output)[0]
+        batch_size = tf.shape(input=output)[0]
         relevant = tf.gather_nd(output, tf.stack(
             [tf.range(batch_size), length-1], axis=1))
         return relevant
 
     @lazy_property
     def cost(self):
-        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
+        cross_entropy = tf.reduce_mean(input_tensor=tf.nn.softmax_cross_entropy_with_logits(
             labels=self.target, logits=self.prediction))
         # cross_entropy = -tf.reduce_sum(self.target * tf.log(self.prediction))
         return cross_entropy
 
     @lazy_property
     def optimize(self):
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
         optimizer = None
         with tf.control_dependencies(update_ops):
-            optimizer = tf.train.AdamOptimizer(self._learning_rate).minimize(
-                self.cost, global_step=tf.train.get_global_step())
+            optimizer = tf.compat.v1.train.AdamOptimizer(self._learning_rate).minimize(
+                self.cost, global_step=tf.compat.v1.train.get_global_step())
         return optimizer
 
     @lazy_property
     def accuracy(self):
         accuracy = tf.equal(
-            tf.argmax(self.target, 1), tf.argmax(self.prediction, 1))
-        return tf.reduce_mean(tf.cast(accuracy, tf.float32))
+            tf.argmax(input=self.target, axis=1), tf.argmax(input=self.prediction, axis=1))
+        return tf.reduce_mean(input_tensor=tf.cast(accuracy, tf.float32))

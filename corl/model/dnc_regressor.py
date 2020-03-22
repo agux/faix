@@ -62,12 +62,12 @@ class DNCRegressorV1:
     def logits(self):
         layer = self.rnn(self, self.data)
         layer = self.fcn(self, layer)
-        with tf.variable_scope("output"):
-            output = tf.layers.dense(
+        with tf.compat.v1.variable_scope("output"):
+            output = tf.compat.v1.layers.dense(
                 inputs=layer,
                 units=1,
-                kernel_initializer=tf.variance_scaling_initializer(),
-                bias_initializer=tf.constant_initializer(0.1)
+                kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             )
             output = tf.squeeze(output)
             # restoring shape info for the tensor
@@ -78,15 +78,15 @@ class DNCRegressorV1:
     def fcn(self, inputs):
         layer = tf.nn.selu(inputs)
         fsize = int(inputs.get_shape()[-1])
-        with tf.variable_scope("fcn"):
+        with tf.compat.v1.variable_scope("fcn"):
             nlayer = 3
             for i in range(nlayer):
                 i = i+1
-                layer = tf.layers.dense(
+                layer = tf.compat.v1.layers.dense(
                     inputs=layer,
                     units=fsize,
-                    kernel_initializer=tf.variance_scaling_initializer(),
-                    bias_initializer=tf.constant_initializer(0.1)
+                    kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                    bias_initializer=tf.compat.v1.constant_initializer(0.1)
                 )
                 if i == 1:
                     layer = tf.contrib.nn.alpha_dropout(
@@ -107,21 +107,21 @@ class DNCRegressorV1:
             # "num_layers": self._num_layers,
             "hidden_size": self._layer_width,
             "initializers": {
-                "w_gates": tf.variance_scaling_initializer(),
-                "b_gates": tf.constant_initializer(0.1),
-                "w_f_diag": tf.variance_scaling_initializer(),
-                "w_i_diag": tf.variance_scaling_initializer(),
-                "w_o_diag": tf.variance_scaling_initializer()
+                "w_gates": tf.compat.v1.variance_scaling_initializer(),
+                "b_gates": tf.compat.v1.constant_initializer(0.1),
+                "w_f_diag": tf.compat.v1.variance_scaling_initializer(),
+                "w_i_diag": tf.compat.v1.variance_scaling_initializer(),
+                "w_o_diag": tf.compat.v1.variance_scaling_initializer()
             },
             "use_peepholes": True
         }
-        with tf.variable_scope("RNN"):
+        with tf.compat.v1.variable_scope("RNN"):
             dnc_core = dnc.DNC(access_config, controller_config,
                                self._layer_width, self._clip_value)
-            initial_state = dnc_core.initial_state(tf.shape(inputs)[0])
+            initial_state = dnc_core.initial_state(tf.shape(input=inputs)[0])
             # transpose to time major: [time, batch, feature]
             # tm_inputs = tf.transpose(inputs, perm=[1, 0, 2])
-            output_sequence, _ = tf.nn.dynamic_rnn(
+            output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
                 cell=dnc_core,
                 inputs=inputs,
                 initial_state=initial_state,
@@ -138,8 +138,8 @@ class DNCRegressorV1:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
@@ -149,8 +149,8 @@ class DNCRegressorV1:
         logits = self.logits
         print("checking shapes, target:{}, logits:{}".format(
             self.target.get_shape(), logits.get_shape()))
-        with tf.name_scope("cost"):
-            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+        with tf.compat.v1.name_scope("cost"):
+            return tf.compat.v1.losses.mean_squared_error(labels=self.target, predictions=logits)
 
     @lazy_property
     def infer(self):
@@ -158,9 +158,9 @@ class DNCRegressorV1:
         Returns positive code, positive corl, negative code, negative corl
         '''
         logits = self.logits
-        with tf.variable_scope("infer"):
-            pos_idx = tf.argmax(logits)
-            neg_idx = tf.argmin(logits)
+        with tf.compat.v1.variable_scope("infer"):
+            pos_idx = tf.argmax(input=logits)
+            neg_idx = tf.argmin(input=logits)
             posc = tf.gather(self.refs, pos_idx)
             pcorl = tf.gather(logits, pos_idx)
             negc = tf.gather(self.refs, neg_idx)
@@ -169,13 +169,13 @@ class DNCRegressorV1:
 
     @lazy_property
     def keep_prob(self):
-        gstep = tf.train.get_or_create_global_step()
-        with tf.variable_scope("keep_prob"):
+        gstep = tf.compat.v1.train.get_or_create_global_step()
+        with tf.compat.v1.variable_scope("keep_prob"):
             def kp():
                 return tf.multiply(self._kp, 1.0)
 
             def cdr_kp():
-                return 1.0-tf.train.cosine_decay_restarts(
+                return 1.0-tf.compat.v1.train.cosine_decay_restarts(
                     learning_rate=1.0-self._kp,
                     global_step=gstep-self._decayed_dropout_start,
                     first_decay_steps=self._dropout_decay_steps,
@@ -186,8 +186,8 @@ class DNCRegressorV1:
             minv = kp()
             if self._decayed_dropout_start is not None:
                 minv = tf.cond(
-                    tf.less(gstep, self._decayed_dropout_start), kp, cdr_kp)
-            rdu = tf.random_uniform(
+                    pred=tf.less(gstep, self._decayed_dropout_start), true_fn=kp, false_fn=cdr_kp)
+            rdu = tf.random.uniform(
                 [],
                 minval=minv,
                 maxval=1.02,
@@ -198,13 +198,13 @@ class DNCRegressorV1:
 
     @lazy_property
     def learning_rate(self):
-        gstep = tf.train.get_or_create_global_step()
-        with tf.variable_scope("learning_rate"):
+        gstep = tf.compat.v1.train.get_or_create_global_step()
+        with tf.compat.v1.variable_scope("learning_rate"):
             def tslr():
                 return tf.multiply(self._lr, 1.0)
 
             def cdr():
-                return tf.train.cosine_decay_restarts(
+                return tf.compat.v1.train.cosine_decay_restarts(
                     learning_rate=self._lr,
                     global_step=gstep-self._decayed_lr_start,
                     first_decay_steps=self._lr_decay_steps,
@@ -215,28 +215,28 @@ class DNCRegressorV1:
             if self._decayed_lr_start is None:
                 return tslr()
             else:
-                return tf.cond(tf.less(gstep, self._decayed_lr_start), tslr, cdr)
+                return tf.cond(pred=tf.less(gstep, self._decayed_lr_start), true_fn=tslr, false_fn=cdr)
 
     @lazy_property
     def optimize(self):
         train_loss = self.cost
-        with tf.name_scope("optimize"):
+        with tf.compat.v1.name_scope("optimize"):
             # Set up optimizer with global norm clipping.
-            trainable_variables = tf.trainable_variables()
+            trainable_variables = tf.compat.v1.trainable_variables()
             grads, _ = tf.clip_by_global_norm(
-                tf.gradients(train_loss, trainable_variables), self._max_grad_norm)
-            optimizer = tf.train.AdamOptimizer(self.learning_rate)
+                tf.gradients(ys=train_loss, xs=trainable_variables), self._max_grad_norm)
+            optimizer = tf.compat.v1.train.AdamOptimizer(self.learning_rate)
             train_step = optimizer.apply_gradients(
-                zip(grads, trainable_variables), global_step=tf.train.get_or_create_global_step())
+                zip(grads, trainable_variables), global_step=tf.compat.v1.train.get_or_create_global_step())
             return train_step
 
     @lazy_property
     def worst(self):
         logits = self.logits
-        with tf.name_scope("worst"):
-            sqd = tf.squared_difference(logits, self.target)
-            bidx = tf.argmax(sqd)
-            max_diff = tf.sqrt(tf.reduce_max(sqd))
+        with tf.compat.v1.name_scope("worst"):
+            sqd = tf.math.squared_difference(logits, self.target)
+            bidx = tf.argmax(input=sqd)
+            max_diff = tf.sqrt(tf.reduce_max(input_tensor=sqd))
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
             return max_diff, predict, actual
@@ -295,12 +295,12 @@ class DNCRegressorV2:
     def logits(self):
         layer = self.rnn(self, self.data)
         layer = self.fcn(self, layer)
-        with tf.variable_scope("output"):
-            output = tf.layers.dense(
+        with tf.compat.v1.variable_scope("output"):
+            output = tf.compat.v1.layers.dense(
                 inputs=layer,
                 units=1,
-                kernel_initializer=tf.variance_scaling_initializer(),
-                bias_initializer=tf.constant_initializer(0.1)
+                kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             )
             output = tf.squeeze(output)
             # restoring shape info for the tensor
@@ -311,15 +311,15 @@ class DNCRegressorV2:
     def fcn(self, inputs):
         layer = tf.nn.selu(inputs)
         fsize = int(inputs.get_shape()[-1])
-        with tf.variable_scope("fcn"):
+        with tf.compat.v1.variable_scope("fcn"):
             nlayer = 3
             for i in range(nlayer):
                 i = i+1
-                layer = tf.layers.dense(
+                layer = tf.compat.v1.layers.dense(
                     inputs=layer,
                     units=fsize,
-                    kernel_initializer=tf.variance_scaling_initializer(),
-                    bias_initializer=tf.constant_initializer(0.1)
+                    kernel_initializer=tf.compat.v1.variance_scaling_initializer(),
+                    bias_initializer=tf.compat.v1.constant_initializer(0.1)
                 )
                 if i == 1:
                     layer = tf.contrib.nn.alpha_dropout(
@@ -340,19 +340,19 @@ class DNCRegressorV2:
             # "num_layers": self._num_layers,
             "hidden_size": self._layer_width,
             "initializers": {
-                "w_gates": tf.variance_scaling_initializer(),
-                "b_gates": tf.constant_initializer(0.1),
-                "w_f_diag": tf.variance_scaling_initializer(),
-                "w_i_diag": tf.variance_scaling_initializer(),
-                "w_o_diag": tf.variance_scaling_initializer()
+                "w_gates": tf.compat.v1.variance_scaling_initializer(),
+                "b_gates": tf.compat.v1.constant_initializer(0.1),
+                "w_f_diag": tf.compat.v1.variance_scaling_initializer(),
+                "w_i_diag": tf.compat.v1.variance_scaling_initializer(),
+                "w_o_diag": tf.compat.v1.variance_scaling_initializer()
             },
             "use_peepholes": True
         }
-        with tf.variable_scope("RNN"):
+        with tf.compat.v1.variable_scope("RNN"):
             dnc_core = dnc.DNC(access_config, controller_config,
                                self._layer_width, self._clip_value)
-            initial_state = dnc_core.initial_state(tf.shape(inputs)[0])
-            output_sequence, _ = tf.nn.dynamic_rnn(
+            initial_state = dnc_core.initial_state(tf.shape(input=inputs)[0])
+            output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
                 cell=dnc_core,
                 inputs=inputs,
                 parallel_iterations=self._parallel_iterations,
@@ -364,8 +364,8 @@ class DNCRegressorV2:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
@@ -375,8 +375,8 @@ class DNCRegressorV2:
         logits = self.logits
         print("checking shapes, target:{}, logits:{}".format(
             self.target.get_shape(), logits.get_shape()))
-        with tf.name_scope("cost"):
-            return tf.losses.mean_squared_error(labels=self.target, predictions=logits)
+        with tf.compat.v1.name_scope("cost"):
+            return tf.compat.v1.losses.mean_squared_error(labels=self.target, predictions=logits)
 
     @lazy_property
     def infer(self):
@@ -384,9 +384,9 @@ class DNCRegressorV2:
         Returns positive code, positive corl, negative code, negative corl
         '''
         logits = self.logits
-        with tf.variable_scope("infer"):
-            pos_idx = tf.argmax(logits)
-            neg_idx = tf.argmin(logits)
+        with tf.compat.v1.variable_scope("infer"):
+            pos_idx = tf.argmax(input=logits)
+            neg_idx = tf.argmin(input=logits)
             posc = tf.gather(self.refs, pos_idx)
             pcorl = tf.gather(logits, pos_idx)
             negc = tf.gather(self.refs, neg_idx)
@@ -395,13 +395,13 @@ class DNCRegressorV2:
 
     @lazy_property
     def keep_prob(self):
-        gstep = tf.train.get_or_create_global_step()
-        with tf.variable_scope("keep_prob"):
+        gstep = tf.compat.v1.train.get_or_create_global_step()
+        with tf.compat.v1.variable_scope("keep_prob"):
             def kp():
                 return tf.multiply(self._kp, 1.0)
 
             def cdr_kp():
-                return 1.0-tf.train.cosine_decay_restarts(
+                return 1.0-tf.compat.v1.train.cosine_decay_restarts(
                     learning_rate=1.0-self._kp,
                     global_step=gstep-self._decayed_dropout_start,
                     first_decay_steps=self._dropout_decay_steps,
@@ -412,8 +412,8 @@ class DNCRegressorV2:
             minv = kp()
             if self._decayed_dropout_start is not None:
                 minv = tf.cond(
-                    tf.less(gstep, self._decayed_dropout_start), kp, cdr_kp)
-            rdu = tf.random_uniform(
+                    pred=tf.less(gstep, self._decayed_dropout_start), true_fn=kp, false_fn=cdr_kp)
+            rdu = tf.random.uniform(
                 [],
                 minval=minv,
                 maxval=1.02,
@@ -424,13 +424,13 @@ class DNCRegressorV2:
 
     @lazy_property
     def learning_rate(self):
-        gstep = tf.train.get_or_create_global_step()
-        with tf.variable_scope("learning_rate"):
+        gstep = tf.compat.v1.train.get_or_create_global_step()
+        with tf.compat.v1.variable_scope("learning_rate"):
             def tslr():
                 return tf.multiply(self._lr, 1.0)
 
             def cdr():
-                return tf.train.cosine_decay_restarts(
+                return tf.compat.v1.train.cosine_decay_restarts(
                     learning_rate=self._lr,
                     global_step=gstep-self._decayed_lr_start,
                     first_decay_steps=self._lr_decay_steps,
@@ -441,30 +441,30 @@ class DNCRegressorV2:
             if self._decayed_lr_start is None:
                 return tslr()
             else:
-                return tf.cond(tf.less(gstep, self._decayed_lr_start), tslr, cdr)
+                return tf.cond(pred=tf.less(gstep, self._decayed_lr_start), true_fn=tslr, false_fn=cdr)
 
     @lazy_property
     def optimize(self):
         train_loss = self.cost
-        with tf.name_scope("optimize"):
+        with tf.compat.v1.name_scope("optimize"):
             # Set up optimizer with global norm clipping.
-            trainable_variables = tf.trainable_variables()
+            trainable_variables = tf.compat.v1.trainable_variables()
             grads, _ = tf.clip_by_global_norm(
                 # gradients(train_loss, trainable_variables, checkpoints=self._gdck),
-                tf.gradients(train_loss, trainable_variables),
+                tf.gradients(ys=train_loss, xs=trainable_variables),
                 self._max_grad_norm)
-            optimizer = tf.train.AdamOptimizer(self.learning_rate)
+            optimizer = tf.compat.v1.train.AdamOptimizer(self.learning_rate)
             train_step = optimizer.apply_gradients(
-                zip(grads, trainable_variables), global_step=tf.train.get_or_create_global_step())
+                zip(grads, trainable_variables), global_step=tf.compat.v1.train.get_or_create_global_step())
             return train_step
 
     @lazy_property
     def worst(self):
         logits = self.logits
-        with tf.name_scope("worst"):
-            sqd = tf.squared_difference(logits, self.target)
-            bidx = tf.argmax(sqd)
-            max_diff = tf.sqrt(tf.reduce_max(sqd))
+        with tf.compat.v1.name_scope("worst"):
+            sqd = tf.math.squared_difference(logits, self.target)
+            bidx = tf.argmax(input=sqd)
+            max_diff = tf.sqrt(tf.reduce_max(input_tensor=sqd))
             predict = tf.gather(logits, bidx)
             actual = tf.gather(self.target, bidx)
             return max_diff, predict, actual

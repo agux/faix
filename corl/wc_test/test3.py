@@ -36,17 +36,17 @@ k_cols = [
 
 
 def run():
-    tf.logging.set_verbosity(tf.logging.INFO)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
     loader = data0.DataLoader(TIME_SHIFT, k_cols)
     print('{} loading test data...'.format(strftime("%H:%M:%S")))
     tuuids, tdata, tvals, tseqlen = loader.loadTestSet(MAX_STEP, N_TEST)
     print('input shape: {}'.format(tdata.shape))
     print('target shape: {}'.format(tvals.shape))
     featSize = tdata.shape[2]
-    data = tf.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
-    target = tf.placeholder(tf.float32, [None], "target")
-    seqlen = tf.placeholder(tf.int32, [None], "seqlen")
-    with tf.Session() as sess:
+    data = tf.compat.v1.placeholder(tf.float32, [None, MAX_STEP, featSize], "input")
+    target = tf.compat.v1.placeholder(tf.float32, [None], "target")
+    seqlen = tf.compat.v1.placeholder(tf.int32, [None], "seqlen")
+    with tf.compat.v1.Session() as sess:
         model = drnn_regressor.DRnnRegressorV2(
             data=data,
             target=target,
@@ -60,13 +60,13 @@ def run():
         base_dir = '{}/{}_{}/{}'.format(LOG_DIR, fbase,
                                         model_name, strftime("%Y%m%d_%H%M%S"))
         print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
-        if tf.gfile.Exists(base_dir):
-            tf.gfile.DeleteRecursively(base_dir)
-        tf.gfile.MakeDirs(base_dir)
-        sess.run(tf.global_variables_initializer())
+        if tf.io.gfile.exists(base_dir):
+            tf.io.gfile.rmtree(base_dir)
+        tf.io.gfile.makedirs(base_dir)
+        sess.run(tf.compat.v1.global_variables_initializer())
         summary, train_writer, test_writer = collect_summary(
             sess, model, base_dir)
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
         bno = 0
         epoch = 0
         while True:

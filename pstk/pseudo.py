@@ -79,22 +79,22 @@ def gen_epochs(n, num_steps):
 
 
 if __name__ == '__main__':
-    if tf.gfile.Exists(LOG_DIR):
-        tf.gfile.DeleteRecursively(LOG_DIR)
-    tf.gfile.MakeDirs(LOG_DIR)
-    data = tf.placeholder(tf.float32, [None, MAX_STEP, num_classes])
-    target = tf.placeholder(tf.float32, [None, num_classes])
-    training = tf.placeholder(tf.bool)
+    if tf.io.gfile.exists(LOG_DIR):
+        tf.io.gfile.rmtree(LOG_DIR)
+    tf.io.gfile.makedirs(LOG_DIR)
+    data = tf.compat.v1.placeholder(tf.float32, [None, MAX_STEP, num_classes])
+    target = tf.compat.v1.placeholder(tf.float32, [None, num_classes])
+    training = tf.compat.v1.placeholder(tf.bool)
     model = BasicRnnPredictor(
         data, target, W_SIZE, training, num_hidden=HIDDEN_SIZE,
         num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        summary_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
-        tf.summary.scalar("Train Loss", model.cost)
-        tf.summary.scalar("Train Accuracy", model.accuracy*100)
-        summary = tf.summary.merge_all()
-        saver = tf.train.Saver()
+    with tf.compat.v1.Session() as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
+        summary_writer = tf.compat.v1.summary.FileWriter(LOG_DIR, sess.graph)
+        tf.compat.v1.summary.scalar("Train Loss", model.cost)
+        tf.compat.v1.summary.scalar("Train Accuracy", model.accuracy*100)
+        summary = tf.compat.v1.summary.merge_all()
+        saver = tf.compat.v1.train.Saver()
         for idx, epoch in enumerate(gen_epochs(1, MAX_STEP)):
             print("\nEPOCH", idx)
             for step, (X, Y) in enumerate(epoch):

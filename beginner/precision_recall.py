@@ -40,44 +40,44 @@ mask2[0][3] = 1
 
 
 def model(input):
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
     print("update_ops:{}".format(update_ops))
     with tf.control_dependencies(update_ops):
-        return tf.one_hot(tf.argmax(input, 1), 4, axis=-1)
+        return tf.one_hot(tf.argmax(input=input, axis=1), 4, axis=-1)
 
 
-with tf.Session() as sess:
-    input = tf.placeholder(tf.float32, [None, 4])
+with tf.compat.v1.Session() as sess:
+    input = tf.compat.v1.placeholder(tf.float32, [None, 4])
     # print(sess.run(tf.cast(t1, tf.bool)))
     # print(sess.run(tf.argmax(t2, 1)))
-    onehot = tf.one_hot(tf.argmax(t2, 1), 4, axis=-1)
+    onehot = tf.one_hot(tf.argmax(input=t2, axis=1), 4, axis=-1)
     print(sess.run(onehot))
     print(sess.run(tf.cast(onehot, tf.bool)))
     # tf.one_hot(tf.argmax(self.prediction, 1), size, axis = -1),
     # print([3, 3, 3]+t1+t3)
 
-    r1, _ = tf.metrics.recall(
+    r1, _ = tf.compat.v1.metrics.recall(
         labels=labels,
         predictions=model(input),
         weights=mask1,
-        updates_collections=tf.GraphKeys.UPDATE_OPS)
-    p1, _ = tf.metrics.precision(
+        updates_collections=tf.compat.v1.GraphKeys.UPDATE_OPS)
+    p1, _ = tf.compat.v1.metrics.precision(
         labels=labels,
         predictions=model(input),
         weights=mask1,
-        updates_collections=tf.GraphKeys.UPDATE_OPS)
-    r2, _ = tf.metrics.recall(
+        updates_collections=tf.compat.v1.GraphKeys.UPDATE_OPS)
+    r2, _ = tf.compat.v1.metrics.recall(
         labels=labels,
         predictions=model(input),
         weights=mask2,
-        updates_collections=tf.GraphKeys.UPDATE_OPS)
-    p2, _ = tf.metrics.precision(
+        updates_collections=tf.compat.v1.GraphKeys.UPDATE_OPS)
+    p2, _ = tf.compat.v1.metrics.precision(
         labels=labels,
         predictions=model(input),
         weights=mask2,
-        updates_collections=tf.GraphKeys.UPDATE_OPS)
-    sess.run(tf.global_variables_initializer())
-    sess.run(tf.local_variables_initializer())
+        updates_collections=tf.compat.v1.GraphKeys.UPDATE_OPS)
+    sess.run(tf.compat.v1.global_variables_initializer())
+    sess.run(tf.compat.v1.local_variables_initializer())
     # sess.run([r_op, p_op])
 
     sess.run(model(input), feed_dict={input: logits})

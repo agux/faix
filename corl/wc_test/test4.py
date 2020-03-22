@@ -59,20 +59,20 @@ args = parser.parse_args()
 
 
 def collect_summary(sess, model, base_dir):
-    train_writer = tf.summary.FileWriter(os.path.join(
+    train_writer = tf.compat.v1.summary.FileWriter(os.path.join(
         base_dir, "train", strftime("%Y%m%d_%H%M%S")), sess.graph)
-    test_writer = tf.summary.FileWriter(os.path.join(
+    test_writer = tf.compat.v1.summary.FileWriter(os.path.join(
         base_dir, "test", strftime("%Y%m%d_%H%M%S")), sess.graph)
-    with tf.name_scope("Basic"):
-        tf.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
-    summary = tf.summary.merge_all()
+    with tf.compat.v1.name_scope("Basic"):
+        tf.compat.v1.summary.scalar("Mean_Diff", tf.sqrt(model.cost))
+    summary = tf.compat.v1.summary.merge_all()
     return summary, train_writer, test_writer
 
 
 def run():
     global args
-    tf.logging.set_verbosity(tf.logging.INFO)
-    with tf.Session() as sess:
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
+    with tf.compat.v1.Session() as sess:
         model = base_model.SRnnRegressorV3(
             dim=DIM,
             layer_width=LAYER_WIDTH,
@@ -94,7 +94,7 @@ def run():
         restored = False
         ckpt = tf.train.get_checkpoint_state(training_dir)
 
-        if tf.gfile.Exists(training_dir):
+        if tf.io.gfile.exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
@@ -109,15 +109,15 @@ def run():
                     args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset)
                 model.setNodes(d['uuids'], d['features'],
                                d['labels'], d['seqlens'])
-                saver = tf.train.Saver()
+                saver = tf.compat.v1.train.Saver()
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 print('{} check restored global step: {}'.format(
-                    strftime("%H:%M:%S"), sess.run(tf.train.get_global_step())))
+                    strftime("%H:%M:%S"), sess.run(tf.compat.v1.train.get_global_step())))
                 restored = True
             else:
                 print("{} model checkpoint path not found, cleaning training folder".format(
                     strftime("%H:%M:%S")))
-                tf.gfile.DeleteRecursively(training_dir)
+                tf.io.gfile.rmtree(training_dir)
 
         if not restored:
             d = input_fn.getInputs(
@@ -125,9 +125,9 @@ def run():
                 args.prefetch, args.db_pool, args.db_host, args.db_port, args.db_pwd, args.vset)
             model.setNodes(d['uuids'], d['features'],
                            d['labels'], d['seqlens'])
-            saver = tf.train.Saver()
-            sess.run(tf.global_variables_initializer())
-            tf.gfile.MakeDirs(training_dir)
+            saver = tf.compat.v1.train.Saver()
+            sess.run(tf.compat.v1.global_variables_initializer())
+            tf.io.gfile.makedirs(training_dir)
 
         train_handle, test_handle = sess.run(
             [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
@@ -167,7 +167,7 @@ def run():
             test_writer.flush()
             if bno == 1 or bno % SAVE_INTERVAL == 0:
                 saver.save(sess, checkpoint_file,
-                           global_step=tf.train.get_global_step())
+                           global_step=tf.compat.v1.train.get_global_step())
         # test last epoch
         print('{} running on test set...'.format(strftime("%H:%M:%S")))
         mse, worst, test_summary_str = sess.run(
@@ -180,10 +180,10 @@ def run():
         train_writer.flush()
         test_writer.flush()
         saver.save(sess, checkpoint_file,
-                   global_step=tf.train.get_global_step())
+                   global_step=tf.compat.v1.train.get_global_step())
         # training finished, move to 'trained' folder
         trained = os.path.join(base_dir, 'trained')
-        tf.gfile.MakeDirs(trained)
+        tf.io.gfile.makedirs(trained)
         tmp_dir = os.path.join(
             base_dir, strftime("%Y%m%d_%H%M%S"))
         os.rename(training_dir, tmp_dir)

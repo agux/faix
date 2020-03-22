@@ -41,24 +41,24 @@ class foo:
         print("saying {} from foo".format(self._bar))
 
 
-with tf.Session() as sess:
+with tf.compat.v1.Session() as sess:
     # foos = [foo(i+10) for i in range(EPOCHS)]
     # train_dataset = tf.data.Dataset.from_tensor_slices(
     #     foos).map(lambda f: tuple(tf.py_func(foo_parse_fn, [f], [tf.float64, tf.float64]))).batch(1).prefetch(2)
     train_dataset = tf.data.Dataset.from_tensor_slices(
-        train).map(lambda f: tuple(tf.py_func(parse_fn, [f], [tf.float64, tf.float64]))).batch(1).prefetch(2)
+        train).map(lambda f: tuple(tf.compat.v1.py_func(parse_fn, [f], [tf.float64, tf.float64]))).batch(1).prefetch(2)
     test_dataset = tf.data.Dataset.from_tensor_slices(
-        test).map(lambda f: tuple(tf.py_func(parse_fn, [f], [tf.float64, tf.float64]))).batch(1).repeat()
+        test).map(lambda f: tuple(tf.compat.v1.py_func(parse_fn, [f], [tf.float64, tf.float64]))).batch(1).repeat()
 
-    train_iterator = train_dataset.make_one_shot_iterator()
-    test_iterator = test_dataset.make_one_shot_iterator()
+    train_iterator = tf.compat.v1.data.make_one_shot_iterator(train_dataset)
+    test_iterator = tf.compat.v1.data.make_one_shot_iterator(test_dataset)
 
-    handle = tf.placeholder(tf.string, shape=[])
-    iter = tf.data.Iterator.from_string_handle(
+    handle = tf.compat.v1.placeholder(tf.string, shape=[])
+    iter = tf.compat.v1.data.Iterator.from_string_handle(
         handle, train_dataset.output_types, train_dataset.output_shapes)
 
     next_el = iter.get_next()
-    next_el = tf.tuple([tf.squeeze(next_el[0], [0]),
+    next_el = tf.tuple(tensors=[tf.squeeze(next_el[0], [0]),
                         tf.squeeze(next_el[1], [0])])
 
     train_handle, test_handle = sess.run(

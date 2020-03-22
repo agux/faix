@@ -62,17 +62,17 @@ def parseArgs():
 def run(args):
     print("{} started inference, pid:{}, del_used: {}".format(
         strftime("%H:%M:%S"), os.getpid(), args.del_used))
-    tf.logging.set_verbosity(tf.logging.INFO)
-    keep_prob = tf.placeholder(tf.float32, [], name="kprob")
-    config = tf.ConfigProto(
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
+    keep_prob = tf.compat.v1.placeholder(tf.float32, [], name="kprob")
+    config = tf.compat.v1.ConfigProto(
         log_device_placement=args.log_device,
         allow_soft_placement=True)
     config.gpu_options.allow_growth = args.gpu_grow_mem
-    if not tf.gfile.Exists(args.model):
+    if not tf.io.gfile.exists(args.model):
         print('{} invalid model path: {}'.format(
             strftime("%H:%M:%S"), args.model))
         sys.exit(1)
-    with tf.Session(config=config) as sess:
+    with tf.compat.v1.Session(config=config) as sess:
         model = dncr.DNCRegressorV1(
             layer_width=LAYER_WIDTH,
             memory_size=MEMORY_SIZE,
@@ -93,7 +93,7 @@ def run(args):
                 strftime("%H:%M:%S"), ckpt.model_checkpoint_path))
             d = input_file2.getInferInput(args.rbase, args.prefetch)
             model.setNodes(d['features'], None, d['seqlens'], d['refs'])
-            saver = tf.train.Saver(name="reg_saver")
+            saver = tf.compat.v1.train.Saver(name="reg_saver")
             saver.restore(sess, ckpt.model_checkpoint_path)
         else:
             print("{} model checkpoint path not found, please examine the model.ckpt file under {}".format(
@@ -106,9 +106,9 @@ def run(args):
             print("{} full trace will be collected every {} run".format(
                 strftime("%H:%M:%S"), TRACE_INTERVAL))
         if args.profile:
-            profiler = tf.profiler.Profiler(sess.graph)
+            profiler = tf.compat.v1.profiler.Profiler(sess.graph)
             profile_path = os.path.join(LOG_DIR, "profile")
-            tf.gfile.MakeDirs(profile_path)
+            tf.io.gfile.makedirs(profile_path)
         bno = 0
         records = []
         indices = []
@@ -121,8 +121,8 @@ def run(args):
                     strftime("%H:%M:%S"), bno))
                 ro, rm = None, None
                 if (args.trace or args.profile) and bno+1 >= 5 and bno+1 <= 10:
-                    ro = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-                    rm = tf.RunMetadata()
+                    ro = tf.compat.v1.RunOptions(trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
+                    rm = tf.compat.v1.RunMetadata()
                 code, klid, idx, rpath, r = sess.run([d['code'], d['klid'], d['idx'], d['rel_path'], model.infer],
                                                      {d['handle']: infer_handle,
                                                       keep_prob: KEEP_PROB},
@@ -152,7 +152,7 @@ def run(args):
                 if profiler is not None and bno+1 >= 5 and bno+1 <= 10:
                     profiler.add_step(bno+1, rm)
                     if bno+1 == 10:
-                        option_builder = tf.profiler.ProfileOptionBuilder
+                        option_builder = tf.compat.v1.profiler.ProfileOptionBuilder
                         # profile timing of model operations
                         opts = (option_builder(option_builder.time_and_memory())
                                 .with_step(-1)

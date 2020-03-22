@@ -74,8 +74,8 @@ def gen_epochs(n, num_steps):
 Placeholders
 """
 
-x = tf.placeholder(tf.int32, [batch_size, num_steps], name='input_placeholder')
-y = tf.placeholder(tf.int32, [batch_size, num_steps],
+x = tf.compat.v1.placeholder(tf.int32, [batch_size, num_steps], name='input_placeholder')
+y = tf.compat.v1.placeholder(tf.int32, [batch_size, num_steps],
                    name='labels_placeholder')
 init_state = tf.zeros([batch_size, state_size])
 
@@ -94,17 +94,17 @@ Definition of rnn_cell
 This is very similar to the __call__ method on Tensorflow's BasicRNNCell. See:
 https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/rnn/python/ops/core_rnn_cell_impl.py#L95
 """
-with tf.variable_scope('rnn_cell'):
-    W = tf.get_variable('W', [num_classes + state_size, state_size])
-    b = tf.get_variable('b', [state_size],
-                        initializer=tf.constant_initializer(0.0))
+with tf.compat.v1.variable_scope('rnn_cell'):
+    W = tf.compat.v1.get_variable('W', [num_classes + state_size, state_size])
+    b = tf.compat.v1.get_variable('b', [state_size],
+                        initializer=tf.compat.v1.constant_initializer(0.0))
 
 
 def rnn_cell(rnn_input, state):
-    with tf.variable_scope('rnn_cell', reuse=True):
-        W = tf.get_variable('W', [num_classes + state_size, state_size])
-        b = tf.get_variable('b', [state_size],
-                            initializer=tf.constant_initializer(0.0))
+    with tf.compat.v1.variable_scope('rnn_cell', reuse=True):
+        W = tf.compat.v1.get_variable('W', [num_classes + state_size, state_size])
+        b = tf.compat.v1.get_variable('b', [state_size],
+                            initializer=tf.compat.v1.constant_initializer(0.0))
     return tf.tanh(tf.matmul(tf.concat([rnn_input, state], 1), W) + b)
 
 
@@ -132,10 +132,10 @@ https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/seq2seq/
 """
 
 #logits and predictions
-with tf.variable_scope('softmax'):
-    W = tf.get_variable('W', [state_size, num_classes])
-    b = tf.get_variable('b', [num_classes],
-                        initializer=tf.constant_initializer(0.0))
+with tf.compat.v1.variable_scope('softmax'):
+    W = tf.compat.v1.get_variable('W', [state_size, num_classes])
+    b = tf.compat.v1.get_variable('b', [num_classes],
+                        initializer=tf.compat.v1.constant_initializer(0.0))
 logits = [tf.matmul(rnn_output, W) + b for rnn_output in rnn_outputs]
 predictions = [tf.nn.softmax(logit) for logit in logits]
 
@@ -145,8 +145,8 @@ y_as_list = tf.unstack(y, num=num_steps, axis=1)
 #losses and train_step
 losses = [tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=logit) for
           logit, label in zip(logits, y_as_list)]
-total_loss = tf.reduce_mean(losses) # sum of loss of each step
-train_step = tf.train.AdagradOptimizer(learning_rate).minimize(total_loss)
+total_loss = tf.reduce_mean(input_tensor=losses) # sum of loss of each step
+train_step = tf.compat.v1.train.AdagradOptimizer(learning_rate).minimize(total_loss)
 
 """
 Train the network
@@ -154,8 +154,8 @@ Train the network
 
 
 def train_network(num_epochs, num_steps, state_size=4, verbose=True):
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session() as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
         training_losses = []
         for idx, epoch in enumerate(gen_epochs(num_epochs, num_steps)):
             training_loss = 0

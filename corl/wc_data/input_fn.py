@@ -319,7 +319,7 @@ def getInputs(start=0, shift=0, cols=None, step=30,
     print("{} Using parallel: {}, prefetch: {} db_host: {} port: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port))
     _init(db_pool_size, db_host, db_port, db_pwd)
-    with tf.variable_scope("build_inputs"):
+    with tf.compat.v1.variable_scope("build_inputs"):
         # query max flag from wcc_trn and fill a slice with flags between start and max
         max_bno, _ = _getDataSetMeta("TRAIN", start)
         if max_bno is None:
@@ -327,7 +327,7 @@ def getInputs(start=0, shift=0, cols=None, step=30,
         flags = ["TRAIN_{}".format(bno) for bno in range(start, max_bno+1)]
         train_dataset = tf.data.Dataset.from_tensor_slices(flags).map(
             lambda f: tuple(
-                tf.py_func(_loadTrainingData, [f], [
+                tf.compat.v1.py_func(_loadTrainingData, [f], [
                     tf.string, tf.float32, tf.float32, tf.int32])
             ), _prefetch
         ).batch(1).prefetch(_prefetch)
@@ -336,14 +336,14 @@ def getInputs(start=0, shift=0, cols=None, step=30,
         test_dataset = tf.data.Dataset.from_tensor_slices(
             _loadTestSet(step, max_bno+1, vset)).batch(batch_size).repeat()
 
-        train_iterator = train_dataset.make_one_shot_iterator()
-        test_iterator = test_dataset.make_one_shot_iterator()
+        train_iterator = tf.compat.v1.data.make_one_shot_iterator(train_dataset)
+        test_iterator = tf.compat.v1.data.make_one_shot_iterator(test_dataset)
 
-        handle = tf.placeholder(tf.string, shape=[])
+        handle = tf.compat.v1.placeholder(tf.string, shape=[])
         types = (tf.string, tf.float32, tf.float32, tf.int32)
         shapes = (tf.TensorShape([None]), tf.TensorShape(
             [None, step, feat_size]), tf.TensorShape([None]), tf.TensorShape([None]))
-        iter = tf.data.Iterator.from_string_handle(
+        iter = tf.compat.v1.data.Iterator.from_string_handle(
             handle, types, train_dataset.output_shapes)
 
         next_el = iter.get_next()

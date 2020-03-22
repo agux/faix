@@ -52,7 +52,7 @@ def validate(sess, model, summary, feed, bno, epoch):
         bst_file.write('{}\n{}\n'.format(diff, bno))
         bst_file.truncate()
         bst_saver.save(sess, bst_ckpt,
-                       global_step=tf.train.get_global_step())
+                       global_step=tf.compat.v1.train.get_global_step())
         print('{} acquired better model with validation score {}, at batch {}'.format(
               strftime("%H:%M:%S"), diff, bno))
         found_better = True
@@ -61,9 +61,9 @@ def validate(sess, model, summary, feed, bno, epoch):
 
 def run(args):
     global bst_saver, bst_score, bst_file, bst_ckpt
-    tf.logging.set_verbosity(tf.logging.INFO)
-    keep_prob = tf.placeholder(tf.float32, [], name="keep_prob")
-    with tf.Session(config=tf.ConfigProto(log_device_placement=args.log_device)) as sess:
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
+    keep_prob = tf.compat.v1.placeholder(tf.float32, [], name="keep_prob")
+    with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(log_device_placement=args.log_device)) as sess:
         model = drnn.DRnnRegressorV7(
             layer_width=LAYER_WIDTH,
             dim=DIM,
@@ -90,7 +90,7 @@ def run(args):
         bno, epoch, bst_score = 0, 0, sys.maxint
         ckpt = tf.train.get_checkpoint_state(training_dir)
 
-        if tf.gfile.Exists(bst_file_path):
+        if tf.io.gfile.exists(bst_file_path):
             bst_file = open(bst_file_path, 'r+')
             bst_file.seek(0)
             try:
@@ -102,7 +102,7 @@ def run(args):
                     strftime("%H:%M:%S")))
             bst_file.seek(0)
 
-        if tf.gfile.Exists(training_dir):
+        if tf.io.gfile.exists(training_dir):
             print("{} training folder exists".format(strftime("%H:%M:%S")))
             if ckpt and ckpt.model_checkpoint_path:
                 print("{} found model checkpoint path: {}".format(
@@ -114,30 +114,30 @@ def run(args):
                     strftime("%H:%M:%S"), bno))
                 d = getInput(bno+1, args)
                 model.setNodes(d['features'], d['labels'], d['seqlens'])
-                saver = tf.train.Saver(name="reg_saver")
+                saver = tf.compat.v1.train.Saver(name="reg_saver")
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 restored = True
-                rbno = sess.run(tf.train.get_global_step())
+                rbno = sess.run(tf.compat.v1.train.get_global_step())
                 print('{} check restored global step: {}, previous batch no: {}'.format(
                     strftime("%H:%M:%S"), rbno, bno))
                 if bno != rbno:
                     print('{} bno({}) inconsistent with global step({}). reset global step with bno.'.format(
                         strftime("%H:%M:%S"), bno, rbno))
-                    gstep = tf.train.get_global_step(sess.graph)
-                    sess.run(tf.assign(gstep, bno))
+                    gstep = tf.compat.v1.train.get_global_step(sess.graph)
+                    sess.run(tf.compat.v1.assign(gstep, bno))
             else:
                 print("{} model checkpoint path not found, cleaning training folder".format(
                     strftime("%H:%M:%S")))
-                tf.gfile.DeleteRecursively(training_dir)
+                tf.io.gfile.rmtree(training_dir)
 
         if not restored:
             d = getInput(bno+1, args)
             model.setNodes(d['features'], d['labels'], d['seqlens'])
-            saver = tf.train.Saver(name="reg_saver")
-            sess.run(tf.global_variables_initializer())
-            tf.gfile.MakeDirs(training_dir)
+            saver = tf.compat.v1.train.Saver(name="reg_saver")
+            sess.run(tf.compat.v1.global_variables_initializer())
+            tf.io.gfile.makedirs(training_dir)
             bst_file = open(bst_file_path, 'w+')
-        bst_saver = tf.train.Saver(name="bst_saver")
+        bst_saver = tf.compat.v1.train.Saver(name="bst_saver")
 
         train_handle, test_handle = sess.run(
             [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
@@ -175,7 +175,7 @@ def run(args):
             test_writer.flush()
             if bno == 1 or bno % SAVE_INTERVAL == 0:
                 saver.save(sess, checkpoint_file,
-                           global_step=tf.train.get_global_step())
+                           global_step=tf.compat.v1.train.get_global_step())
         # test last epoch
         test_summary_str, _ = validate(
             sess, model, summary,
@@ -186,10 +186,10 @@ def run(args):
         train_writer.flush()
         test_writer.flush()
         saver.save(sess, checkpoint_file,
-                   global_step=tf.train.get_global_step())
+                   global_step=tf.compat.v1.train.get_global_step())
         # training finished, move to 'trained' folder
         trained = os.path.join(base_dir, 'trained')
-        tf.gfile.MakeDirs(trained)
+        tf.io.gfile.makedirs(trained)
         tmp_dir = os.path.join(
             base_dir, strftime("%Y%m%d_%H%M%S"))
         os.rename(training_dir, tmp_dir)

@@ -40,14 +40,14 @@ class DRnnPredictorV1:
     def logits(self):
         layer = self.rnn(self, self.data)
         layer = self.dnn(self, layer)
-        layer = tf.layers.dropout(
+        layer = tf.compat.v1.layers.dropout(
             inputs=layer, rate=0.1, training=self.training)
-        output = tf.layers.dense(
+        output = tf.compat.v1.layers.dense(
             inputs=layer,
             units=len(self._classes),
-            kernel_initializer=tf.truncated_normal_initializer(
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                 stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             activation=tf.nn.relu6,
             name="output"
         )
@@ -55,27 +55,27 @@ class DRnnPredictorV1:
 
     @staticmethod
     def dnn(self, input):
-        with tf.variable_scope("dnn"):
-            dense = tf.layers.dense(
+        with tf.compat.v1.variable_scope("dnn"):
+            dense = tf.compat.v1.layers.dense(
                 inputs=input,
                 units=self._num_hidden,
-                kernel_initializer=tf.truncated_normal_initializer(
+                kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                     stddev=0.01),
-                bias_initializer=tf.constant_initializer(0.1)
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             )
-            dense = tf.layers.dense(
+            dense = tf.compat.v1.layers.dense(
                 inputs=dense,
                 units=self._num_hidden,
-                kernel_initializer=tf.truncated_normal_initializer(
+                kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                     stddev=0.01),
-                bias_initializer=tf.constant_initializer(0.1)
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             )
-            dense = tf.layers.dense(
+            dense = tf.compat.v1.layers.dense(
                 inputs=dense,
                 units=self._num_hidden,
-                kernel_initializer=tf.truncated_normal_initializer(
+                kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                     stddev=0.01),
-                bias_initializer=tf.constant_initializer(0.1),
+                bias_initializer=tf.compat.v1.constant_initializer(0.1),
                 activation=tf.nn.elu
             )
             return dense
@@ -85,11 +85,11 @@ class DRnnPredictorV1:
         # Deep Recurrent network.
         cells = []
         # Layer 1
-        c = tf.nn.rnn_cell.GRUCell(
+        c = tf.compat.v1.nn.rnn_cell.GRUCell(
             num_units=self._num_hidden,
-            kernel_initializer=tf.truncated_normal_initializer(
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                 stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1)
+            bias_initializer=tf.compat.v1.constant_initializer(0.1)
         )
         cells.append(c)
         # Layer 2
@@ -103,7 +103,7 @@ class DRnnPredictorV1:
         # Layer 3
         c = tf.contrib.rnn.UGRNNCell(
             num_units=self._num_hidden,
-            initializer=tf.truncated_normal_initializer(
+            initializer=tf.compat.v1.truncated_normal_initializer(
                 stddev=0.01)
         )
         c = tf.contrib.rnn.HighwayWrapper(
@@ -119,8 +119,8 @@ class DRnnPredictorV1:
         )
         cells.append(c)
         # Stack layers of cell
-        mc = tf.nn.rnn_cell.MultiRNNCell(cells)
-        output, _ = tf.nn.dynamic_rnn(
+        mc = tf.compat.v1.nn.rnn_cell.MultiRNNCell(cells)
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             mc,
             input,
             dtype=tf.float32,
@@ -130,60 +130,60 @@ class DRnnPredictorV1:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
 
     @lazy_property
     def cost(self):
-        return tf.reduce_mean(self.xentropy, name="cost")
+        return tf.reduce_mean(input_tensor=self.xentropy, name="cost")
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate).minimize(
-            self.cost, global_step=tf.train.get_global_step())
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate).minimize(
+            self.cost, global_step=tf.compat.v1.train.get_global_step())
 
     @lazy_property
     def xentropy(self):
         logits = self.logits
-        with tf.name_scope("xentropy"):
-            return tf.nn.softmax_cross_entropy_with_logits_v2(
+        with tf.compat.v1.name_scope("xentropy"):
+            return tf.nn.softmax_cross_entropy_with_logits(
                 labels=self.target, logits=logits)
 
     @lazy_property
     def worst(self):
         logits = self.logits
         xentropy = self.xentropy
-        with tf.name_scope("worst"):
-            bidx = tf.argmax(xentropy)
-            max_entropy = tf.reduce_max(xentropy)
+        with tf.compat.v1.name_scope("worst"):
+            bidx = tf.argmax(input=xentropy)
+            max_entropy = tf.reduce_max(input_tensor=xentropy)
             shift = len(self._classes)//2
-            predict = tf.gather(tf.argmax(logits, 1), bidx)-shift
-            actual = tf.argmax(tf.gather(self.target, bidx))-shift
+            predict = tf.gather(tf.argmax(input=logits, axis=1), bidx)-shift
+            actual = tf.argmax(input=tf.gather(self.target, bidx))-shift
             return bidx, max_entropy, predict, actual
 
     @lazy_property
     def accuracy(self):
-        with tf.name_scope("accuracy"):
+        with tf.compat.v1.name_scope("accuracy"):
             accuracy = tf.equal(
-                tf.argmax(self.target, 1), tf.argmax(self.logits, 1))
-            return tf.reduce_mean(tf.cast(accuracy, tf.float32), name="accuracy")
+                tf.argmax(input=self.target, axis=1), tf.argmax(input=self.logits, axis=1))
+            return tf.reduce_mean(input_tensor=tf.cast(accuracy, tf.float32), name="accuracy")
 
     @lazy_property
     def one_hot(self):
         logits = self.logits
         size = len(self._classes)
-        with tf.name_scope("one_hot"):
+        with tf.compat.v1.name_scope("one_hot"):
             return tf.one_hot(
-                tf.argmax(logits, 1), size, axis=-1)
+                tf.argmax(input=logits, axis=1), size, axis=-1)
 
     @lazy_property
     def precisions(self):
         predictions = self.one_hot
         size = len(self._classes)
-        with tf.name_scope("Precisions"):
+        with tf.compat.v1.name_scope("Precisions"):
             ps = []
             ops = []
             for i, c in enumerate(self._classes):
@@ -193,7 +193,7 @@ class DRnnPredictorV1:
                     predictions=predictions,
                     weights=mask
                 )
-                tf.summary.scalar("c{}_{}".format(i, c), p*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), p*100)
                 ps.append(p)
                 ops.append(op)
             return ps, ops
@@ -202,7 +202,7 @@ class DRnnPredictorV1:
     def recalls(self):
         predictions = self.one_hot
         size = len(self._classes)
-        with tf.name_scope("Recalls"):
+        with tf.compat.v1.name_scope("Recalls"):
             rs = []
             ops = []
             for i, c in enumerate(self._classes):
@@ -212,7 +212,7 @@ class DRnnPredictorV1:
                     predictions=predictions,
                     weights=mask
                 )
-                tf.summary.scalar("c{}_{}".format(i, c), r*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), r*100)
                 rs.append(r)
                 ops.append(op)
             return rs, ops
@@ -223,7 +223,7 @@ class DRnnPredictorV1:
         mid = size // 2
         ps = self.precisions[0]
         rs = self.recalls[0]
-        with tf.name_scope("Fscore"):
+        with tf.compat.v1.name_scope("Fscore"):
             ops = []
             for i, c in enumerate(self._classes):
                 b = 2.0
@@ -235,9 +235,9 @@ class DRnnPredictorV1:
                 r = rs[i]
                 nu = (1.+b**2.) * p * r
                 de = (b**2. * p + r)
-                op = tf.where(tf.less(de, 1e-7), de, nu/de)
+                op = tf.compat.v1.where(tf.less(de, 1e-7), de, nu/de)
                 ops.append(op)
-                tf.summary.scalar("c{}_{}".format(i, c), op*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), op*100)
             return ops
 
 
@@ -270,12 +270,12 @@ class DRnnPredictorV2:
     @lazy_property
     def logits(self):
         layer = self.rnn(self, self.data)
-        output = tf.layers.dense(
+        output = tf.compat.v1.layers.dense(
             inputs=layer,
             units=len(self._classes),
-            kernel_initializer=tf.truncated_normal_initializer(
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                 stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             activation=tf.nn.relu6,
             name="output"
         )
@@ -288,11 +288,11 @@ class DRnnPredictorV2:
         feat_size = int(input.get_shape()[2])
         if feat_size != self._layer_width:
             # dimensionality transformation layer (no highway wrapper)
-            c = tf.nn.rnn_cell.GRUCell(
+            c = tf.compat.v1.nn.rnn_cell.GRUCell(
                 num_units=self._layer_width,
-                kernel_initializer=tf.truncated_normal_initializer(
+                kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                     stddev=0.01),
-                bias_initializer=tf.constant_initializer(0.1)
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             )
             cells.append(c)
         carry_bias = math.e
@@ -305,7 +305,7 @@ class DRnnPredictorV2:
             # Sub-Layer 2
             c = tf.contrib.rnn.HighwayWrapper(tf.contrib.rnn.UGRNNCell(
                 num_units=self._layer_width,
-                initializer=tf.truncated_normal_initializer(
+                initializer=tf.compat.v1.truncated_normal_initializer(
                     stddev=0.01)
             ), carry_bias_init=carry_bias)
             cells.append(c)
@@ -316,8 +316,8 @@ class DRnnPredictorV2:
                 ), carry_bias_init=carry_bias)
                 cells.append(c)
         # Stack layers of cell
-        mc = tf.nn.rnn_cell.MultiRNNCell(cells)
-        output, _ = tf.nn.dynamic_rnn(
+        mc = tf.compat.v1.nn.rnn_cell.MultiRNNCell(cells)
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             mc,
             input,
             dtype=tf.float32,
@@ -327,60 +327,60 @@ class DRnnPredictorV2:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
 
     @lazy_property
     def cost(self):
-        return tf.reduce_mean(self.xentropy, name="cost")
+        return tf.reduce_mean(input_tensor=self.xentropy, name="cost")
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate).minimize(
-            self.cost, global_step=tf.train.get_global_step())
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate).minimize(
+            self.cost, global_step=tf.compat.v1.train.get_global_step())
 
     @lazy_property
     def xentropy(self):
         logits = self.logits
-        with tf.name_scope("xentropy"):
-            return tf.nn.softmax_cross_entropy_with_logits_v2(
+        with tf.compat.v1.name_scope("xentropy"):
+            return tf.nn.softmax_cross_entropy_with_logits(
                 labels=self.target, logits=logits)
 
     @lazy_property
     def worst(self):
         logits = self.logits
         xentropy = self.xentropy
-        with tf.name_scope("worst"):
-            bidx = tf.argmax(xentropy)
-            max_entropy = tf.reduce_max(xentropy)
+        with tf.compat.v1.name_scope("worst"):
+            bidx = tf.argmax(input=xentropy)
+            max_entropy = tf.reduce_max(input_tensor=xentropy)
             shift = len(self._classes)//2
-            predict = tf.gather(tf.argmax(logits, 1), bidx)-shift
-            actual = tf.argmax(tf.gather(self.target, bidx))-shift
+            predict = tf.gather(tf.argmax(input=logits, axis=1), bidx)-shift
+            actual = tf.argmax(input=tf.gather(self.target, bidx))-shift
             return bidx, max_entropy, predict, actual
 
     @lazy_property
     def accuracy(self):
-        with tf.name_scope("accuracy"):
+        with tf.compat.v1.name_scope("accuracy"):
             accuracy = tf.equal(
-                tf.argmax(self.target, 1), tf.argmax(self.logits, 1))
-            return tf.reduce_mean(tf.cast(accuracy, tf.float32), name="accuracy")
+                tf.argmax(input=self.target, axis=1), tf.argmax(input=self.logits, axis=1))
+            return tf.reduce_mean(input_tensor=tf.cast(accuracy, tf.float32), name="accuracy")
 
     @lazy_property
     def one_hot(self):
         logits = self.logits
         size = len(self._classes)
-        with tf.name_scope("one_hot"):
+        with tf.compat.v1.name_scope("one_hot"):
             return tf.one_hot(
-                tf.argmax(logits, 1), size, axis=-1)
+                tf.argmax(input=logits, axis=1), size, axis=-1)
 
     @lazy_property
     def precisions(self):
         predictions = self.one_hot
         size = len(self._classes)
-        with tf.name_scope("Precisions"):
+        with tf.compat.v1.name_scope("Precisions"):
             ps = []
             ops = []
             for i, c in enumerate(self._classes):
@@ -390,7 +390,7 @@ class DRnnPredictorV2:
                     predictions=predictions,
                     weights=mask
                 )
-                tf.summary.scalar("c{}_{}".format(i, c), p*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), p*100)
                 ps.append(p)
                 ops.append(op)
             return ps, ops
@@ -399,7 +399,7 @@ class DRnnPredictorV2:
     def recalls(self):
         predictions = self.one_hot
         size = len(self._classes)
-        with tf.name_scope("Recalls"):
+        with tf.compat.v1.name_scope("Recalls"):
             rs = []
             ops = []
             for i, c in enumerate(self._classes):
@@ -409,7 +409,7 @@ class DRnnPredictorV2:
                     predictions=predictions,
                     weights=mask
                 )
-                tf.summary.scalar("c{}_{}".format(i, c), r*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), r*100)
                 rs.append(r)
                 ops.append(op)
             return rs, ops
@@ -420,7 +420,7 @@ class DRnnPredictorV2:
         mid = size // 2
         ps = self.precisions[0]
         rs = self.recalls[0]
-        with tf.name_scope("Fscore"):
+        with tf.compat.v1.name_scope("Fscore"):
             ops = []
             for i, c in enumerate(self._classes):
                 b = 2.0
@@ -432,9 +432,9 @@ class DRnnPredictorV2:
                 r = rs[i]
                 nu = (1.+b**2.) * p * r
                 de = (b**2. * p + r)
-                op = tf.where(tf.less(de, 1e-7), de, nu/de)
+                op = tf.compat.v1.where(tf.less(de, 1e-7), de, nu/de)
                 ops.append(op)
-                tf.summary.scalar("c{}_{}".format(i, c), op*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), op*100)
             return ops
 
 
@@ -470,12 +470,12 @@ class DRnnPredictorV3:
     def logits(self):
         layer = self.rnn(self, self.data)
         layer = self.fcn(self, layer)
-        output = tf.layers.dense(
+        output = tf.compat.v1.layers.dense(
             inputs=layer,
             units=len(self._classes),
-            kernel_initializer=tf.truncated_normal_initializer(
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                 stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             activation=tf.nn.relu6,
             name="output"
         )
@@ -483,7 +483,7 @@ class DRnnPredictorV3:
 
     @staticmethod
     def fcn(self, input):
-        with tf.variable_scope("dnn"):
+        with tf.compat.v1.variable_scope("dnn"):
             # Dimensionality Abstraction
             # fc = tf.layers.dense(
             #     inputs=input,
@@ -516,7 +516,7 @@ class DRnnPredictorV3:
         c = tf.contrib.rnn.HighwayWrapper(tf.contrib.rnn.UGRNNCell(
             num_units=feat_size,
             forget_bias=carry_bias,
-            initializer=tf.truncated_normal_initializer(stddev=0.01)
+            initializer=tf.compat.v1.truncated_normal_initializer(stddev=0.01)
         ), carry_bias_init=carry_bias)
         cells.append(c)
         # dimensionality transformation layer (with or without highway)
@@ -531,11 +531,11 @@ class DRnnPredictorV3:
         # minus one for prior and posterior cells
         for _ in range(self._num_rnn_layers-1):
             # Sub-Layer 1
-            c = tf.contrib.rnn.HighwayWrapper(tf.nn.rnn_cell.GRUCell(
+            c = tf.contrib.rnn.HighwayWrapper(tf.compat.v1.nn.rnn_cell.GRUCell(
                 num_units=self._layer_width,
-                kernel_initializer=tf.truncated_normal_initializer(
+                kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                     stddev=0.01),
-                bias_initializer=tf.constant_initializer(0.1)
+                bias_initializer=tf.compat.v1.constant_initializer(0.1)
             ), carry_bias_init=carry_bias)
             cells.append(c)
             # Sub-Layer 2
@@ -553,7 +553,7 @@ class DRnnPredictorV3:
             c = tf.contrib.rnn.HighwayWrapper(tf.contrib.rnn.UGRNNCell(
                 num_units=self._layer_width,
                 forget_bias=carry_bias,
-                initializer=tf.truncated_normal_initializer(
+                initializer=tf.compat.v1.truncated_normal_initializer(
                     stddev=0.01)
             ), carry_bias_init=carry_bias)
             cells.append(c)
@@ -564,8 +564,8 @@ class DRnnPredictorV3:
         ), carry_bias_init=carry_bias)
         cells.append(c)
         # Stack layers of cell
-        mc = tf.nn.rnn_cell.MultiRNNCell(cells)
-        output, _ = tf.nn.dynamic_rnn(
+        mc = tf.compat.v1.nn.rnn_cell.MultiRNNCell(cells)
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             mc,
             input,
             dtype=tf.float32,
@@ -575,61 +575,61 @@ class DRnnPredictorV3:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
 
     @lazy_property
     def cost(self):
-        return tf.reduce_mean(self.xentropy, name="cost")
+        return tf.reduce_mean(input_tensor=self.xentropy, name="cost")
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate,
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate,
                                       epsilon=1e-7).minimize(
-            self.cost, global_step=tf.train.get_global_step())
+            self.cost, global_step=tf.compat.v1.train.get_global_step())
 
     @lazy_property
     def xentropy(self):
         logits = self.logits
-        with tf.name_scope("xentropy"):
-            return tf.nn.softmax_cross_entropy_with_logits_v2(
+        with tf.compat.v1.name_scope("xentropy"):
+            return tf.nn.softmax_cross_entropy_with_logits(
                 labels=self.target, logits=logits)
 
     @lazy_property
     def worst(self):
         logits = self.logits
         xentropy = self.xentropy
-        with tf.name_scope("worst"):
-            bidx = tf.argmax(xentropy)
-            max_entropy = tf.reduce_max(xentropy)
+        with tf.compat.v1.name_scope("worst"):
+            bidx = tf.argmax(input=xentropy)
+            max_entropy = tf.reduce_max(input_tensor=xentropy)
             shift = len(self._classes)//2
-            predict = tf.gather(tf.argmax(logits, 1), bidx)-shift
-            actual = tf.argmax(tf.gather(self.target, bidx))-shift
+            predict = tf.gather(tf.argmax(input=logits, axis=1), bidx)-shift
+            actual = tf.argmax(input=tf.gather(self.target, bidx))-shift
             return bidx, max_entropy, predict, actual
 
     @lazy_property
     def accuracy(self):
-        with tf.name_scope("accuracy"):
+        with tf.compat.v1.name_scope("accuracy"):
             accuracy = tf.equal(
-                tf.argmax(self.target, 1), tf.argmax(self.logits, 1))
-            return tf.reduce_mean(tf.cast(accuracy, tf.float32), name="accuracy")
+                tf.argmax(input=self.target, axis=1), tf.argmax(input=self.logits, axis=1))
+            return tf.reduce_mean(input_tensor=tf.cast(accuracy, tf.float32), name="accuracy")
 
     @lazy_property
     def one_hot(self):
         logits = self.logits
         size = len(self._classes)
-        with tf.name_scope("one_hot"):
+        with tf.compat.v1.name_scope("one_hot"):
             return tf.one_hot(
-                tf.argmax(logits, 1), size, axis=-1)
+                tf.argmax(input=logits, axis=1), size, axis=-1)
 
     @lazy_property
     def precisions(self):
         predictions = self.one_hot
         size = len(self._classes)
-        with tf.name_scope("Precisions"):
+        with tf.compat.v1.name_scope("Precisions"):
             ps = []
             ops = []
             for i, c in enumerate(self._classes):
@@ -639,7 +639,7 @@ class DRnnPredictorV3:
                     predictions=predictions,
                     weights=mask
                 )
-                tf.summary.scalar("c{}_{}".format(i, c), p*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), p*100)
                 ps.append(p)
                 ops.append(op)
             return ps, ops
@@ -648,7 +648,7 @@ class DRnnPredictorV3:
     def recalls(self):
         predictions = self.one_hot
         size = len(self._classes)
-        with tf.name_scope("Recalls"):
+        with tf.compat.v1.name_scope("Recalls"):
             rs = []
             ops = []
             for i, c in enumerate(self._classes):
@@ -658,7 +658,7 @@ class DRnnPredictorV3:
                     predictions=predictions,
                     weights=mask
                 )
-                tf.summary.scalar("c{}_{}".format(i, c), r*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), r*100)
                 rs.append(r)
                 ops.append(op)
             return rs, ops
@@ -669,7 +669,7 @@ class DRnnPredictorV3:
         mid = size // 2
         ps = self.precisions[0]
         rs = self.recalls[0]
-        with tf.name_scope("Fscore"):
+        with tf.compat.v1.name_scope("Fscore"):
             ops = []
             for i, c in enumerate(self._classes):
                 b = 2.0
@@ -681,9 +681,9 @@ class DRnnPredictorV3:
                 r = rs[i]
                 nu = (1.+b**2.) * p * r
                 de = (b**2. * p + r)
-                op = tf.where(tf.less(de, 1e-7), de, nu/de)
+                op = tf.compat.v1.where(tf.less(de, 1e-7), de, nu/de)
                 ops.append(op)
-                tf.summary.scalar("c{}_{}".format(i, c), op*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), op*100)
             return ops
 
 
@@ -723,12 +723,12 @@ class DRnnPredictorV4:
     def logits(self):
         layer = self.rnn(self, self.data)
         layer = self.fcn(self, layer)
-        output = tf.layers.dense(
+        output = tf.compat.v1.layers.dense(
             inputs=layer,
             units=len(self._classes),
-            kernel_initializer=tf.truncated_normal_initializer(
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                 stddev=stddev(1.0, int(layer.get_shape()[-1]))),
-            bias_initializer=tf.constant_initializer(0.1),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             activation=tf.nn.selu,
             name="output"
         )
@@ -737,10 +737,10 @@ class DRnnPredictorV4:
     @staticmethod
     def fcn(self, input):
         block = input
-        with tf.variable_scope("fcn"):
+        with tf.compat.v1.variable_scope("fcn"):
             p = int(round(self._num_fcn_layers ** 0.5))
             for i in range(self._num_fcn_layers):
-                with tf.variable_scope("dense_block_{}".format(i+1)):
+                with tf.compat.v1.variable_scope("dense_block_{}".format(i+1)):
                     if i % p == 0:
                         block = tf.contrib.layers.batch_norm(
                             inputs=block,
@@ -755,12 +755,12 @@ class DRnnPredictorV4:
                             block, 1.0 - self.dropout)
                         size = int(block.get_shape()[-1])
                         new_size = int(round(size*self._size_decay))
-                        block = tf.layers.dense(
+                        block = tf.compat.v1.layers.dense(
                             inputs=block,
                             units=new_size,
-                            kernel_initializer=tf.truncated_normal_initializer(
+                            kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                                 stddev=stddev(1.0, size)),
-                            bias_initializer=tf.constant_initializer(0.1)
+                            bias_initializer=tf.compat.v1.constant_initializer(0.1)
                         )
                         print("fcn layer_{} decayed size:{}".format(i, new_size))
                     else:
@@ -779,9 +779,9 @@ class DRnnPredictorV4:
             for j in range(self._rnn_layer_size):
                 c = DenseCellWrapper(LayerNormGRUCell(
                     num_units=self._layer_width,
-                    kernel_initializer=tf.truncated_normal_initializer(
+                    kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                         stddev=stddev(1.0, feat_size)),
-                    bias_initializer=tf.constant_initializer(0.1),
+                    bias_initializer=tf.compat.v1.constant_initializer(0.1),
                     input_layer_norm=(not (i == 0 and j == 0))
                 ), output_size=output_size)
                 if not (i == 0 and j == 0):
@@ -810,8 +810,8 @@ class DRnnPredictorV4:
                 print("rnn layer_{} decayed size:{}".format(i, output_size))
                 cells.append(c)
         # Stack layers of cell
-        mc = tf.nn.rnn_cell.MultiRNNCell(cells)
-        output, _ = tf.nn.dynamic_rnn(
+        mc = tf.compat.v1.nn.rnn_cell.MultiRNNCell(cells)
+        output, _ = tf.compat.v1.nn.dynamic_rnn(
             mc,
             input,
             dtype=tf.float32,
@@ -821,61 +821,61 @@ class DRnnPredictorV4:
 
     @staticmethod
     def last_relevant(output, length):
-        with tf.name_scope("last_relevant"):
-            batch_size = tf.shape(output)[0]
+        with tf.compat.v1.name_scope("last_relevant"):
+            batch_size = tf.shape(input=output)[0]
             relevant = tf.gather_nd(output, tf.stack(
                 [tf.range(batch_size), length-1], axis=1))
             return relevant
 
     @lazy_property
     def cost(self):
-        return tf.reduce_mean(self.xentropy, name="cost")
+        return tf.reduce_mean(input_tensor=self.xentropy, name="cost")
 
     @lazy_property
     def optimize(self):
-        return tf.train.AdamOptimizer(self._learning_rate,
+        return tf.compat.v1.train.AdamOptimizer(self._learning_rate,
                                       epsilon=1e-7).minimize(
-            self.cost, global_step=tf.train.get_global_step())
+            self.cost, global_step=tf.compat.v1.train.get_global_step())
 
     @lazy_property
     def xentropy(self):
         logits = self.logits
-        with tf.name_scope("xentropy"):
-            return tf.nn.softmax_cross_entropy_with_logits_v2(
+        with tf.compat.v1.name_scope("xentropy"):
+            return tf.nn.softmax_cross_entropy_with_logits(
                 labels=self.target, logits=logits)
 
     @lazy_property
     def worst(self):
         logits = self.logits
         xentropy = self.xentropy
-        with tf.name_scope("worst"):
-            bidx = tf.argmax(xentropy)
-            max_entropy = tf.reduce_max(xentropy)
+        with tf.compat.v1.name_scope("worst"):
+            bidx = tf.argmax(input=xentropy)
+            max_entropy = tf.reduce_max(input_tensor=xentropy)
             shift = len(self._classes)//2
-            predict = tf.gather(tf.argmax(logits, 1), bidx)-shift
-            actual = tf.argmax(tf.gather(self.target, bidx))-shift
+            predict = tf.gather(tf.argmax(input=logits, axis=1), bidx)-shift
+            actual = tf.argmax(input=tf.gather(self.target, bidx))-shift
             return bidx, max_entropy, predict, actual
 
     @lazy_property
     def accuracy(self):
-        with tf.name_scope("accuracy"):
+        with tf.compat.v1.name_scope("accuracy"):
             accuracy = tf.equal(
-                tf.argmax(self.target, 1), tf.argmax(self.logits, 1))
-            return tf.reduce_mean(tf.cast(accuracy, tf.float32), name="accuracy")
+                tf.argmax(input=self.target, axis=1), tf.argmax(input=self.logits, axis=1))
+            return tf.reduce_mean(input_tensor=tf.cast(accuracy, tf.float32), name="accuracy")
 
     @lazy_property
     def one_hot(self):
         logits = self.logits
         size = len(self._classes)
-        with tf.name_scope("one_hot"):
+        with tf.compat.v1.name_scope("one_hot"):
             return tf.one_hot(
-                tf.argmax(logits, 1), size, axis=-1)
+                tf.argmax(input=logits, axis=1), size, axis=-1)
 
     @lazy_property
     def precisions(self):
         predictions = self.one_hot
         size = len(self._classes)
-        with tf.name_scope("Precisions"):
+        with tf.compat.v1.name_scope("Precisions"):
             ps = []
             ops = []
             for i, c in enumerate(self._classes):
@@ -885,7 +885,7 @@ class DRnnPredictorV4:
                     predictions=predictions,
                     weights=mask
                 )
-                tf.summary.scalar("c{}_{}".format(i, c), p*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), p*100)
                 ps.append(p)
                 ops.append(op)
             return ps, ops
@@ -894,7 +894,7 @@ class DRnnPredictorV4:
     def recalls(self):
         predictions = self.one_hot
         size = len(self._classes)
-        with tf.name_scope("Recalls"):
+        with tf.compat.v1.name_scope("Recalls"):
             rs = []
             ops = []
             for i, c in enumerate(self._classes):
@@ -904,7 +904,7 @@ class DRnnPredictorV4:
                     predictions=predictions,
                     weights=mask
                 )
-                tf.summary.scalar("c{}_{}".format(i, c), r*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), r*100)
                 rs.append(r)
                 ops.append(op)
             return rs, ops
@@ -915,7 +915,7 @@ class DRnnPredictorV4:
         mid = size // 2
         ps = self.precisions[0]
         rs = self.recalls[0]
-        with tf.name_scope("Fscore"):
+        with tf.compat.v1.name_scope("Fscore"):
             ops = []
             for i, c in enumerate(self._classes):
                 b = 2.0
@@ -927,7 +927,7 @@ class DRnnPredictorV4:
                 r = rs[i]
                 nu = (1.+b**2.) * p * r
                 de = (b**2. * p + r)
-                op = tf.where(tf.less(de, 1e-7), de, nu/de)
+                op = tf.compat.v1.where(tf.less(de, 1e-7), de, nu/de)
                 ops.append(op)
-                tf.summary.scalar("c{}_{}".format(i, c), op*100)
+                tf.compat.v1.summary.scalar("c{}_{}".format(i, c), op*100)
             return ops

@@ -124,19 +124,19 @@ class PTBModel(object):
     vocab_size = config.vocab_size
 
     with tf.device("/cpu:0"):
-      embedding = tf.get_variable(
+      embedding = tf.compat.v1.get_variable(
           "embedding", [vocab_size, size], dtype=data_type())
-      inputs = tf.nn.embedding_lookup(embedding, input_.input_data)
+      inputs = tf.nn.embedding_lookup(params=embedding, ids=input_.input_data)
 
     if is_training and config.keep_prob < 1:
-      inputs = tf.nn.dropout(inputs, config.keep_prob)
+      inputs = tf.nn.dropout(inputs, 1 - (config.keep_prob))
 
     output, state = self._build_rnn_graph(inputs, config, is_training)
 
-    softmax_w = tf.get_variable(
+    softmax_w = tf.compat.v1.get_variable(
         "softmax_w", [size, vocab_size], dtype=data_type())
-    softmax_b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
-    logits = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
+    softmax_b = tf.compat.v1.get_variable("softmax_b", [vocab_size], dtype=data_type())
+    logits = tf.compat.v1.nn.xw_plus_b(output, softmax_w, softmax_b)
      # Reshape logits to be a 3-D tensor for sequence loss
     logits = tf.reshape(logits, [self.batch_size, self.num_steps, vocab_size])
 
@@ -149,24 +149,24 @@ class PTBModel(object):
         average_across_batch=True)
 
     # Update the cost
-    self._cost = tf.reduce_sum(loss)
+    self._cost = tf.reduce_sum(input_tensor=loss)
     self._final_state = state
 
     if not is_training:
       return
 
     self._lr = tf.Variable(0.0, trainable=False)
-    tvars = tf.trainable_variables()
-    grads, _ = tf.clip_by_global_norm(tf.gradients(self._cost, tvars),
+    tvars = tf.compat.v1.trainable_variables()
+    grads, _ = tf.clip_by_global_norm(tf.gradients(ys=self._cost, xs=tvars),
                                       config.max_grad_norm)
-    optimizer = tf.train.GradientDescentOptimizer(self._lr)
+    optimizer = tf.compat.v1.train.GradientDescentOptimizer(self._lr)
     self._train_op = optimizer.apply_gradients(
         zip(grads, tvars),
-        global_step=tf.train.get_or_create_global_step())
+        global_step=tf.compat.v1.train.get_or_create_global_step())
 
-    self._new_lr = tf.placeholder(
+    self._new_lr = tf.compat.v1.placeholder(
         tf.float32, shape=[], name="new_learning_rate")
-    self._lr_update = tf.assign(self._lr, self._new_lr)
+    self._lr_update = tf.compat.v1.assign(self._lr, self._new_lr)
 
   def _build_rnn_graph(self, inputs, config, is_training):
     if config.rnn_mode == CUDNN:
@@ -176,31 +176,31 @@ class PTBModel(object):
 
   def _build_rnn_graph_cudnn(self, inputs, config, is_training):
     """Build the inference graph using CUDNN cell."""
-    inputs = tf.transpose(inputs, [1, 0, 2])
+    inputs = tf.transpose(a=inputs, perm=[1, 0, 2])
     self._cell = tf.contrib.cudnn_rnn.CudnnLSTM(
         num_layers=config.num_layers,
         num_units=config.hidden_size,
         input_size=config.hidden_size,
         dropout=1 - config.keep_prob if is_training else 0)
     params_size_t = self._cell.params_size()
-    self._rnn_params = tf.get_variable(
+    self._rnn_params = tf.compat.v1.get_variable(
         "lstm_params",
-        initializer=tf.random_uniform(
+        initializer=tf.random.uniform(
             [params_size_t], -config.init_scale, config.init_scale),
         validate_shape=False)
     c = tf.zeros([config.num_layers, self.batch_size, config.hidden_size],
                  tf.float32)
     h = tf.zeros([config.num_layers, self.batch_size, config.hidden_size],
                  tf.float32)
-    self._initial_state = (tf.contrib.rnn.LSTMStateTuple(h=h, c=c),)
+    self._initial_state = (tf.nn.rnn_cell.LSTMStateTuple(h=h, c=c),)
     outputs, h, c = self._cell(inputs, h, c, self._rnn_params, is_training)
-    outputs = tf.transpose(outputs, [1, 0, 2])
+    outputs = tf.transpose(a=outputs, perm=[1, 0, 2])
     outputs = tf.reshape(outputs, [-1, config.hidden_size])
-    return outputs, (tf.contrib.rnn.LSTMStateTuple(h=h, c=c),)
+    return outputs, (tf.nn.rnn_cell.LSTMStateTuple(h=h, c=c),)
 
   def _get_lstm_cell(self, config, is_training):
     if config.rnn_mode == BASIC:
-      return tf.contrib.rnn.BasicLSTMCell(
+      return tf.compat.v1.nn.rnn_cell.BasicLSTMCell(
           config.hidden_size, forget_bias=0.0, state_is_tuple=True,
           reuse=not is_training)
     if config.rnn_mode == BLOCK:
@@ -220,7 +220,7 @@ class PTBModel(object):
             cell, output_keep_prob=config.keep_prob)
       return cell
 
-    cell = tf.contrib.rnn.MultiRNNCell(
+    cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell(
         [make_cell() for _ in range(config.num_layers)], state_is_tuple=True)
 
     self._initial_state = cell.zero_state(config.batch_size, data_type())
@@ -235,9 +235,9 @@ class PTBModel(object):
     # outputs, state = tf.contrib.rnn.static_rnn(cell, inputs,
     #                            initial_state=self._initial_state)
     outputs = []
-    with tf.variable_scope("RNN"):
+    with tf.compat.v1.variable_scope("RNN"):
       for time_step in range(self.num_steps):
-        if time_step > 0: tf.get_variable_scope().reuse_variables()
+        if time_step > 0: tf.compat.v1.get_variable_scope().reuse_variables()
         (cell_output, state) = cell(inputs[:, time_step, :], state)
         outputs.append(cell_output)
     output = tf.reshape(tf.concat(outputs, 1), [-1, config.hidden_size])
@@ -255,7 +255,7 @@ class PTBModel(object):
       if self._rnn_params:
         ops.update(rnn_params=self._rnn_params)
     for name, op in ops.items():
-      tf.add_to_collection(name, op)
+      tf.compat.v1.add_to_collection(name, op)
     self._initial_state_name = util.with_prefix(self._name, "initial")
     self._final_state_name = util.with_prefix(self._name, "final")
     util.export_state_tuples(self._initial_state, self._initial_state_name)
@@ -264,11 +264,11 @@ class PTBModel(object):
   def import_ops(self):
     """Imports ops from collections."""
     if self._is_training:
-      self._train_op = tf.get_collection_ref("train_op")[0]
-      self._lr = tf.get_collection_ref("lr")[0]
-      self._new_lr = tf.get_collection_ref("new_lr")[0]
-      self._lr_update = tf.get_collection_ref("lr_update")[0]
-      rnn_params = tf.get_collection_ref("rnn_params")
+      self._train_op = tf.compat.v1.get_collection_ref("train_op")[0]
+      self._lr = tf.compat.v1.get_collection_ref("lr")[0]
+      self._new_lr = tf.compat.v1.get_collection_ref("new_lr")[0]
+      self._lr_update = tf.compat.v1.get_collection_ref("lr_update")[0]
+      rnn_params = tf.compat.v1.get_collection_ref("rnn_params")
       if self._cell and rnn_params:
         params_saveable = tf.contrib.cudnn_rnn.RNNParamsSaveable(
             self._cell,
@@ -276,8 +276,8 @@ class PTBModel(object):
             self._cell.canonical_to_params,
             rnn_params,
             base_variable_scope="Model/RNN")
-        tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, params_saveable)
-    self._cost = tf.get_collection_ref(util.with_prefix(self._name, "cost"))[0]
+        tf.compat.v1.add_to_collection(tf.compat.v1.GraphKeys.SAVEABLE_OBJECTS, params_saveable)
+    self._cost = tf.compat.v1.get_collection_ref(util.with_prefix(self._name, "cost"))[0]
     num_replicas = FLAGS.num_gpus if self._name == "Train" else 1
     self._initial_state = util.import_state_tuples(
         self._initial_state, self._initial_state_name, num_replicas)
@@ -462,33 +462,33 @@ def main(_):
   eval_config.num_steps = 1
 
   with tf.Graph().as_default():
-    initializer = tf.random_uniform_initializer(-config.init_scale,
+    initializer = tf.compat.v1.random_uniform_initializer(-config.init_scale,
                                                 config.init_scale)
 
-    with tf.name_scope("Train"):
+    with tf.compat.v1.name_scope("Train"):
       train_input = PTBInput(config=config, data=train_data, name="TrainInput")
-      with tf.variable_scope("Model", reuse=None, initializer=initializer):
+      with tf.compat.v1.variable_scope("Model", reuse=None, initializer=initializer):
         m = PTBModel(is_training=True, config=config, input_=train_input)
-      tf.summary.scalar("Training Loss", m.cost)
-      tf.summary.scalar("Learning Rate", m.lr)
+      tf.compat.v1.summary.scalar("Training Loss", m.cost)
+      tf.compat.v1.summary.scalar("Learning Rate", m.lr)
 
-    with tf.name_scope("Valid"):
+    with tf.compat.v1.name_scope("Valid"):
       valid_input = PTBInput(config=config, data=valid_data, name="ValidInput")
-      with tf.variable_scope("Model", reuse=True, initializer=initializer):
+      with tf.compat.v1.variable_scope("Model", reuse=True, initializer=initializer):
         mvalid = PTBModel(is_training=False, config=config, input_=valid_input)
-      tf.summary.scalar("Validation Loss", mvalid.cost)
+      tf.compat.v1.summary.scalar("Validation Loss", mvalid.cost)
 
-    with tf.name_scope("Test"):
+    with tf.compat.v1.name_scope("Test"):
       test_input = PTBInput(
           config=eval_config, data=test_data, name="TestInput")
-      with tf.variable_scope("Model", reuse=True, initializer=initializer):
+      with tf.compat.v1.variable_scope("Model", reuse=True, initializer=initializer):
         mtest = PTBModel(is_training=False, config=eval_config,
                          input_=test_input)
 
     models = {"Train": m, "Valid": mvalid, "Test": mtest}
     for name, model in models.items():
       model.export_ops(name)
-    metagraph = tf.train.export_meta_graph()
+    metagraph = tf.compat.v1.train.export_meta_graph()
     if tf.__version__ < "1.1.0" and FLAGS.num_gpus > 1:
       raise ValueError("num_gpus > 1 is not supported for TensorFlow versions "
                        "below 1.1.0")
@@ -498,11 +498,11 @@ def main(_):
       util.auto_parallel(metagraph, m)
 
   with tf.Graph().as_default():
-    tf.train.import_meta_graph(metagraph)
+    tf.compat.v1.train.import_meta_graph(metagraph)
     for model in models.values():
       model.import_ops()
-    sv = tf.train.Supervisor(logdir=FLAGS.save_path)
-    config_proto = tf.ConfigProto(allow_soft_placement=soft_placement)
+    sv = tf.compat.v1.train.Supervisor(logdir=FLAGS.save_path)
+    config_proto = tf.compat.v1.ConfigProto(allow_soft_placement=soft_placement)
     with sv.managed_session(config=config_proto) as session:
       for i in range(config.max_max_epoch):
         lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
@@ -524,4 +524,4 @@ def main(_):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

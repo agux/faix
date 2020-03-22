@@ -29,29 +29,29 @@ def numLayers(d1, d2=None):
 
 
 def conv2d(input, kernel, filters, seq):
-    with tf.variable_scope("conv{}".format(seq)):
+    with tf.compat.v1.variable_scope("conv{}".format(seq)):
         h = int(input.get_shape()[1])
         w = int(input.get_shape()[2])
-        conv = tf.layers.conv2d(
+        conv = tf.compat.v1.layers.conv2d(
             inputs=input,
             name="conv_lv{}".format(seq),
             filters=filters,
             kernel_size=kernel,
-            kernel_initializer=tf.truncated_normal_initializer(
+            kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                 stddev=0.01),
-            bias_initializer=tf.constant_initializer(0.1),
+            bias_initializer=tf.compat.v1.constant_initializer(0.1),
             padding="SAME",
-            reuse=tf.AUTO_REUSE)
+            reuse=tf.compat.v1.AUTO_REUSE)
         h_stride = 2 if (h > 2 or w == 2) else 1
         w_stride = 2 if (w > 2 or h == 2) else 1
-        pool = tf.layers.max_pooling2d(
+        pool = tf.compat.v1.layers.max_pooling2d(
             name="pool_lv{}".format(seq),
             inputs=conv, pool_size=2, strides=[h_stride, w_stride],
             padding="SAME")
         ln = tf.contrib.layers.layer_norm(
             scope="ln_{}".format(seq),
             inputs=pool,
-            reuse=tf.AUTO_REUSE
+            reuse=tf.compat.v1.AUTO_REUSE
         )
         print("rnn-conv{}: {}".format(seq, ln.get_shape()))
         return ln
@@ -239,13 +239,13 @@ class GRUCellv2(_LayerRNNCell):
         r = tf.contrib.layers.layer_norm(
             scope="r_ln",
             inputs=r,
-            reuse=tf.AUTO_REUSE
+            reuse=tf.compat.v1.AUTO_REUSE
         )
 
         u = tf.contrib.layers.layer_norm(
             scope="u_ln",
             inputs=u,
-            reuse=tf.AUTO_REUSE
+            reuse=tf.compat.v1.AUTO_REUSE
         )
 
         r_state = r * state
@@ -363,7 +363,7 @@ class EGRUCell_V1(_LayerRNNCell):
         gate_inputs = tf.contrib.layers.layer_norm(
             scope="gate_ln",
             inputs=gate_inputs,
-            reuse=tf.AUTO_REUSE
+            reuse=tf.compat.v1.AUTO_REUSE
         )
 
         value = math_ops.sigmoid(gate_inputs)
@@ -405,7 +405,7 @@ class EGRUCell_V1(_LayerRNNCell):
             convlayer = tf.contrib.layers.layer_norm(
                 scope="conv_ln_{}".format(i),
                 inputs=convlayer,
-                reuse=tf.AUTO_REUSE
+                reuse=tf.compat.v1.AUTO_REUSE
             )
         convlayer = tf.squeeze(convlayer, [1, 2])
         return convlayer
@@ -511,7 +511,7 @@ class EGRUCell_V2(_LayerRNNCell):
 
         inputs = self.cnn2d(inputs)
 
-        inputs = tf.layers.dropout(
+        inputs = tf.compat.v1.layers.dropout(
             inputs=inputs, rate=0.5, training=self._training)
 
         gate_inputs = math_ops.matmul(
@@ -521,7 +521,7 @@ class EGRUCell_V2(_LayerRNNCell):
         gate_inputs = tf.contrib.layers.layer_norm(
             scope="gate_ln",
             inputs=gate_inputs,
-            reuse=tf.AUTO_REUSE
+            reuse=tf.compat.v1.AUTO_REUSE
         )
 
         value = math_ops.sigmoid(gate_inputs)
@@ -550,7 +550,7 @@ class EGRUCell_V2(_LayerRNNCell):
         for i in range(nlayer):
             filters *= 2
             convlayer = conv2d(convlayer, self._kernel, int(filters), i)
-        convlayer = tf.layers.flatten(convlayer)
+        convlayer = tf.compat.v1.layers.flatten(convlayer)
         return convlayer
 
 
@@ -640,7 +640,7 @@ class LayerNormGRUCell(_LayerRNNCell):
             inputs = tf.contrib.layers.layer_norm(
                 scope="input_ln",
                 inputs=inputs,
-                reuse=tf.AUTO_REUSE
+                reuse=tf.compat.v1.AUTO_REUSE
             )
 
         gate_inputs = math_ops.matmul(
@@ -651,7 +651,7 @@ class LayerNormGRUCell(_LayerRNNCell):
             gate_inputs = tf.contrib.layers.layer_norm(
                 scope="gate_ln",
                 inputs=gate_inputs,
-                reuse=tf.AUTO_REUSE
+                reuse=tf.compat.v1.AUTO_REUSE
             )
 
         value = math_ops.sigmoid(gate_inputs)
@@ -747,7 +747,7 @@ class LayerNormNASCell(rnn_cell_impl.RNNCell):
             inputs = tf.contrib.layers.layer_norm(
                 scope="inputs_ln",
                 inputs=inputs,
-                reuse=tf.AUTO_REUSE
+                reuse=tf.compat.v1.AUTO_REUSE
             )
 
         sigmoid = math_ops.sigmoid
@@ -765,16 +765,16 @@ class LayerNormNASCell(rnn_cell_impl.RNNCell):
                 "Could not infer input size from inputs.get_shape()[-1]")
         # Variables for the NAS cell. W_m is all matrices multiplying the
         # hidden state and W_inputs is all matrices multiplying the inputs.
-        concat_w_m = tf.get_variable("recurrent_kernel",
+        concat_w_m = tf.compat.v1.get_variable("recurrent_kernel",
                                      [num_proj, 8 * self._num_units], dtype)
-        concat_w_inputs = tf.get_variable(
+        concat_w_inputs = tf.compat.v1.get_variable(
             "kernel", [input_size.value, 8 * self._num_units], dtype)
 
         m_matrix = math_ops.matmul(m_prev, concat_w_m)
         inputs_matrix = math_ops.matmul(inputs, concat_w_inputs)
 
         if self._use_biases:
-            b = tf.get_variable(
+            b = tf.compat.v1.get_variable(
                 "bias",
                 shape=[8 * self._num_units],
                 initializer=init_ops.zeros_initializer(),
@@ -785,7 +785,7 @@ class LayerNormNASCell(rnn_cell_impl.RNNCell):
             m_matrix = tf.contrib.layers.layer_norm(
                 scope="m_matrix_ln",
                 inputs=m_matrix,
-                reuse=tf.AUTO_REUSE
+                reuse=tf.compat.v1.AUTO_REUSE
             )
             # inputs_matrix = tf.contrib.layers.layer_norm(
             #     scope="inputs_matrix_ln",
@@ -830,7 +830,7 @@ class LayerNormNASCell(rnn_cell_impl.RNNCell):
 
         # Projection layer if specified
         if self._num_proj is not None:
-            concat_w_proj = tf.get_variable("projection_weights",
+            concat_w_proj = tf.compat.v1.get_variable("projection_weights",
                                             [self._num_units, self._num_proj], dtype)
             new_m = math_ops.matmul(new_m, concat_w_proj)
 

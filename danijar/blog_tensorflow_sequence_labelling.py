@@ -32,11 +32,11 @@ class SequenceLabelling:
     @lazy_property
     def prediction(self):
         # Recurrent network.
-        network = tf.nn.rnn_cell.GRUCell(self._num_hidden)
-        network = tf.nn.rnn_cell.DropoutWrapper(
+        network = tf.compat.v1.nn.rnn_cell.GRUCell(self._num_hidden)
+        network = tf.compat.v1.nn.rnn_cell.DropoutWrapper(
             network, output_keep_prob=self.dropout)
-        network = tf.nn.rnn_cell.MultiRNNCell([network] * self._num_layers)
-        output, _ = tf.nn.dynamic_rnn(network, data, dtype=tf.float32)
+        network = tf.compat.v1.nn.rnn_cell.MultiRNNCell([network] * self._num_layers)
+        output, _ = tf.compat.v1.nn.dynamic_rnn(network, data, dtype=tf.float32)
         # Softmax layer.
         max_length = int(self.target.get_shape()[1])
         num_classes = int(self.target.get_shape()[2])
@@ -50,25 +50,25 @@ class SequenceLabelling:
     @lazy_property
     def cost(self):
         cross_entropy = -tf.reduce_sum(
-            self.target * tf.log(self.prediction), [1, 2])
-        cross_entropy = tf.reduce_mean(cross_entropy)
+            input_tensor=self.target * tf.math.log(self.prediction), axis=[1, 2])
+        cross_entropy = tf.reduce_mean(input_tensor=cross_entropy)
         return cross_entropy
 
     @lazy_property
     def optimize(self):
         learning_rate = 0.003
-        optimizer = tf.train.RMSPropOptimizer(learning_rate)
+        optimizer = tf.compat.v1.train.RMSPropOptimizer(learning_rate)
         return optimizer.minimize(self.cost)
 
     @lazy_property
     def error(self):
         mistakes = tf.not_equal(
-            tf.argmax(self.target, 2), tf.argmax(self.prediction, 2))
-        return tf.reduce_mean(tf.cast(mistakes, tf.float32))
+            tf.argmax(input=self.target, axis=2), tf.argmax(input=self.prediction, axis=2))
+        return tf.reduce_mean(input_tensor=tf.cast(mistakes, tf.float32))
 
     @staticmethod
     def _weight_and_bias(in_size, out_size):
-        weight = tf.truncated_normal([in_size, out_size], stddev=0.01)
+        weight = tf.random.truncated_normal([in_size, out_size], stddev=0.01)
         bias = tf.constant(0.1, shape=[out_size])
         return tf.Variable(weight), tf.Variable(bias)
 
@@ -86,12 +86,12 @@ if __name__ == '__main__':
     train, test = read_dataset()
     _, length, image_size = train.data.shape
     num_classes = train.target.shape[2]
-    data = tf.placeholder(tf.float32, [None, length, image_size])
-    target = tf.placeholder(tf.float32, [None, length, num_classes])
-    dropout = tf.placeholder(tf.float32)
+    data = tf.compat.v1.placeholder(tf.float32, [None, length, image_size])
+    target = tf.compat.v1.placeholder(tf.float32, [None, length, num_classes])
+    dropout = tf.compat.v1.placeholder(tf.float32)
     model = SequenceLabelling(data, target, dropout)
-    sess = tf.Session()
-    sess.run(tf.initialize_all_variables())
+    sess = tf.compat.v1.Session()
+    sess.run(tf.compat.v1.initialize_all_variables())
     for epoch in range(10):
         for _ in range(100):
             batch = train.sample(10)

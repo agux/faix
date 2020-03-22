@@ -23,22 +23,22 @@ LEARNING_RATE = 1e-4
 LOG_DIR = 'logdir'
 
 if __name__ == '__main__':
-    if tf.gfile.Exists(LOG_DIR):
-        tf.gfile.DeleteRecursively(LOG_DIR)
-    tf.gfile.MakeDirs(LOG_DIR)
+    if tf.io.gfile.exists(LOG_DIR):
+        tf.io.gfile.rmtree(LOG_DIR)
+    tf.io.gfile.makedirs(LOG_DIR)
 
-    data = tf.placeholder(tf.float32, [None, MAX_STEP, FEAT_SIZE])
-    target = tf.placeholder(tf.float32, [None, NUM_CLASSES])
-    training = tf.placeholder(tf.bool)
+    data = tf.compat.v1.placeholder(tf.float32, [None, MAX_STEP, FEAT_SIZE])
+    target = tf.compat.v1.placeholder(tf.float32, [None, NUM_CLASSES])
+    training = tf.compat.v1.placeholder(tf.bool)
     model = SecurityGradePredictor(
         data, target, W_SIZE, training, num_hidden=HIDDEN_SIZE, num_layers=NUM_LAYERS, learning_rate=LEARNING_RATE)
-    saver = tf.train.Saver()
-    with tf.Session() as sess:
-        summary_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
-        sess.run(tf.global_variables_initializer())
-        tf.summary.scalar("Train Loss", model.cost)
-        tf.summary.scalar("Train Accuracy", model.accuracy*100)
-        summary = tf.summary.merge_all()
+    saver = tf.compat.v1.train.Saver()
+    with tf.compat.v1.Session() as sess:
+        summary_writer = tf.compat.v1.summary.FileWriter(LOG_DIR, sess.graph)
+        sess.run(tf.compat.v1.global_variables_initializer())
+        tf.compat.v1.summary.scalar("Train Loss", model.cost)
+        tf.compat.v1.summary.scalar("Train Accuracy", model.accuracy*100)
+        summary = tf.compat.v1.summary.merge_all()
         bno = 0
         for epoch in range(EPOCH_SIZE):
             bno = epoch*50
