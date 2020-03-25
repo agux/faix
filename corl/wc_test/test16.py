@@ -1,21 +1,20 @@
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+from tensorflow import keras
+import random
+import shutil
+import math
+from test11 import parseArgs, LOG_DIR, collect_summary
+from wc_data import input_fn, input_bq, input_file2
+from time import strftime
+from model.tf2 import lstm
+import tensorflow as tf
 # Path hack.
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
-import tensorflow as tf
 # pylint: disable-msg=E0401
-from model import dnc_regressor as dncr
-from time import strftime
-from test11 import parseArgs, feat_cols, LOG_DIR, collect_summary
-from test13 import getInput
-import math
-import shutil
-import random
-
-
-# TODO: refactor to adapt tensorflow v2.1 api
 
 VSET = 9
 TEST_BATCH_SIZE = 3000
@@ -30,6 +29,7 @@ NUM_READS = 8
 MAX_STEP = 35
 TIME_SHIFT = 4
 KEEP_PROB = 0.5
+DROPOUT_RATE = 0.5
 LEARNING_RATE = 1e-3
 LR_DECAY_STEPS = 1000
 DECAYED_LR_START = 40000
@@ -37,229 +37,148 @@ DROPOUT_DECAY_STEPS = 1000
 DECAYED_DROPOUT_START = 40000
 SEED = 285139
 
+VAL_SAVE_FREQ = 50
+
+feat_cols = ["close", "volume", "amount"]
+
 # pylint: disable-msg=E0601,E1101
 
-bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
 
-
-def validate(sess, model, summary, feed, bno, epoch):
-    global bst_saver, bst_score, bst_file, bst_ckpt
-    print('{} running on test set...'.format(strftime("%H:%M:%S")))
-    mse, worst, test_summary_str = sess.run(
-        [model.cost, model.worst, summary], feed
-    )
-    diff, max_diff, predict, actual = math.sqrt(
-        mse), worst[0], worst[1], worst[2]
-    print('{} Epoch {} diff {:3.5f} max_diff {:3.4f} predict {} actual {}'.format(
-        strftime("%H:%M:%S"), epoch, diff, max_diff, predict, actual))
-    found_better = False
-    if diff < bst_score:
-        bst_score = diff
-        bst_file.seek(0)
-        bst_file.truncate()
-        bst_file.write('{}\n{}\n'.format(diff, bno))
-        bst_file.truncate()
-        bst_saver.save(sess, bst_ckpt,
-                       global_step=tf.compat.v1.train.get_global_step())
-        print('{} acquired better model with validation score {}, at batch {}'.format(
-              strftime("%H:%M:%S"), diff, bno))
-        found_better = True
-    return test_summary_str, found_better
+def getInput(start, args):
+    ds = args.ds.lower()
+    print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
+    if ds == 'db':
+        return input_fn.getInputs(TIME_SHIFT, feat_cols, MAX_STEP,
+                                  args.parallel, args.prefetch, args.db_pool,
+                                  args.db_host, args.db_port, args.db_pwd,
+                                  args.vset or VSET)
+    elif ds == 'bigquery':
+        return input_bq.getInputs(start,
+                                  TIME_SHIFT,
+                                  feat_cols,
+                                  MAX_STEP,
+                                  TEST_BATCH_SIZE,
+                                  vset=args.vset or VSET)
+    elif ds == 'file':
+        return input_file2.getInputs(args.dir, start, args.prefetch, args.vset
+                                     or VSET, args.vol_size)
+    return None
 
 
 def run(args):
-    global bst_saver, bst_score, bst_file, bst_ckpt
-    print("{} started training, pid:{}".format(
-        strftime("%H:%M:%S"), os.getpid()))
-    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
-    keep_prob = tf.compat.v1.placeholder(tf.float32, [], name="kprob")
-    with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(
-            log_device_placement=args.log_device,
-            allow_soft_placement=True)) as sess:
-        model = dncr.DNCRegressorV1(
-            layer_width=LAYER_WIDTH,
-            memory_size=MEMORY_SIZE,
-            word_size=WORD_SIZE,
-            num_writes=NUM_WRITES,
-            num_reads=NUM_READS,
-            keep_prob=keep_prob,
-            decayed_dropout_start=DECAYED_DROPOUT_START,
-            dropout_decay_steps=DROPOUT_DECAY_STEPS,
-            learning_rate=LEARNING_RATE,
-            decayed_lr_start=DECAYED_LR_START,
-            lr_decay_steps=LR_DECAY_STEPS,
-            seed=SEED)
-        model_name = model.getName()
-        print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
-        f = __file__
-        testn = f[f.rfind('/')+1:f.rindex('.py')]
-        base_name = "{}_{}".format(testn, model_name)
-        base_dir = '{}/{}'.format(LOG_DIR, base_name)
-        training_dir = os.path.join(base_dir, 'training')
-        checkpoint_file = os.path.join(training_dir, 'model.ckpt')
-        bst_ckpt = os.path.join(base_dir, 'best', 'model.ckpt')
-        bst_file_path = os.path.join(base_dir, 'best_score')
-        saver = None
-        summary_str = None
-        d = None
-        restored = False
-        bno, epoch, bst_score = 0, 0, sys.maxint
-        ckpt = tf.train.get_checkpoint_state(training_dir)
+    print("{} started training, pid:{}".format(strftime("%H:%M:%S"),
+                                               os.getpid()))
+    regressor = lstm.LSTMRegressorV1(
+        layer_width=LAYER_WIDTH,
+        dropout_rate=DROPOUT_RATE,
+        decayed_dropout_start=DECAYED_DROPOUT_START,
+        dropout_decay_steps=DROPOUT_DECAY_STEPS,
+        learning_rate=LEARNING_RATE,
+        decayed_lr_start=DECAYED_LR_START,
+        lr_decay_steps=LR_DECAY_STEPS,
+        seed=SEED)
+    model_name = regressor.getName()
+    print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
 
-        if tf.io.gfile.exists(bst_file_path):
-            bst_file = open(bst_file_path, 'r+')
-            bst_file.seek(0)
-            try:
-                bst_score = float(bst_file.readline().rstrip())
-                print('{} previous best score: {}'.format(
-                    strftime("%H:%M:%S"), bst_score))
-            except Exception:
-                print('{} not able to read best score. best_score file is invalid.'.format(
-                    strftime("%H:%M:%S")))
-            bst_file.seek(0)
+    f = __file__
+    testn = f[f.rfind('/') + 1:f.rindex('.py')]
+    base_name = "{}_{}".format(testn, model_name)
+    base_dir = os.path.join(LOG_DIR, base_name)
+    # Define the checkpoint directory to store the checkpoints
+    log_dir = os.path.join(base_dir, 'tblogs')
+    training_dir = os.path.join(base_dir, 'training')
+    best_dir = os.path.join(base_dir, 'best')
+    # Function for decaying the learning rate.
+    # You can define any decay function you need.
+    # decay = tf.keras.callbacks.ReduceLROnPlateau(
+    #     monitor='val_loss', factor=0.1, patience=10, verbose=0, mode='auto',
+    #     min_delta=0.0001, cooldown=0, min_lr=0, **kwargs
+    # )
+    tensorboard_cbk = keras.callbacks.TensorBoard(
+        log_dir=log_dir,
+        # how often to log histogram visualizations
+        histogram_freq=VAL_SAVE_FREQ,
+        #the log file can become quite large when write_graph is set to True.
+        write_graph=True,
+        #whether to write model weights to visualize as image in TensorBoard.
+        write_images=False,
+        # How often to write logs (default: once per epoch)
+        update_freq='epoch')
+    callbacks = [
+        # decay,
+        tensorboard_cbk,
+        tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(
+            training_dir, "ckpt_{epoch}_{val_loss:.5f}.tf"),
+                                           monitor='val_loss',
+                                           verbose=1,
+                                           save_freq=VAL_SAVE_FREQ),
+        tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(
+            best_dir, "ckpt_best.tf"),
+                                           monitor='val_loss',
+                                           verbose=1,
+                                           save_best_only=True,
+                                           save_freq=VAL_SAVE_FREQ)
+    ]
+    # Check if previous training progress exists
+    bno = 0
+    restored = False
+    latest_ckpt = tf.train.get_checkpoint_state(training_dir)
+    if tf.io.gfile.exists(training_dir):
+        print("{} training folder exists".format(strftime("%H:%M:%S")))
+        if latest_ckpt and latest_ckpt.model_checkpoint_path:
+            ck_path = latest_ckpt.model_checkpoint_path
+            print("{} found model checkpoint path: {}".format(
+                strftime("%H:%M:%S"), ck_path))
+            # Extract from checkpoint filename
+            bno = int(os.path.basename(ck_path).split('_')[1])
+            print('{} resuming from last training, bno = {}'.format(
+                strftime("%H:%M:%S"), bno))
+            model = keras.models.load_model(ck_path)
+            initial_epoch = model.optimizer.iterations.numpy()
+            if bno != initial_epoch:
+                print(
+                    '{} bno({}) from checkpoint file inconsistent with optimizer iterations({}).'
+                    .format(strftime("%H:%M:%S"), bno, initial_epoch))
+            regressor.setModel(model)
+            restored = True
+        else:
+            print(
+                "{} model checkpoint path not found, cleaning training folder".
+                format(strftime("%H:%M:%S")))
+            tf.io.gfile.rmtree(training_dir)
+    else:
+        tf.io.gfile.makedirs(training_dir)
+        tf.io.gfile.makedirs(best_dir)
+        tf.io.gfile.makedirs(log_dir)
 
-        if tf.io.gfile.exists(training_dir):
-            print("{} training folder exists".format(strftime("%H:%M:%S")))
-            if ckpt and ckpt.model_checkpoint_path:
-                print("{} found model checkpoint path: {}".format(
-                    strftime("%H:%M:%S"), ckpt.model_checkpoint_path))
-                # Extract from checkpoint filename
-                bno = int(os.path.basename(
-                    ckpt.model_checkpoint_path).split('-')[1])
-                print('{} resuming from last training, bno = {}'.format(
-                    strftime("%H:%M:%S"), bno))
-                d = getInput(bno+1, args)
-                model.setNodes(d['features'], d['labels'], d['seqlens'])
-                saver = tf.compat.v1.train.Saver(name="reg_saver")
-                saver.restore(sess, ckpt.model_checkpoint_path)
-                restored = True
-                rbno = sess.run(tf.compat.v1.train.get_global_step())
-                print('{} check restored global step: {}, previous batch no: {}'.format(
-                    strftime("%H:%M:%S"), rbno, bno))
-                if bno != rbno:
-                    print('{} bno({}) inconsistent with global step({}). reset global step with bno.'.format(
-                        strftime("%H:%M:%S"), bno, rbno))
-                    gstep = tf.compat.v1.train.get_global_step(sess.graph)
-                    sess.run(tf.compat.v1.assign(gstep, bno))
-            else:
-                print("{} model checkpoint path not found, cleaning training folder".format(
-                    strftime("%H:%M:%S")))
-                tf.io.gfile.rmtree(training_dir)
+    train_ds, test_ds = getInput(bno, args)
+    model = regressor.getModel()
+    # https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit
+    model.fit(
+        x=train_ds,
+        verbose=2,
+        # must we specify the epochs explicitly?
+        epochs=sys.maxsize,
+        # Epoch at which to start training (for resuming a previous training run)
+        initial_epoch=bno,
+        # steps_per_epoch=EVALUATION_INTERVAL, # If None, the epoch will run until the input dataset is exhausted.
+        validation_data=test_ds,
+        #validation_steps=50,
+        validation_freq=VAL_SAVE_FREQ,
+        callbacks=callbacks)
 
-        if not restored:
-            d = getInput(bno+1, args)
-            model.setNodes(d['features'], d['labels'], d['seqlens'])
-            saver = tf.compat.v1.train.Saver(name="reg_saver")
-            sess.run(tf.compat.v1.global_variables_initializer())
-            tf.io.gfile.makedirs(training_dir)
-            bst_file = open(bst_file_path, 'w+')
-        bst_saver = tf.compat.v1.train.Saver(name="bst_saver")
+    # Export the finalized graph and the variables to the platform-agnostic SavedModel format.
+    model.save(filepath=os.path.join(training_dir, 'final.tf'),
+               save_format='tf')
 
-        train_handle, test_handle = sess.run(
-            [d['train_iter'].string_handle(), d['test_iter'].string_handle()])
-
-        summary, train_writer, test_writer = collect_summary(
-            sess, model, training_dir)
-        profiler = None
-        profile_path = None
-        test_summary_str = None
-        if args.trace:
-            print("{} full trace will be collected every {} run".format(
-                strftime("%H:%M:%S"), TRACE_INTERVAL))
-        if args.profile:
-            profiler = tf.compat.v1.profiler.Profiler(sess.graph)
-            profile_path = os.path.join(LOG_DIR, "profile")
-            tf.io.gfile.makedirs(profile_path)
-        while True:
-            epoch = bno // TEST_INTERVAL
-            if (restored or bno % TEST_INTERVAL == 0) and not (args.skip_init_test and bno == 0):
-                test_summary_str, _ = validate(
-                    sess, model, summary, {
-                        d['handle']: test_handle, keep_prob: 1.0},
-                    bno, epoch)
-                restored = False
-            lr, kp = None, None
-            try:
-                print('{} training batch {}'.format(
-                    strftime("%H:%M:%S"), bno+1))
-                ro, rm = None, None
-                if (args.trace or args.profile) and bno+1 >= 5 and bno+1 <= 10:
-                    ro = tf.compat.v1.RunOptions(trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
-                    rm = tf.compat.v1.RunMetadata()
-                summary_str, kp, lr, worst = sess.run(
-                    [summary, model.keep_prob, model.learning_rate,
-                        model.worst, model.optimize],
-                    {d['handle']: train_handle, keep_prob: KEEP_PROB},
-                    options=ro, run_metadata=rm)[:-1]
-                if profiler is not None and bno+1 >= 5 and bno+1 <= 10:
-                    profiler.add_step(bno+1, rm)
-                    if bno+1 == 10:
-                        option_builder = tf.compat.v1.profiler.ProfileOptionBuilder
-                        # profile timing of model operations
-                        opts = (option_builder(option_builder.time_and_memory())
-                                .with_step(-1)
-                                .with_file_output(os.path.join(profile_path, "{}_ops.txt".format(base_name)))
-                                .select(['micros', 'bytes', 'occurrence'])
-                                .order_by('micros')
-                                .build())
-                        profiler.profile_operations(options=opts)
-                        # profile timing by model name scope
-                        opts = (option_builder(option_builder.time_and_memory())
-                                .with_step(-1)
-                                .with_file_output(os.path.join(profile_path, "{}_scope.txt".format(base_name)))
-                                .select(['micros', 'bytes', 'occurrence'])
-                                .order_by('micros')
-                                .build())
-                        profiler.profile_name_scope(options=opts)
-                        # generate timeline graph
-                        opts = (option_builder(option_builder.time_and_memory())
-                                .with_step(bno+1)
-                                .with_timeline_output(os.path.join(profile_path, "{}_timeline.json".format(base_name)))
-                                .build())
-                        profiler.profile_graph(options=opts)
-                        # Auto detect problems and generate advice.
-                        # opts = (option_builder(option_builder.time_and_memory()).
-                        #         with_file_output(os.path.join(profile_path, "{}_advise.txt".format(base_name))).
-                        #         build())
-                        # profiler.advise(options=opts)
-            except tf.errors.OutOfRangeError:
-                print("End of Dataset.")
-                break
-            bno = bno+1
-            max_diff, predict, actual = worst[0], worst[1], worst[2]
-            print('{} bno {} lr: {:1.6f}, kp: {:1.5f}, max_diff {:3.4f} predict {} actual {}'.format(
-                strftime("%H:%M:%S"), bno, lr, kp, max_diff, predict, actual))
-            train_writer.add_summary(summary_str, bno)
-            if rm is not None:
-                train_writer.add_run_metadata(
-                    rm, "bno_{}".format(bno))
-            train_writer.flush()
-            if test_summary_str is not None:
-                test_writer.add_summary(test_summary_str, bno)
-                test_writer.flush()
-            if bno == 1 or bno % SAVE_INTERVAL == 0:
-                saver.save(sess, checkpoint_file,
-                           global_step=tf.compat.v1.train.get_global_step())
-        # test last epoch
-        test_summary_str, _ = validate(
-            sess, model, summary,
-            {d['handle']: test_handle, keep_prob: 1.0},
-            bno, epoch)
-        train_writer.add_summary(summary_str, bno)
-        test_writer.add_summary(test_summary_str, bno)
-        train_writer.flush()
-        test_writer.flush()
-        saver.save(sess, checkpoint_file,
-                   global_step=tf.compat.v1.train.get_global_step())
-        # training finished, move to 'trained' folder
-        trained = os.path.join(base_dir, 'trained')
-        tf.io.gfile.makedirs(trained)
-        tmp_dir = os.path.join(
-            base_dir, strftime("%Y%m%d_%H%M%S"))
-        os.rename(training_dir, tmp_dir)
-        shutil.move(tmp_dir, trained)
-        print('{} model is saved to {}'.format(strftime("%H:%M:%S"), trained))
-        bst_file.close()
+    # training finished, move to 'trained' folder
+    trained = os.path.join(base_dir, 'trained')
+    tf.io.gfile.makedirs(trained)
+    tmp_dir = os.path.join(base_dir, strftime("%Y%m%d_%H%M%S"))
+    os.rename(training_dir, tmp_dir)
+    shutil.move(tmp_dir, trained)
+    print('{} model has been saved to {}'.format(strftime("%H:%M:%S"),
+                                                 trained))
 
 
 if __name__ == '__main__':

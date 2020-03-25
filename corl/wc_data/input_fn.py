@@ -10,9 +10,10 @@ import os
 import multiprocessing
 import numpy as np
 
-qk, qd = None, None
+qk, qd, qd_idx = None, None, None
 parallel = None
 feat_cols = []
+idxlst = None
 time_shift = None
 max_step = None
 _prefetch = None
@@ -26,47 +27,28 @@ k_cols = ["lr"]
 ftQueryTpl = (
     "SELECT  "
     "    date, "
-    "    {0} "  # (d.COLS - mean) / std
+    "    {0} "  # fields
     "FROM "
-    "    kline_d_b d "
-    "        LEFT OUTER JOIN "
-    "    (SELECT  "
-    "        %s code, "
-    "        t.method, "
-    "        {1} "  # mean & std fields
-    "    FROM "
-    "        fs_stats t "
-    "    WHERE "
-    "        t.method = 'standardization' "
-    "    GROUP BY code , t.method) s USING (code) "
+    "    {1} d "  # table
     "WHERE "
     "    d.code = %s "
     "    {2} "
     "ORDER BY klid "
-    "LIMIT %s "
-)
+    "LIMIT %s ")
 
-maxbno_query = (
-    "SELECT  "
-    "    MAX(CONVERT( SUBSTRING_INDEX(flag, '_', - 1) , UNSIGNED INTEGER)) AS max_bno "
-    "FROM "
-    "    (SELECT DISTINCT "
-    "        flag "
-    "    FROM "
-    "        wcc_trn "
-    "    WHERE "
-    "        flag LIKE %s) t "
-)
+maxbno_query = ("SELECT  "
+                "    MAX(bno) AS max_bno "
+                "FROM "
+                "    wcc_trn "
+                "WHERE "
+                "    flag = %s")
 
 _executor = None
 
 cnxpool = None
 
 
-def _init(db_pool_size=None,
-          db_host=None,
-          db_port=None,
-          db_pwd=None):
+def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
     print("PID {}: initializing mysql connection pool...".format(os.getpid()))
     cnxpool = MySQLConnectionPool(
@@ -79,23 +61,22 @@ def _init(db_pool_size=None,
         password=db_pwd or '123456',
         # ssl_ca='',
         # use_pure=True,
-        connect_timeout=60000
-    )
+        connect_timeout=60000)
 
 
 def _getExecutor():
     global parallel, _executor, _prefetch, db_pool_size, db_host, db_port, db_pwd
     if _executor is not None:
         return _executor
-    _executor = get_reusable_executor(
-        max_workers=parallel*_prefetch,
-        initializer=_init,
-        initargs=(db_pool_size, db_host, db_port, db_pwd),
-        timeout=450)
+    _executor = get_reusable_executor(max_workers=parallel * _prefetch,
+                                      initializer=_init,
+                                      initargs=(db_pool_size, db_host, db_port,
+                                                db_pwd),
+                                      timeout=450)
     return _executor
 
 
-def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
+def _getBatch(code, s, e, rcode, max_step, time_shift, qk, qd):
     '''
     [max_step, feature*time_shift], length
     '''
@@ -103,32 +84,35 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
     cnx = cnxpool.get_connection()
     fcursor = cnx.cursor(buffered=True)
     try:
-        fcursor.execute(ftQueryK, (code, code, s, e, max_step+time_shift))
+        fcursor.execute(qk, (code, s, e, max_step + time_shift))
         col_names = fcursor.column_names
-        featSize = (len(col_names)-1)*2
+        featSize = (len(col_names) - 1) * 2
         total = fcursor.rowcount
         rows = fcursor.fetchall()
         # extract dates and transform to sql 'in' query
-        dates = "'{}'".format("','".join([r[0] for r in rows]))
-        qd = ftQueryD.format(dates)
-        fcursor.execute(qd, (rcode, rcode, max_step+time_shift))
+        dates = [r[0] for r in rows]
+        dateStr = "'{}'".format("','".join(dates))
+        ym = {d[:-2] for d in dates}  #extract year-month to a set
+        ymStr = ",".join(ym)
+        qd = qd.format(ymStr, dateStr)
+        fcursor.execute(qd, (rcode, max_step + time_shift))
         rtotal = fcursor.rowcount
         r_rows = fcursor.fetchall()
         if total != rtotal:
-            raise ValueError(
-                "rcode prior data size {} != code's: {}".format(rtotal, total))
+            raise ValueError("{} prior data size {} != {}'s: {}".format(
+                rcode, rtotal, code, total))
         batch = []
-        for t in range(time_shift+1):
+        for t in range(time_shift + 1):
             steps = np.zeros((max_step, featSize), dtype='f')
             offset = max_step + time_shift - total
             s = max(0, t - offset)
             e = total - time_shift + t
             for i, row in enumerate(rows[s:e]):
                 for j, col in enumerate(row[1:]):
-                    steps[i+offset][j] = col
+                    steps[i + offset][j] = col
             for i, row in enumerate(r_rows[s:e]):
                 for j, col in enumerate(row[1:]):
-                    steps[i+offset][j+featSize//2] = col
+                    steps[i + offset][j + featSize // 2] = col
             batch.append(steps)
         return np.concatenate(batch, 1), total - time_shift
     except:
@@ -140,43 +124,46 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, ftQueryK, ftQueryD):
 
 
 def _getSeries(p):
-    uuid, code, klid, rcode, val, max_step, time_shift, ftQueryK, ftQueryD = p
-    s = max(0, klid-max_step+1-time_shift)
-    batch, total = _getBatch(
-        code, s, klid, rcode, max_step, time_shift, ftQueryK, ftQueryD)
-    return uuid, batch, val, total
+    code, klid, rcode, val, max_step, time_shift, qk, qd = p
+    s = max(0, klid - max_step + 1 - time_shift)
+    batch, total = _getBatch(code, s, klid, rcode, max_step, time_shift, qk,
+                             qd)
+    return batch, val, total
 
 
 def _loadTestSet(max_step, ntest, vset=None):
     global parallel, time_shift, cnxpool
     cnx = cnxpool.get_connection()
+    idxlst = _getIndex()
     try:
         setno = vset or np.random.randint(ntest)
-        flag = 'TEST_{}'.format(setno)
-        print('{} selected test set: {}'.format(
-            strftime("%H:%M:%S"), flag))
-        query = (
-            "SELECT "
-            "   uuid, code, klid, rcode, corl "
-            "FROM "
-            "   wcc_trn "
-            "WHERE "
-            "   flag = %s "
-        )
+        flag = 'TS'
+        print('{} selected test set: {}'.format(strftime("%H:%M:%S"), setno))
+        query = ("SELECT "
+                 "   code, klid, rcode, corl_stz "
+                 "FROM "
+                 "   wcc_trn "
+                 "WHERE "
+                 "   flag = %s "
+                 "   AND bno = %s")
         cursor = cnx.cursor(buffered=True)
-        cursor.execute(query, (flag,))
+        cursor.execute(query, (flag, setno))
         tset = cursor.fetchall()
         cursor.close()
-        qk, qd = _getFtQuery()
+        qk, qd, qd_idx = _getFtQuery()
         exc = _getExecutor()
-        params = [(uuid, code, klid, rcode, val, max_step, time_shift, qk, qd)
-                  for uuid, code, klid, rcode, val in tset]
+        params = [(code, klid, rcode, val, max_step, time_shift, qk,
+                   qd_idx if rcode in idxlst else qd)
+                  for code, klid, rcode, val in tset]
         r = list(exc.map(_getSeries, params))
-        uuids, data, vals, seqlen = zip(*r)
+        data, vals, seqlen = zip(*r)
         # data = [batch, max_step, feature*time_shift]
         # vals = [batch]
         # seqlen = [batch]
-        return np.array(uuids, 'U'), np.array(data, 'f'), np.array(vals, 'f'), np.array(seqlen, 'i')
+        return {
+            'features': np.array(data, 'f'),
+            'seqlens': np.array(seqlen, 'i')
+        }, np.array(vals, 'f'),
     except:
         print(sys.exc_info()[0])
         raise
@@ -184,38 +171,105 @@ def _loadTestSet(max_step, ntest, vset=None):
         cnx.close()
 
 
-def _loadTrainingData(flag):
-    global max_step, parallel, time_shift, cnxpool
-    print("{} loading training set {}...".format(
-        strftime("%H:%M:%S"), flag))
+def _getIndex():
+    '''
+    Returns a set of index codes from idxlst table.
+    '''
+    global idxlst
+    if idxlst is not None:
+        return idxlst
+    print("{} loading index...".format(strftime("%H:%M:%S")))
     cnx = cnxpool.get_connection()
     try:
         cursor = cnx.cursor(buffered=True)
-        query = (
-            'SELECT '
-            "   uuid, code, klid, rcode, corl "
-            'FROM '
-            '   wcc_trn '
-            'WHERE '
-            "   flag = %s"
-        )
-        cursor.execute(query, (flag,))
+        query = ('SELECT distinct code FROM idxlst')
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        idxlst = {c[0] for c in rows}
+        return idxlst
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        cnx.close()
+
+
+def _loadTrainingData(flag, bno):
+    global max_step, parallel, time_shift, cnxpool
+    idxlst = _getIndex()
+    print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag, bno))
+    cnx = cnxpool.get_connection()
+    try:
+        cursor = cnx.cursor(buffered=True)
+        query = ('SELECT '
+                 "   code, klid, rcode, corl_stz "
+                 'FROM '
+                 '   wcc_trn '
+                 'WHERE '
+                 "   flag = %s "
+                 "   AND bno = %s")
+        cursor.execute(query, (
+            flag,
+            bno,
+        ))
         train_set = cursor.fetchall()
         total = cursor.rowcount
         cursor.close()
-        uuids, data, vals, seqlen = [], [], [], []
+        data, vals, seqlen = [], [], []
         if total > 0:
-            qk, qd = _getFtQuery()
+            qk, qd, qd_idx = _getFtQuery()
             # joblib doesn't support nested threading
             exc = _getExecutor()
-            params = [(uuid, code, klid, rcode, val, max_step, time_shift, qk, qd)
-                      for uuid, code, klid, rcode, val in train_set]
+            params = [(code, klid, rcode, val, max_step, time_shift, qk,
+                       qd_idx if rcode in idxlst else qd)
+                      for code, klid, rcode, val in train_set]
             r = list(exc.map(_getSeries, params))
-            uuids, data, vals, seqlen = zip(*r)
+            data, vals, seqlen = zip(*r)
         # data = [batch, max_step, feature*time_shift]
-        # vals = [batch]
         # seqlen = [batch]
-        return np.array(uuids, 'U'), np.array(data, 'f'), np.array(vals, 'f'), np.array(seqlen, 'i')
+        # vals = [batch]
+        return {
+            'features': np.array(data, 'f'),
+            'seqlens': np.array(seqlen, 'i')
+        }, np.array(vals, 'f')
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        cnx.close()
+
+
+def _getStats():
+    '''
+    Get statistics from fs_stats table.
+    Returns:
+    A dictionary of {"table:column" : tuple(mean, std)}
+    '''
+    global feat_cols
+    print("{} loading statistics for {}...".format(strftime("%H:%M:%S"),
+                                                   feat_cols))
+    cnx = cnxpool.get_connection()
+    try:
+        cursor = cnx.cursor(buffered=True)
+        query = ('SELECT '
+                 "   `tab`, `fields`, `mean`, `std`"
+                 'FROM '
+                 '   fs_stats '
+                 'WHERE '
+                 "   method = 'standardization' "
+                 "   AND tab in ('index_d_n_lr','kline_d_b_lr') "
+                 "   AND fields in ({}) ")
+        fields = "'{}'".format("','".join(feat_cols))
+        query = query.format(fields)
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        total = cursor.rowcount
+        cursor.close()
+        stats = {}
+        for t, f, m, s in rows:
+            stats[('{}:{}'.format(t, f))] = (m, s)
+        return stats
     except:
         print(sys.exc_info()[0])
         raise
@@ -224,36 +278,33 @@ def _loadTrainingData(flag):
 
 
 def _getFtQuery():
-    global qk, qd, feat_cols
-    if qk is not None and qd is not None:
-        return qk, qd
+    global qk, qd, qd_idx, feat_cols
+    if qk is not None and qd is not None and qd_idx is not None:
+        return qk, qd, qd_idx
 
+    stats = _getStats()
     k_cols = feat_cols
-    sep = " "
-    p_kline = sep.join(
-        ["(d.{0}-s.{0}_mean)/s.{0}_std {0},".format(c) for c in k_cols])
+    p_kline = ""
+    p_index = ""
+    for k, v in feat_cols.items:
+        if k.startswith('kline'):
+            _, c = k.split(':')
+            p_kline += "(d.{0}-{1})/{2} {0},".format(c, v[0], v[1])
+        else:
+            _, c = k.split(':')
+            p_index += "(d.{0}-{1})/{2} {0},".format(c, v[0], v[1])
     p_kline = p_kline[:-1]  # strip last comma
-    stats_tpl = (
-        " MAX(CASE "
-        "     WHEN t.fields = '{0}' THEN t.mean "
-        "     ELSE NULL "
-        " END) AS {0}_mean, "
-        " MAX(CASE "
-        "     WHEN t.fields = '{0}' THEN t.std "
-        "     ELSE NULL "
-        " END) AS {0}_std,"
-    )
-    stats = sep.join([stats_tpl.format(c) for c in k_cols])
-    stats = stats[:-1]  # strip last comma
-
-    qk = ftQueryTpl.format(p_kline, stats,
+    p_index = p_index[:-1]  # strip last comma
+    qk = ftQueryTpl.format(p_kline, 'kline_d_b_lr',
                            " AND d.klid BETWEEN %s AND %s ")
-    qd = ftQueryTpl.format(p_kline, stats,
-                           " AND d.date in ({})")
-    return qk, qd
+    qd = ftQueryTpl.format(p_kline, 'kline_d_b_lr',
+                           " AND d.ym in ({}) AND d.date in ({})")
+    qd_idx = ftQueryTpl.format(p_index, 'index_d_n_lr',
+                               " AND d.ym in ({}) AND d.date in ({})")
+    return qk, qd, qd_idx
 
 
-def _getDataSetMeta(flag, start=0):
+def _getDataSetMeta(flag):
     global cnxpool
     cnx = cnxpool.get_connection()
     max_bno, batch_size = None, None
@@ -261,30 +312,24 @@ def _getDataSetMeta(flag, start=0):
         print('{} querying max batch no for {} set...'.format(
             strftime("%H:%M:%S"), flag))
         cursor = cnx.cursor()
-        cursor.execute(maxbno_query, ("{}_%".format(flag),))
+        cursor.execute(maxbno_query, (flag, ))
         row = cursor.fetchone()
         max_bno = row[0]
-        print('{} start: {}, max batch no: {}'.format(
-            strftime("%H:%M:%S"), start, max_bno))
-        if start > max_bno:
-            print('{} no more material to {}.'.format(
-                strftime("%H:%M:%S"), flag.lower()))
-            return None, None
-        query = (
-            "SELECT  "
-            "    COUNT(*) "
-            "FROM "
-            "    wcc_trn "
-            "WHERE "
-            "    flag = %s "
-        )
-        cursor.execute(query, ("{}_{}".format(flag, start),))
+        print('{} max batch no: {}'.format(strftime("%H:%M:%S"), max_bno))
+        query = ("SELECT  "
+                 "    COUNT(*) "
+                 "FROM "
+                 "    wcc_trn "
+                 "WHERE "
+                 "    flag = %s "
+                 "    AND bno = 1 ")
+        cursor.execute(query, (flag))
         row = cursor.fetchone()
         batch_size = row[0]
         print('{} batch size: {}'.format(strftime("%H:%M:%S"), batch_size))
         if batch_size == 0:
-            print('{} no more material to {}.'.format(
-                strftime("%H:%M:%S"), flag.lower()))
+            print('{} no more data for {}.'.format(strftime("%H:%M:%S"),
+                                                   flag.lower()))
             return None, None
         cursor.close()
     except:
@@ -295,14 +340,22 @@ def _getDataSetMeta(flag, start=0):
     return max_bno, batch_size
 
 
-def getInputs(start=0, shift=0, cols=None, step=30,
-              cores=multiprocessing.cpu_count(), pfetch=2,
-              pool=None, host=None, port=None, pwd=None, vset=None):
+def getInputs(shift=0,
+              cols=None,
+              step=30,
+              cores=multiprocessing.cpu_count(),
+              pfetch=2,
+              pool=None,
+              host=None,
+              port=None,
+              pwd=None,
+              vset=None):
     """Input function for the wcc training dataset.
 
     Returns:
-        A dictionary containing:
-        uuids,features,labels,seqlens,train_iter,test_iter
+        A tuple of (inputs, targets). 
+        Where inputs is a dictionary of {features,seqlens}.
+        In summary, ({features, seqlens}, targets)
     """
     # Create dataset for training
     global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size, db_host, db_port, db_pwd
@@ -312,52 +365,31 @@ def getInputs(start=0, shift=0, cols=None, step=30,
     parallel = cores
     _prefetch = pfetch
     db_pool_size = pool
-    feat_size = len(feat_cols)*2*(shift+1)
+    feat_size = len(feat_cols) * 2 * (shift + 1)
     db_host = host
     db_port = port
     db_pwd = pwd
     print("{} Using parallel: {}, prefetch: {} db_host: {} port: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port))
     _init(db_pool_size, db_host, db_port, db_pwd)
-    with tf.compat.v1.variable_scope("build_inputs"):
-        # query max flag from wcc_trn and fill a slice with flags between start and max
-        max_bno, _ = _getDataSetMeta("TRAIN", start)
-        if max_bno is None:
-            return None
-        flags = ["TRAIN_{}".format(bno) for bno in range(start, max_bno+1)]
-        train_dataset = tf.data.Dataset.from_tensor_slices(flags).map(
-            lambda f: tuple(
-                tf.compat.v1.py_func(_loadTrainingData, [f], [
-                    tf.string, tf.float32, tf.float32, tf.int32])
-            ), _prefetch
-        ).batch(1).prefetch(_prefetch)
-        # Create dataset for testing
-        max_bno, batch_size = _getDataSetMeta("TEST", 1)
-        test_dataset = tf.data.Dataset.from_tensor_slices(
-            _loadTestSet(step, max_bno+1, vset)).batch(batch_size).repeat()
 
-        train_iterator = tf.compat.v1.data.make_one_shot_iterator(train_dataset)
-        test_iterator = tf.compat.v1.data.make_one_shot_iterator(test_dataset)
+    # query max flag from wcc_trn and fill a slice with flags between start and max
+    max_bno, _ = _getDataSetMeta("TR")
+    if max_bno is None:
+        return None
+    bnums = [bno for bno in range(1, max_bno + 1)]
+    ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
+        lambda bno: tuple(
+            tf.py_function(func=_loadTrainingData,
+                           inp=['TR', bno],
+                           Tout=[{
+                               'features': tf.float32,
+                               'seqlens': tf.int32
+                           }, tf.float32])),
+        _prefetch).batch(1).prefetch(_prefetch)
+    # Create dataset for testing
+    max_bno, batch_size = _getDataSetMeta("TS")
+    ds_test = tf.data.Dataset.from_tensor_slices(
+        _loadTestSet(step, max_bno + 1, vset)).batch(batch_size).repeat()
 
-        handle = tf.compat.v1.placeholder(tf.string, shape=[])
-        types = (tf.string, tf.float32, tf.float32, tf.int32)
-        shapes = (tf.TensorShape([None]), tf.TensorShape(
-            [None, step, feat_size]), tf.TensorShape([None]), tf.TensorShape([None]))
-        iter = tf.compat.v1.data.Iterator.from_string_handle(
-            handle, types, train_dataset.output_shapes)
-
-        next_el = iter.get_next()
-        uuids = tf.squeeze(next_el[0])
-        uuids.set_shape(shapes[0])
-        features = tf.squeeze(next_el[1])
-        features.set_shape(shapes[1])
-        labels = tf.squeeze(next_el[2])
-        labels.set_shape(shapes[2])
-        seqlens = tf.squeeze(next_el[3])
-        seqlens.set_shape(shapes[3])
-        print("{} uuids:{}, features:{}, labels:{}, seqlens:{}".format(
-            strftime("%H:%M:%S"), uuids.get_shape(), features.get_shape(), labels.get_shape(), seqlens.get_shape()))
-        # return a dictionary
-        inputs = {'uuids': uuids, 'features': features, 'labels': labels,
-                  'seqlens': seqlens, 'handle': handle, 'train_iter': train_iterator, 'test_iter': test_iterator}
-        return inputs
+    return ds_train, ds_test
