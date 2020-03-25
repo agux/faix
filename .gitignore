@@ -1,1 +1,5 @@
 .vscode/settings.json
+*.pyc
+nohup.log
+command_remote.sh
+train_remote.sh

@@ -323,7 +323,7 @@ def _getDataSetMeta(flag):
                  "WHERE "
                  "    flag = %s "
                  "    AND bno = 1 ")
-        cursor.execute(query, (flag))
+        cursor.execute(query, (flag,))
         row = cursor.fetchone()
         batch_size = row[0]
         print('{} batch size: {}'.format(strftime("%H:%M:%S"), batch_size))

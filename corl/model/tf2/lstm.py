@@ -5,15 +5,35 @@ import tensorflow as tf
 from tensorflow import keras
 
 
+class InputLayer(keras.layers.Layer):
+    '''
+        Serve as entry point to split features and seqlens from the dictionary in x.
+    '''
+    def __init__(self):
+        super(InputLayer, self).__init__()
+        self.seqlens = tf.Variable(trainable=False,
+                                   validate_shape=True,
+                                   name='seqlens',
+                                   dtype=tf.int32,
+                                   shape=[None])
+
+    def getSeqLens(self):
+        return self.seqlens
+
+    def call(self, inputs):
+        self.seqlens.assign(value=inputs['seqlens'], name='update_seqlens')
+        return inputs['features']
+
+
 class LastRelevant(keras.layers.Layer):
-    def __init__(self, length):
+    def __init__(self, seqlens):
         super(LastRelevant, self).__init__()
-        self.length = length
+        self.seqlens = seqlens
 
     def call(self, inputs):
         batch_size = tf.shape(inputs)[0]
         return tf.gather_nd(
-            inputs, tf.stack([tf.range(batch_size), self.length - 1], axis=1))
+            inputs, tf.stack([tf.range(batch_size), self.seqlens - 1], axis=1))
 
 
 class Squeeze(keras.layers.Layer):
@@ -113,9 +133,6 @@ class LSTMRegressorV1:
         self._lr_decay_steps = lr_decay_steps
         self._seed = seed
 
-        self.keep_prob
-        self.learning_rate
-
     def getName(self):
         return self.__class__.__name__
 
@@ -126,8 +143,11 @@ class LSTMRegressorV1:
     def getModel(self):
         if self.model is not None:
             return self.model
-        # RNN
+
+        inputLayer = InputLayer()
         self.model = keras.Sequential()
+        self.model.add(inputLayer)
+        # RNN
         self.model.add(
             keras.layers.LSTM(units=self._layer_width,
                               return_sequences=True,
@@ -135,7 +155,7 @@ class LSTMRegressorV1:
         self.model.add(keras.layers.LSTM(units=self._layer_width // 2))
 
         # extract last_relevant timestep
-        self.model.add(LastRelevant(self.seqlen))
+        self.model.add(LastRelevant(inputLayer.getSeqLens()))
 
         # Activation
         self.model.add(
@@ -179,6 +199,7 @@ class LSTMRegressorV1:
 
         self.model.compile(optimizer=adam,
                            loss='mse',
-                           metrics=['accuracy', 'mse', 'precision', 'recall'])
+                           metrics=['accuracy', 'loss', 'precision', 'recall'])
 
+        self.model.summary()
         return self.model

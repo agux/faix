@@ -4,8 +4,8 @@ from tensorflow import keras
 import random
 import shutil
 import math
-from test11 import parseArgs, LOG_DIR, collect_summary
-from wc_data import input_fn, input_bq, input_file2
+from common import parseArgs, LOG_DIR
+from wc_data import input_fn
 from time import strftime
 from model.tf2 import lstm
 import tensorflow as tf
@@ -16,7 +16,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 # pylint: disable-msg=E0401
 
-VSET = 9
+VSET = 5
 TEST_BATCH_SIZE = 3000
 TEST_INTERVAL = 50
 TRACE_INTERVAL = 10
@@ -43,7 +43,6 @@ feat_cols = ["close", "volume", "amount"]
 
 # pylint: disable-msg=E0601,E1101
 
-
 def getInput(start, args):
     ds = args.ds.lower()
     print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
@@ -52,18 +51,7 @@ def getInput(start, args):
                                   args.parallel, args.prefetch, args.db_pool,
                                   args.db_host, args.db_port, args.db_pwd,
                                   args.vset or VSET)
-    elif ds == 'bigquery':
-        return input_bq.getInputs(start,
-                                  TIME_SHIFT,
-                                  feat_cols,
-                                  MAX_STEP,
-                                  TEST_BATCH_SIZE,
-                                  vset=args.vset or VSET)
-    elif ds == 'file':
-        return input_file2.getInputs(args.dir, start, args.prefetch, args.vset
-                                     or VSET, args.vol_size)
     return None
-
 
 def run(args):
     print("{} started training, pid:{}".format(strftime("%H:%M:%S"),
