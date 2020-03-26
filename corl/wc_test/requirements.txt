@@ -46,8 +46,10 @@ rsa==4.0
 scipy==1.4.1
 six==1.14.0
 tensorboard==2.1.1
-tensorflow==2.1.0
-tensorflow-estimator==2.1.0
+# tensorflow will be installed separately, 
+# such as provisioned by docker image
+#tensorflow==2.1.0
+#tensorflow-estimator==2.1.0
 termcolor==1.1.0
 urllib3==1.25.8
 virtualenv==20.0.13
