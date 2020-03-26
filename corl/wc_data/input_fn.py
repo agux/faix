@@ -198,7 +198,8 @@ def _getIndex():
 def _loadTrainingData(flag, bno):
     global max_step, parallel, time_shift, cnxpool
     idxlst = _getIndex()
-    print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag, bno))
+    print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag,
+                                                    bno))
     cnx = cnxpool.get_connection()
     try:
         cursor = cnx.cursor(buffered=True)
@@ -268,7 +269,9 @@ def _getStats():
         cursor.close()
         stats = {}
         for t, f, m, s in rows:
-            stats[('{}:{}'.format(t, f))] = (m, s)
+            stats['{}:{}'.format(t, f)] = (m, s)
+        print("{} statistics loaded: {}...".format(strftime("%H:%M:%S"),
+                                                   stats))
         return stats
     except:
         print(sys.exc_info()[0])
@@ -286,7 +289,7 @@ def _getFtQuery():
     k_cols = feat_cols
     p_kline = ""
     p_index = ""
-    for k, v in feat_cols.items:
+    for k, v in stats.items():
         if k.startswith('kline'):
             _, c = k.split(':')
             p_kline += "(d.{0}-{1})/{2} {0},".format(c, v[0], v[1])
@@ -323,7 +326,7 @@ def _getDataSetMeta(flag):
                  "WHERE "
                  "    flag = %s "
                  "    AND bno = 1 ")
-        cursor.execute(query, (flag,))
+        cursor.execute(query, (flag, ))
         row = cursor.fetchone()
         batch_size = row[0]
         print('{} batch size: {}'.format(strftime("%H:%M:%S"), batch_size))
@@ -380,12 +383,12 @@ def getInputs(shift=0,
     bnums = [bno for bno in range(1, max_bno + 1)]
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
         lambda bno: tuple(
-            tf.py_function(func=_loadTrainingData,
-                           inp=['TR', bno],
-                           Tout=[{
-                               'features': tf.float32,
-                               'seqlens': tf.int32
-                           }, tf.float32])),
+            py_function(func=_loadTrainingData,
+                        inp=['TR', bno],
+                        Tout=[{
+                            'features': tf.float32,
+                            'seqlens': tf.int32
+                        }, tf.float32])),
         _prefetch).batch(1).prefetch(_prefetch)
     # Create dataset for testing
     max_bno, batch_size = _getDataSetMeta("TS")
@@ -393,3 +396,32 @@ def getInputs(shift=0,
         _loadTestSet(step, max_bno + 1, vset)).batch(batch_size).repeat()
 
     return ds_train, ds_test
+
+
+def py_function(func, inp, Tout, name=None):
+    def wrapped_func(*flat_inp):
+        reconstructed_inp = tf.nest.pack_sequence_as(inp,
+                                                     flat_inp,
+                                                     expand_composites=True)
+        out = func(*reconstructed_inp)
+        return tf.nest.flatten(out, expand_composites=True)
+
+    flat_Tout = tf.nest.flatten(Tout, expand_composites=True)
+    flat_out = tf.py_function(
+        func=wrapped_func,
+        inp=tf.nest.flatten(inp, expand_composites=True),
+        Tout=[_tensor_spec_to_dtype(v) for v in flat_Tout],
+        name=name)
+    spec_out = tf.nest.map_structure(_dtype_to_tensor_spec,
+                                     Tout,
+                                     expand_composites=True)
+    out = tf.nest.pack_sequence_as(spec_out, flat_out, expand_composites=True)
+    return out
+
+
+def _dtype_to_tensor_spec(v):
+    return tf.TensorSpec(None, v) if isinstance(v, tf.dtypes.DType) else v
+
+
+def _tensor_spec_to_dtype(v):
+    return v.dtype if isinstance(v, tf.TensorSpec) else v
