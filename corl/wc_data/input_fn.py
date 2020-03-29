@@ -37,11 +37,13 @@ ftQueryTpl = (
     "LIMIT %s ")
 
 maxbno_query = ("SELECT  "
-                "    MAX(bno) AS max_bno "
+                "    vmax "
                 "FROM "
-                "    wcc_trn "
+                "    fs_stats "
                 "WHERE "
-                "    flag = %s")
+                "    method = 'standardization' "
+                "    AND tab = 'wcc_trn' "
+                "    AND fields = %s ")
 
 _executor = None
 
@@ -92,7 +94,8 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, qk, qd):
         # extract dates and transform to sql 'in' query
         dates = [r[0] for r in rows]
         dateStr = "'{}'".format("','".join(dates))
-        ym = {d[:-2] for d in dates}  #extract year-month to a set
+        ym = {d.replace('-', '')[:-2]
+              for d in dates}  #extract year-month to a set
         ymStr = ",".join(ym)
         qd = qd.format(ymStr, dateStr)
         fcursor.execute(qd, (rcode, max_step + time_shift))
@@ -195,9 +198,10 @@ def _getIndex():
         cnx.close()
 
 
-def _loadTrainingData(flag, bno):
+def _loadTrainingData(bno):
     global max_step, parallel, time_shift, cnxpool
     idxlst = _getIndex()
+    flag = 'TR'
     print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag,
                                                     bno))
     cnx = cnxpool.get_connection()
@@ -212,7 +216,7 @@ def _loadTrainingData(flag, bno):
                  "   AND bno = %s")
         cursor.execute(query, (
             flag,
-            bno,
+            int(bno),
         ))
         train_set = cursor.fetchall()
         total = cursor.rowcount
@@ -230,10 +234,7 @@ def _loadTrainingData(flag, bno):
         # data = [batch, max_step, feature*time_shift]
         # seqlen = [batch]
         # vals = [batch]
-        return {
-            'features': np.array(data, 'f'),
-            'seqlens': np.array(seqlen, 'i')
-        }, np.array(vals, 'f')
+        return np.array(data, 'f'), np.array(seqlen, 'i'), np.array(vals, 'f')
     except:
         print(sys.exc_info()[0])
         raise
@@ -315,9 +316,9 @@ def _getDataSetMeta(flag):
         print('{} querying max batch no for {} set...'.format(
             strftime("%H:%M:%S"), flag))
         cursor = cnx.cursor()
-        cursor.execute(maxbno_query, (flag, ))
+        cursor.execute(maxbno_query, (flag + "_BNO", ))
         row = cursor.fetchone()
-        max_bno = row[0]
+        max_bno = int(row[0])
         print('{} max batch no: {}'.format(strftime("%H:%M:%S"), max_bno))
         query = ("SELECT  "
                  "    COUNT(*) "
@@ -365,10 +366,10 @@ def getInputs(shift=0,
     time_shift = shift
     feat_cols = cols or k_cols
     max_step = step
+    feat_size = len(feat_cols) * 2 * (time_shift + 1)
     parallel = cores
     _prefetch = pfetch
     db_pool_size = pool
-    feat_size = len(feat_cols) * 2 * (shift + 1)
     db_host = host
     db_port = port
     db_pwd = pwd
@@ -381,14 +382,24 @@ def getInputs(shift=0,
     if max_bno is None:
         return None
     bnums = [bno for bno in range(1, max_bno + 1)]
+
+    def mapfunc(bno):
+        ret = tf.numpy_function(func=_loadTrainingData,
+                                inp=[bno],
+                                Tout=[tf.float32, tf.int32, tf.float32])
+        # f = py_function(func=_loadTrainingData,
+        #                 inp=[bno],
+        #                 Tout=[{
+        #                     'features': tf.float32,
+        #                     'seqlens': tf.int32
+        #                 }, tf.float32])
+        ret[0].set_shape([max_step, feat_size])
+        ret[1].set_shape([])
+        ret[2].set_shape([])
+        return {'features': ret[0], 'seqlens': ret[1]}, ret[2]
+
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
-        lambda bno: tuple(
-            py_function(func=_loadTrainingData,
-                        inp=['TR', bno],
-                        Tout=[{
-                            'features': tf.float32,
-                            'seqlens': tf.int32
-                        }, tf.float32])),
+        lambda bno: tuple(mapfunc(bno)),
         _prefetch).batch(1).prefetch(_prefetch)
     # Create dataset for testing
     max_bno, batch_size = _getDataSetMeta("TS")
@@ -400,16 +411,18 @@ def getInputs(shift=0,
 
 def py_function(func, inp, Tout, name=None):
     def wrapped_func(*flat_inp):
-        reconstructed_inp = tf.nest.pack_sequence_as(inp,
-                                                     flat_inp,
-                                                     expand_composites=True)
-        out = func(*reconstructed_inp)
+        # reconstructed_inp = tf.nest.pack_sequence_as(inp,
+        #                                              flat_inp,
+        #                                              expand_composites=True)
+        # out = func(*reconstructed_inp)
+        out = func(*inp)
         return tf.nest.flatten(out, expand_composites=True)
 
     flat_Tout = tf.nest.flatten(Tout, expand_composites=True)
     flat_out = tf.py_function(
         func=wrapped_func,
-        inp=tf.nest.flatten(inp, expand_composites=True),
+        # inp=tf.nest.flatten(inp, expand_composites=True),
+        inp=inp,
         Tout=[_tensor_spec_to_dtype(v) for v in flat_Tout],
         name=name)
     spec_out = tf.nest.map_structure(_dtype_to_tensor_spec,

@@ -3,3 +3,5 @@
 nohup.log
 command_run.sh
 train_run.sh
+corl/.DS_Store
+logdir/

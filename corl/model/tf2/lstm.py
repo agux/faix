@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import tensorflow as tf
 
 from tensorflow import keras
+from time import strftime
 
 
 class InputLayer(keras.layers.Layer):
@@ -11,18 +12,33 @@ class InputLayer(keras.layers.Layer):
     '''
     def __init__(self):
         super(InputLayer, self).__init__()
-        self.seqlens = tf.Variable(trainable=False,
-                                   validate_shape=True,
-                                   name='seqlens',
-                                   dtype=tf.int32,
-                                   shape=[None])
+
+    def build(self, input_shape):
+        super(InputLayer, self).build(input_shape)
+        self.global_step = tf.Variable(initial_value=0,
+                                       trainable=False,
+                                       name="global_step")
+        self.seqlen = tf.Variable(initial_value=[0],
+                                  trainable=False,
+                                  name="seqlen")
+
+    def getGlobalStep(self):
+        return self.global_step
 
     def getSeqLens(self):
-        return self.seqlens
+        return self.seqlen
 
     def call(self, inputs):
-        self.seqlens.assign(value=inputs['seqlens'], name='update_seqlens')
-        return inputs['features']
+        self.global_step.assign_add(1)
+        self.seqlen.assign(inputs[1])
+        return inputs[0]
+
+    def get_config(self):
+        config = super().get_config().copy()
+        # config.update({
+        #     'num_layers': self.num_layers,
+        # })
+        return config
 
 
 class LastRelevant(keras.layers.Layer):
@@ -32,8 +48,17 @@ class LastRelevant(keras.layers.Layer):
 
     def call(self, inputs):
         batch_size = tf.shape(inputs)[0]
-        return tf.gather_nd(
+        out = tf.gather_nd(
             inputs, tf.stack([tf.range(batch_size), self.seqlens - 1], axis=1))
+        out = tf.reshape(out, shape=(-1, 1))
+        return out
+
+    def get_config(self):
+        config = super().get_config().copy()
+        # config.update({
+        #     'num_layers': self.num_layers,
+        # })
+        return config
 
 
 class Squeeze(keras.layers.Layer):
@@ -45,11 +70,18 @@ class Squeeze(keras.layers.Layer):
         output.set_shape([None])
         return output
 
+    def get_config(self):
+        config = super().get_config().copy()
+        # config.update({
+        #     'num_layers': self.num_layers,
+        # })
+        return config
+
 
 class DropoutRate:
     def __init__(self, rate, decayed_dropout_start, dropout_decay_steps, seed):
         self._rate = rate
-        self._decayed_dropout_start
+        self._decayed_dropout_start = decayed_dropout_start
         self._dropout_decay_steps = dropout_decay_steps
         self._seed = seed
 
@@ -111,12 +143,30 @@ class Worst(keras.layers.Layer):
         return max_diff, predict, actual
 
 
+@tf.function
+def getInputs(time_step, feat_size):
+    feat = keras.Input(
+        # A shape tuple (integers), not including the batch size.
+        shape=(time_step, feat_size),
+        # The name becomes a key in the dict.
+        name='features',
+        dtype='float32')
+    seqlens = keras.Input(
+        shape=(),
+        # The name becomes a key in the dict.
+        name='seqlens',
+        dtype='int32')
+    return [feat, seqlens]
+
+
 class LSTMRegressorV1:
     '''
 
     '''
     def __init__(self,
                  layer_width=200,
+                 time_step=30,
+                 feat_size=3,
                  dropout_rate=0.5,
                  decayed_dropout_start=None,
                  dropout_decay_steps=None,
@@ -125,6 +175,8 @@ class LSTMRegressorV1:
                  lr_decay_steps=None,
                  seed=None):
         self._layer_width = layer_width
+        self._time_step = time_step
+        self._feat_size = feat_size
         self._dropout_rate = dropout_rate
         self._decayed_dropout_start = decayed_dropout_start
         self._dropout_decay_steps = dropout_decay_steps
@@ -132,6 +184,7 @@ class LSTMRegressorV1:
         self._decayed_lr_start = decayed_lr_start
         self._lr_decay_steps = lr_decay_steps
         self._seed = seed
+        self.model = None
 
     def getName(self):
         return self.__class__.__name__
@@ -139,67 +192,81 @@ class LSTMRegressorV1:
     def setModel(self, model):
         self.model = model
 
-    @staticmethod
     def getModel(self):
         if self.model is not None:
             return self.model
 
+        feat = keras.Input(
+            # A shape tuple (integers), not including the batch size.
+            shape=(self._time_step, self._feat_size),
+            # The name becomes a key in the dict.
+            name='features',
+            dtype='float32')
+        seqlens = keras.Input(
+            shape=(),
+            # The name becomes a key in the dict.
+            name='seqlens',
+            dtype='int32')
+        inputs = [feat, seqlens]
+        # inputs = getInputs(self._time_step, self._feat_size)
+        # seqlens = inputs[1]
         inputLayer = InputLayer()
-        self.model = keras.Sequential()
-        self.model.add(inputLayer)
         # RNN
-        self.model.add(
-            keras.layers.LSTM(units=self._layer_width,
-                              return_sequences=True,
-                              input_shape=self.data.shape[-2:]))
-        self.model.add(keras.layers.LSTM(units=self._layer_width // 2))
-
+        lstm = keras.layers.LSTM(units=self._layer_width,
+                                 shape=(self._time_step, self._feat_size),
+                                 return_sequences=True)(inputLayer(inputs))
+        lstm = keras.layers.LSTM(units=self._layer_width // 2,
+                                 shape=(self._time_step,
+                                        self._feat_size))(lstm)
         # extract last_relevant timestep
-        self.model.add(LastRelevant(inputLayer.getSeqLens()))
-
-        # Activation
-        self.model.add(
-            keras.layers.Dense(units=self._layer_width // 2,
-                               kernel_initializer='lecun_normal',
-                               activation='selu'))
+        lstm = LastRelevant(inputLayer.getSeqLens())(lstm)
 
         # FCN
+        fcn = keras.layers.Dense(units=self._layer_width // 2,
+                                 kernel_initializer='lecun_normal',
+                                 activation='selu')(lstm)
         fsize = self._layer_width // 2
         nlayer = 3
         for i in range(nlayer):
             if i == 0:
-                self.model.add(
-                    keras.layers.AlphaDropout(rate=DropoutRate(
-                        self._dropout_rate, self._decayed_dropout_start,
-                        self._dropout_decay_steps, self._seed)))
-            self.model.add(
-                keras.layers.Dense(units=fsize,
-                                   kernel_initializer='lecun_normal'))
+                fcn = keras.layers.AlphaDropout(rate=self._dropout_rate)(fcn)
+            fcn = keras.layers.Dense(units=fsize,
+                                     kernel_initializer='lecun_normal')(fcn)
             fsize = fsize // 2
-        self.model.add(
-            keras.layers.Dense(units=fsize,
-                               kernel_initializer='lecun_normal',
-                               activation='selu'))
+        fcn = keras.layers.Dense(units=fsize,
+                                 kernel_initializer='lecun_normal',
+                                 activation='selu')(fcn)
 
         # Output layer
-        self.model.add(
-            keras.layers.Dense(
-                units=1,
-                kernel_initializer='lecun_normal',
-            ))
-        self.model.add(Squeeze())
+        outputs = keras.layers.Dense(
+            units=1,
+            kernel_initializer='lecun_normal',
+        )(fcn)
+        # outputs = tf.squeeze(outputs)
+
+        model = keras.Model(inputs=inputs, outputs=outputs)
 
         # TODO study how to use ReduceLROnPlateau and CosineDecayRestarts on adam optimizer
-        decay = tf.keras.experimental.CosineDecayRestarts(self._lr,
-                                                          self._lr_decay_steps,
-                                                          t_mul=1.02,
-                                                          m_mul=0.95,
-                                                          alpha=0.095)
-        adam = tf.keras.optimizers.Adam(learning_rate=decay)
+        # decay = tf.keras.experimental.CosineDecayRestarts(self._lr,
+        #                                                   self._lr_decay_steps,
+        #                                                   t_mul=1.02,
+        #                                                   m_mul=0.95,
+        #                                                   alpha=0.095)
+        adam = tf.keras.optimizers.Adam(learning_rate=self._lr)
 
-        self.model.compile(optimizer=adam,
-                           loss='mse',
-                           metrics=['accuracy', 'loss', 'precision', 'recall'])
+        model.compile(optimizer=adam,
+                      loss='mse',
+                      metrics=[
+                          'accuracy', 'mse',
+                          keras.metrics.Precision(),
+                          keras.metrics.Recall()
+                      ])
+        #TypeError: Error converting shape to a TensorShape: Dimension value must be integer or None or have an __index__ method, got [35, 6].
+        #input_shape = ([self._time_step, self._feat_size], None)
+        # input_shape = {[self._time_step, self._feat_size], None}
+        # self.model.build(input_shape)
+        model.summary()
 
-        self.model.summary()
-        return self.model
+        self.model = model
+
+        return model

@@ -43,6 +43,7 @@ feat_cols = ["close", "volume", "amount"]
 
 # pylint: disable-msg=E0601,E1101
 
+
 def getInput(start, args):
     ds = args.ds.lower()
     print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
@@ -53,11 +54,14 @@ def getInput(start, args):
                                   args.vset or VSET)
     return None
 
+
 def run(args):
     print("{} started training, pid:{}".format(strftime("%H:%M:%S"),
                                                os.getpid()))
     regressor = lstm.LSTMRegressorV1(
         layer_width=LAYER_WIDTH,
+        time_step=MAX_STEP,
+        feat_size=len(feat_cols) * 2 * (TIME_SHIFT + 1),
         dropout_rate=DROPOUT_RATE,
         decayed_dropout_start=DECAYED_DROPOUT_START,
         dropout_decay_steps=DROPOUT_DECAY_STEPS,
@@ -151,8 +155,8 @@ def run(args):
         initial_epoch=bno,
         # steps_per_epoch=EVALUATION_INTERVAL, # If None, the epoch will run until the input dataset is exhausted.
         validation_data=test_ds,
-        #validation_steps=50,
-        validation_freq=VAL_SAVE_FREQ,
+        validation_steps=VAL_SAVE_FREQ,
+        # validation_freq=VAL_SAVE_FREQ,
         callbacks=callbacks)
 
     # Export the finalized graph and the variables to the platform-agnostic SavedModel format.
