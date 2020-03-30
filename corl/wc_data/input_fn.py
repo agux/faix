@@ -63,7 +63,7 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         password=db_pwd or '123456',
         # ssl_ca='',
         # use_pure=True,
-        connect_timeout=60000)
+        connect_timeout=90000)
 
 
 def _getExecutor():
@@ -165,8 +165,8 @@ def _loadTestSet(max_step, ntest, vset=None):
         # seqlen = [batch]
         return {
             'features': np.array(data, 'f'),
-            'seqlens': np.array(seqlen, 'i')
-        }, np.array(vals, 'f'),
+            'seqlens': np.expand_dims(np.array(seqlen, 'i'), axis=1)
+        }, np.expand_dims(np.array(vals, 'f'), axis=1)
     except:
         print(sys.exc_info()[0])
         raise
@@ -234,7 +234,14 @@ def _loadTrainingData(bno):
         # data = [batch, max_step, feature*time_shift]
         # seqlen = [batch]
         # vals = [batch]
-        return np.array(data, 'f'), np.array(seqlen, 'i'), np.array(vals, 'f')
+        d = np.array(data, 'f')
+        s = np.expand_dims(np.array(seqlen, 'i'), axis=1)
+        v = np.expand_dims(np.array(vals, 'f'), axis=1)
+        # print('nan for data: {}'.format(np.argwhere(np.isnan(d))))
+        # if len(np.argwhere(np.isnan(d))) > 0:
+        #     print(d)
+        # print('nan for seqlens: {}'.format(np.argwhere(np.isnan(s))))
+        return d, s, v
     except:
         print(sys.exc_info()[0])
         raise
@@ -357,9 +364,9 @@ def getInputs(shift=0,
     """Input function for the wcc training dataset.
 
     Returns:
-        A tuple of (inputs, targets). 
+        inputs, targets, train_batches, test_batches 
         Where inputs is a dictionary of {features,seqlens}.
-        In summary, ({features, seqlens}, targets)
+        In summary, ({features, seqlens}, targets, train_batches, test_batches)
     """
     # Create dataset for training
     global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size, db_host, db_port, db_pwd
@@ -378,10 +385,10 @@ def getInputs(shift=0,
     _init(db_pool_size, db_host, db_port, db_pwd)
 
     # query max flag from wcc_trn and fill a slice with flags between start and max
-    max_bno, _ = _getDataSetMeta("TR")
-    if max_bno is None:
+    train_batches, _ = _getDataSetMeta("TR")
+    if train_batches is None:
         return None
-    bnums = [bno for bno in range(1, max_bno + 1)]
+    bnums = [bno for bno in range(1, train_batches + 1)]
 
     def mapfunc(bno):
         ret = tf.numpy_function(func=_loadTrainingData,
@@ -393,20 +400,24 @@ def getInputs(shift=0,
         #                     'features': tf.float32,
         #                     'seqlens': tf.int32
         #                 }, tf.float32])
-        ret[0].set_shape([max_step, feat_size])
-        ret[1].set_shape([])
-        ret[2].set_shape([])
-        return {'features': ret[0], 'seqlens': ret[1]}, ret[2]
+        feat, seqlens, corl = ret
+
+        feat.set_shape((None, max_step, feat_size))
+        seqlens.set_shape((None, 1))
+        corl.set_shape((None, 1))
+
+        return {'features': feat, 'seqlens': seqlens}, corl
 
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
         lambda bno: tuple(mapfunc(bno)),
-        _prefetch).batch(1).prefetch(_prefetch)
+        # _prefetch).batch(1).prefetch(_prefetch)
+        _prefetch).prefetch(_prefetch)
     # Create dataset for testing
-    max_bno, batch_size = _getDataSetMeta("TS")
+    test_batches, batch_size = _getDataSetMeta("TS")
     ds_test = tf.data.Dataset.from_tensor_slices(
-        _loadTestSet(step, max_bno + 1, vset)).batch(batch_size).repeat()
+        _loadTestSet(step, test_batches + 1, vset)).batch(batch_size).repeat()
 
-    return ds_train, ds_test
+    return ds_train, ds_test, train_batches, test_batches
 
 
 def py_function(func, inp, Tout, name=None):

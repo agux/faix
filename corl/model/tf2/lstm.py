@@ -6,32 +6,63 @@ from tensorflow import keras
 from time import strftime
 
 
-class InputLayer(keras.layers.Layer):
+class GlobalStepMarker(keras.layers.Layer):
     '''
-        Serve as entry point to split features and seqlens from the dictionary in x.
+        Record global steps.
     '''
-    def __init__(self):
-        super(InputLayer, self).__init__()
+    def __init__(self, time_step=None, feat_size=None):
+        super(GlobalStepMarker, self).__init__()
+        self.time_step = time_step
+        self.feat_size = feat_size
+
+        # self.seqlen = None
+        # self.feat = None
+
+        # self.feat = keras.Input(
+        #     # A shape tuple (integers), not including the batch size.
+        #     shape=(self.time_step, self.feat_size),
+        #     # The name becomes a key in the dict.
+        #     name='features',
+        #     dtype='float32')
+        # self.seqlens = keras.Input(
+        #     shape=(1),
+        #     # The name becomes a key in the dict.
+        #     name='seqlens',
+        #     dtype='int32')
+        # self.inputs = {'features': self.feat, 'seqlens': self.seqlens}
 
     def build(self, input_shape):
-        super(InputLayer, self).build(input_shape)
+        super(GlobalStepMarker, self).build(input_shape)
         self.global_step = tf.Variable(initial_value=0,
                                        trainable=False,
                                        name="global_step")
-        self.seqlen = tf.Variable(initial_value=[0],
-                                  trainable=False,
-                                  name="seqlen")
+        # self.seqlen = tf.Variable(name="seqlen",
+        #                           initial_value=tf.zeros((1, 1), tf.int32),
+        #                           dtype=tf.int32,
+        #                           validate_shape=False,
+        #                           trainable=False,
+        #                           shape=(None, 1)
+        #                           #   shape=tf.TensorShape([None, 1])
+        #                           )
+
+        # self.feat = tf.Variable(
+        #     name="features",
+        #     initial_value=tf.zeros((1, self.time_step, self.feat_size),
+        #                            tf.float32),
+        #     trainable=False,
+        #     dtype=tf.float32,
+        #     shape=tf.TensorShape([None, self.time_step, self.feat_size]))
 
     def getGlobalStep(self):
         return self.global_step
 
-    def getSeqLens(self):
-        return self.seqlen
-
     def call(self, inputs):
         self.global_step.assign_add(1)
-        self.seqlen.assign(inputs[1])
-        return inputs[0]
+        # feat = inputs['features']
+        # seqlens = inputs['seqlens']
+        # self.feat.assign(feat)
+        # self.seqlen.assign(seqlens)
+        return inputs
 
     def get_config(self):
         config = super().get_config().copy()
@@ -42,14 +73,17 @@ class InputLayer(keras.layers.Layer):
 
 
 class LastRelevant(keras.layers.Layer):
-    def __init__(self, seqlens):
+    def __init__(self):
         super(LastRelevant, self).__init__()
-        self.seqlens = seqlens
 
     def call(self, inputs):
-        batch_size = tf.shape(inputs)[0]
+        lstm, seqlens = inputs
+        batch_size = tf.shape(lstm)[0]
         out = tf.gather_nd(
-            inputs, tf.stack([tf.range(batch_size), self.seqlens - 1], axis=1))
+            lstm,
+            tf.stack([tf.range(batch_size),
+                      tf.reshape(seqlens, [-1]) - 1],
+                     axis=1))
         out = tf.reshape(out, shape=(-1, 1))
         return out
 
@@ -195,7 +229,8 @@ class LSTMRegressorV1:
     def getModel(self):
         if self.model is not None:
             return self.model
-
+        print('{} constructing model {}'.format(strftime("%H:%M:%S"),
+                                                self.getName()))
         feat = keras.Input(
             # A shape tuple (integers), not including the batch size.
             shape=(self._time_step, self._feat_size),
@@ -203,23 +238,25 @@ class LSTMRegressorV1:
             name='features',
             dtype='float32')
         seqlens = keras.Input(
-            shape=(),
+            shape=(1),
             # The name becomes a key in the dict.
             name='seqlens',
             dtype='int32')
-        inputs = [feat, seqlens]
+        inputs = {'features': feat, 'seqlens': seqlens}
+
+        # feat = tf.debugging.check_numerics(feat, 'NaN/Inf found in feat')
+        # seqlens = tf.debugging.check_numerics(seqlens, 'NaN/Inf found in seqlens')
+
         # inputs = getInputs(self._time_step, self._feat_size)
         # seqlens = inputs[1]
-        inputLayer = InputLayer()
+        # gsm = GlobalStepMarker()(feat)
+        # inputs = inputLayer.getInputs()
         # RNN
         lstm = keras.layers.LSTM(units=self._layer_width,
-                                 shape=(self._time_step, self._feat_size),
-                                 return_sequences=True)(inputLayer(inputs))
-        lstm = keras.layers.LSTM(units=self._layer_width // 2,
-                                 shape=(self._time_step,
-                                        self._feat_size))(lstm)
+                                 return_sequences=True)(feat)
+        lstm = keras.layers.LSTM(units=self._layer_width // 2)(lstm)
         # extract last_relevant timestep
-        lstm = LastRelevant(inputLayer.getSeqLens())(lstm)
+        lstm = LastRelevant()((lstm, seqlens))
 
         # FCN
         fcn = keras.layers.Dense(units=self._layer_width // 2,
@@ -254,18 +291,24 @@ class LSTMRegressorV1:
         #                                                   alpha=0.095)
         adam = tf.keras.optimizers.Adam(learning_rate=self._lr)
 
-        model.compile(optimizer=adam,
-                      loss='mse',
-                      metrics=[
-                          'accuracy', 'mse',
-                          keras.metrics.Precision(),
-                          keras.metrics.Recall()
-                      ])
+        model.compile(
+            optimizer=adam,
+            loss='mse',
+            metrics=[
+                'accuracy', 'mse'
+                # Only available for logistic regressor with prediction >= 0
+                # keras.metrics.Precision(),
+                # keras.metrics.Recall()
+            ],
+            # trying to fix 'Inputs to eager execution function cannot be Keras symbolic tensors'
+            # ref: https://github.com/tensorflow/probability/issues/519
+            experimental_run_tf_function=False)
         #TypeError: Error converting shape to a TensorShape: Dimension value must be integer or None or have an __index__ method, got [35, 6].
         #input_shape = ([self._time_step, self._feat_size], None)
         # input_shape = {[self._time_step, self._feat_size], None}
         # self.model.build(input_shape)
-        model.summary()
+
+        print(model.summary())
 
         self.model = model
 

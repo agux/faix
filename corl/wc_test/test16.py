@@ -17,18 +17,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 # pylint: disable-msg=E0401
 
 VSET = 5
-TEST_BATCH_SIZE = 3000
-TEST_INTERVAL = 50
-TRACE_INTERVAL = 10
-SAVE_INTERVAL = 20
 LAYER_WIDTH = 512
-MEMORY_SIZE = 32
-WORD_SIZE = 32
-NUM_WRITES = 2
-NUM_READS = 8
 MAX_STEP = 35
 TIME_SHIFT = 4
-KEEP_PROB = 0.5
 DROPOUT_RATE = 0.5
 LEARNING_RATE = 1e-3
 LR_DECAY_STEPS = 1000
@@ -37,9 +28,12 @@ DROPOUT_DECAY_STEPS = 1000
 DECAYED_DROPOUT_START = 40000
 SEED = 285139
 
-VAL_SAVE_FREQ = 50
+# validate and save the model every 2 epochs
+VAL_SAVE_FREQ = 2
+STEPS_PER_EPOCH = 10
 
-feat_cols = ["close", "volume", "amount"]
+# feat_cols = ["close", "volume", "amount"]
+feat_cols = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
@@ -56,6 +50,9 @@ def getInput(start, args):
 
 
 def run(args):
+    # tf.compat.v1.disable_eager_execution()
+    print("TensorFlow version: {}".format(tf.__version__))
+    print("Eager execution: {}".format(tf.executing_eagerly()))
     print("{} started training, pid:{}".format(strftime("%H:%M:%S"),
                                                os.getpid()))
     regressor = lstm.LSTMRegressorV1(
@@ -93,23 +90,27 @@ def run(args):
         #the log file can become quite large when write_graph is set to True.
         write_graph=True,
         #whether to write model weights to visualize as image in TensorBoard.
-        write_images=False,
+        write_images=True,
         # How often to write logs (default: once per epoch)
         update_freq='epoch')
     callbacks = [
         # decay,
         tensorboard_cbk,
-        tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(
-            training_dir, "ckpt_{epoch}_{val_loss:.5f}.tf"),
-                                           monitor='val_loss',
-                                           verbose=1,
-                                           save_freq=VAL_SAVE_FREQ),
-        tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(
-            best_dir, "ckpt_best.tf"),
-                                           monitor='val_loss',
-                                           verbose=1,
-                                           save_best_only=True,
-                                           save_freq=VAL_SAVE_FREQ)
+        tf.keras.callbacks.TerminateOnNaN(),
+        tf.keras.callbacks.ProgbarLogger(count_mode='steps',
+                                         stateful_metrics=None),
+        tf.keras.callbacks.ModelCheckpoint(
+            filepath=os.path.join(training_dir,
+                                  "ckpt_{epoch}_{val_loss:.5f}.tf"),
+            #    monitor='val_mse',
+            verbose=1,
+            save_freq='epoch'),
+        tf.keras.callbacks.ModelCheckpoint(
+            filepath=os.path.join(best_dir, "ckpt_best.tf"),
+            #    monitor='val_mse',
+            verbose=1,
+            save_best_only=True,
+            save_freq='epoch')
     ]
     # Check if previous training progress exists
     bno = 0
@@ -143,20 +144,31 @@ def run(args):
         tf.io.gfile.makedirs(best_dir)
         tf.io.gfile.makedirs(log_dir)
 
-    train_ds, test_ds = getInput(bno, args)
+    def val_freq():
+        i = 1
+        while True:
+            yield i
+            i += VAL_SAVE_FREQ
+
+    train_ds, test_ds, train_batches, test_batches = getInput(bno, args)
     model = regressor.getModel()
     # https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit
     model.fit(
         x=train_ds,
         verbose=2,
         # must we specify the epochs explicitly?
-        epochs=sys.maxsize,
+        epochs=math.ceil(train_batches / STEPS_PER_EPOCH),
+        # Avoids WARNING: Expected a shuffled dataset but input dataset `x` is not shuffled.
+        # Please invoke `shuffle()` on input dataset.
+        shuffle=False,
         # Epoch at which to start training (for resuming a previous training run)
         initial_epoch=bno,
-        # steps_per_epoch=EVALUATION_INTERVAL, # If None, the epoch will run until the input dataset is exhausted.
+        # If None, the epoch will run until the input dataset is exhausted.
+        steps_per_epoch=STEPS_PER_EPOCH,
         validation_data=test_ds,
-        validation_steps=VAL_SAVE_FREQ,
-        # validation_freq=VAL_SAVE_FREQ,
+        validation_steps=test_batches,
+        # If an integer, specifies how many training epochs to run before a new validation run is performed
+        validation_freq=1,
         callbacks=callbacks)
 
     # Export the finalized graph and the variables to the platform-agnostic SavedModel format.
