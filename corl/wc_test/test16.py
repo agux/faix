@@ -212,9 +212,10 @@ def create_regressor():
 async def main():
     regressor, base_dir, training_dir = create_regressor()
 
-    main_task = asyncio.create_task(
-        train(args, regressor, base_dir, training_dir))
-    task2 = asyncio.create_task(cleanup(training_dir, keep=10))
+    loop = asyncio.get_event_loop()
+    main_task = loop.create_task(train(args, regressor, base_dir,
+                                       training_dir))
+    task2 = loop.create_task(cleanup(training_dir, keep=10))
 
     await main_task
 
