@@ -66,29 +66,30 @@ async def train(args, regressor, base_dir, training_dir):
 
     # Check if previous training progress exists
     bno = 0
-    ckpts = sorted(Path(training_dir).iterdir(), key=os.path.getmtime)
-    if len(ckpts) > 0:
-        print("{} training folder exists. checkpoints: {}".format(
-            strftime("%H:%M:%S"), len(ckpts)))
-        ck_path = ckpts[-1]
-        print("{} latest model checkpoint path: {}".format(
-            strftime("%H:%M:%S"), ck_path))
-        # Extract from checkpoint filename
-        bno = int(os.path.basename(ck_path).split('_')[1])
-        print('{} resuming from last training, bno = {}'.format(
-            strftime("%H:%M:%S"), bno))
-        model = keras.models.load_model(ck_path)
-        initial_epoch = model.optimizer.iterations.numpy()
-        if bno != initial_epoch:
-            print(
-                '{} bno({}) from checkpoint file inconsistent with optimizer iterations({}).'
-                .format(strftime("%H:%M:%S"), bno, initial_epoch))
-        regressor.setModel(model)
-        # else:
-        #     print(
-        #         "{} model checkpoint path not found, cleaning training folder".
-        #         format(strftime("%H:%M:%S")))
-        #     tf.io.gfile.rmtree(training_dir)
+    if os.path.exists(training_dir):
+        ckpts = sorted(Path(training_dir).iterdir(), key=os.path.getmtime)
+        if len(ckpts) > 0:
+            print("{} training folder exists. checkpoints: {}".format(
+                strftime("%H:%M:%S"), len(ckpts)))
+            ck_path = ckpts[-1]
+            print("{} latest model checkpoint path: {}".format(
+                strftime("%H:%M:%S"), ck_path))
+            # Extract from checkpoint filename
+            bno = int(os.path.basename(ck_path).split('_')[1])
+            print('{} resuming from last training, bno = {}'.format(
+                strftime("%H:%M:%S"), bno))
+            model = keras.models.load_model(ck_path)
+            initial_epoch = model.optimizer.iterations.numpy()
+            if bno != initial_epoch:
+                print(
+                    '{} bno({}) from checkpoint file inconsistent with optimizer iterations({}).'
+                    .format(strftime("%H:%M:%S"), bno, initial_epoch))
+            regressor.setModel(model)
+            # else:
+            #     print(
+            #         "{} model checkpoint path not found, cleaning training folder".
+            #         format(strftime("%H:%M:%S")))
+            #     tf.io.gfile.rmtree(training_dir)
     else:
         tf.io.gfile.makedirs(training_dir)
         tf.io.gfile.makedirs(best_dir)
