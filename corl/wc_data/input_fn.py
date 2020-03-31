@@ -52,7 +52,8 @@ cnxpool = None
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
-    print("PID {}: initializing mysql connection pool...".format(os.getpid()))
+    print("{} [PID={}]: initializing mysql connection pool...".format(
+        strftime("%H:%M:%S"), os.getpid()))
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
         pool_size=db_pool_size or 5,
@@ -364,9 +365,15 @@ def getInputs(shift=0,
     """Input function for the wcc training dataset.
 
     Returns:
-        inputs, targets, train_batches, test_batches 
-        Where inputs is a dictionary of {features,seqlens}.
-        In summary, ({features, seqlens}, targets, train_batches, test_batches)
+        A dictionary of the following:
+        'train': dataset for training
+        'test': dataset for test/validation
+        'train_batches': total batch of train set
+        'test_batches': total batch of test set
+        'train_batch_size': size of a single train set batch
+        'test_batch_size': size of a single test set batch
+        
+        Where each dataset is a dictionary of {features,seqlens}.
     """
     # Create dataset for training
     global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size, db_host, db_port, db_pwd
@@ -385,7 +392,7 @@ def getInputs(shift=0,
     _init(db_pool_size, db_host, db_port, db_pwd)
 
     # query max flag from wcc_trn and fill a slice with flags between start and max
-    train_batches, _ = _getDataSetMeta("TR")
+    train_batches, train_batch_size = _getDataSetMeta("TR")
     if train_batches is None:
         return None
     bnums = [bno for bno in range(1, train_batches + 1)]
@@ -413,11 +420,19 @@ def getInputs(shift=0,
         # _prefetch).batch(1).prefetch(_prefetch)
         _prefetch).prefetch(_prefetch)
     # Create dataset for testing
-    test_batches, batch_size = _getDataSetMeta("TS")
+    test_batches, test_batch_size = _getDataSetMeta("TS")
     ds_test = tf.data.Dataset.from_tensor_slices(
-        _loadTestSet(step, test_batches + 1, vset)).batch(batch_size).repeat()
+        _loadTestSet(step, test_batches + 1,
+                     vset)).batch(test_batch_size).repeat()
 
-    return ds_train, ds_test, train_batches, test_batches
+    return {
+        'train': ds_train,
+        'test': ds_test,
+        'train_batches': train_batches,
+        'test_batches': test_batches,
+        'train_batch_size': train_batch_size,
+        'test_batch_size': test_batch_size
+    }
 
 
 def py_function(func, inp, Tout, name=None):

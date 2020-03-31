@@ -3,6 +3,10 @@ from __future__ import print_function
 import sys
 import os
 import multiprocessing
+import shutil
+import asyncio
+from pathlib import Path
+from time import strftime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 # from wc_data import input_fn
@@ -10,7 +14,13 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 import argparse
 
+import logging
 LOG_DIR = 'logdir'
+LOGGER_FORMAT = '%(asctime)s %(message)s'
+
+logging.basicConfig(format=LOGGER_FORMAT, datefmt='[%H:%M:%S]')
+log = logging.getLogger()
+log.setLevel(logging.INFO)
 
 
 def parseArgs():
@@ -105,3 +115,21 @@ def parseArgs():
 #     return input_file2.getInputs(args.dir, start, args.prefetch, args.vset
 #                                  or VSET, args.vol_size)
 # return None
+
+
+async def cleanup(dirpath, keep=5, interval=30):
+    while True:
+        print('{} [house keeper] cleaning up {} ...'.format(
+            strftime("%H:%M:%S"), dirpath))
+        paths = sorted(Path(dirpath).iterdir(), key=os.path.getmtime)
+        # print(paths)
+        dir_rm = len(paths) - keep
+        if dir_rm == 0:
+            print('{} [house keeper] no files to delete.'.format(
+                strftime("%H:%M:%S")))
+        for i in range(dir_rm):
+            print('{} [house keeper] removing {}'.format(
+                strftime("%H:%M:%S"), paths[i]))
+            shutil.rmtree(paths[i], ignore_errors=True)
+
+        await asyncio.sleep(interval)

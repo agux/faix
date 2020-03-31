@@ -294,12 +294,14 @@ class LSTMRegressorV1:
         model.compile(
             optimizer=adam,
             loss='mse',
-            metrics=[
-                'accuracy', 'mse'
-                # Only available for logistic regressor with prediction >= 0
-                # keras.metrics.Precision(),
-                # keras.metrics.Recall()
-            ],
+            # metrics=[
+            #     # Already in the "loss" metric
+            #     'mse',
+            #     # Only available for logistic regressor with prediction >= 0
+            #     'accuracy'
+            #     # keras.metrics.Precision(),
+            #     # keras.metrics.Recall()
+            # ],
             # trying to fix 'Inputs to eager execution function cannot be Keras symbolic tensors'
             # ref: https://github.com/tensorflow/probability/issues/519
             experimental_run_tf_function=False)
