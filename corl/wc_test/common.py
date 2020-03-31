@@ -119,17 +119,18 @@ def parseArgs():
 
 async def cleanup(dirpath, keep=5, interval=30):
     while True:
-        print('{} [house keeper] cleaning up {} ...'.format(
-            strftime("%H:%M:%S"), dirpath))
-        paths = sorted(Path(dirpath).iterdir(), key=os.path.getmtime)
-        # print(paths)
-        dir_rm = len(paths) - keep
-        if dir_rm == 0:
-            print('{} [house keeper] no files to delete.'.format(
-                strftime("%H:%M:%S")))
-        for i in range(dir_rm):
-            print('{} [house keeper] removing {}'.format(
-                strftime("%H:%M:%S"), paths[i]))
-            shutil.rmtree(paths[i], ignore_errors=True)
+        if os.path.exists(dirpath):
+            print('{} [house keeper] cleaning up {} ...'.format(
+                strftime("%H:%M:%S"), dirpath))
+            paths = sorted(Path(dirpath).iterdir(), key=os.path.getmtime)
+            # print(paths)
+            dir_rm = len(paths) - keep
+            if dir_rm == 0:
+                print('{} [house keeper] no files to delete.'.format(
+                    strftime("%H:%M:%S")))
+            for i in range(dir_rm):
+                print('{} [house keeper] removing {}'.format(
+                    strftime("%H:%M:%S"), paths[i]))
+                shutil.rmtree(paths[i], ignore_errors=True)
 
         await asyncio.sleep(interval)
