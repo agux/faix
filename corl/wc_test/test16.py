@@ -222,4 +222,9 @@ async def main():
 if __name__ == '__main__':
     log.setLevel(logging.DEBUG)
     args = parseArgs()
-    asyncio.run(main())
+
+    # asyncio.run is new in Python 3.7 only
+    #asyncio.run(main())
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
