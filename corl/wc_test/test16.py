@@ -213,10 +213,10 @@ def create_regressor():
 async def main():
     regressor, base_dir, training_dir = create_regressor()
 
-    loop = asyncio.get_event_loop()
-    main_task = loop.create_task(train(args, regressor, base_dir,
-                                       training_dir))
-    task2 = loop.create_task(cleanup(training_dir, keep=10))
+    # loop = asyncio.get_event_loop()
+    main_task = asyncio.create_task(
+        train(args, regressor, base_dir, training_dir))
+    task2 = asyncio.create_task(cleanup(training_dir, keep=10))
 
     await main_task
 
@@ -226,7 +226,7 @@ if __name__ == '__main__':
     args = parseArgs()
 
     # asyncio.run is new in Python 3.7 only
-    #asyncio.run(main())
+    asyncio.run(main())
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(main())
