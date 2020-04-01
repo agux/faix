@@ -6,6 +6,7 @@ import random
 import shutil
 import math
 import logging
+from itertools import chain
 from pathlib import Path
 from common import parseArgs, cleanup, LOG_DIR, log
 from wc_data import input_fn
@@ -31,8 +32,8 @@ DROPOUT_DECAY_STEPS = 1000
 DECAYED_DROPOUT_START = 40000
 SEED = 285139
 
-# validate and save the model every 5 epochs
-VAL_SAVE_FREQ = 5
+# validate and save the model every n epochs
+VAL_SAVE_FREQ = 2
 STEPS_PER_EPOCH = 10
 
 # feat_cols = ["close", "volume", "amount"]
@@ -44,59 +45,36 @@ feat_cols = ["close"]
 def getInput(start, args):
     ds = args.ds.lower()
     print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
+    input_dict = {}
     if ds == 'db':
-        return input_fn.getInputs(TIME_SHIFT, feat_cols, MAX_STEP,
-                                  args.parallel, args.prefetch, args.db_pool,
-                                  args.db_host, args.db_port, args.db_pwd,
-                                  args.vset or VSET)
-    return None
+        input_dict = input_fn.getInputs(TIME_SHIFT, feat_cols, MAX_STEP,
+                                        args.parallel, args.prefetch,
+                                        args.db_pool, args.db_host,
+                                        args.db_port, args.db_pwd, args.vset
+                                        or VSET)
+    input_dict['bno'] = start
+    return input_dict
 
 
-async def train(args, regressor, base_dir, training_dir):
+def train(args, regressor, input_dict, base_dir, training_dir):
     # tf.compat.v1.disable_eager_execution()
-    print("TensorFlow version: {}".format(tf.__version__))
-    print("Eager execution: {}".format(tf.executing_eagerly()))
-    print("{} started training, pid:{}".format(strftime("%H:%M:%S"),
+    print("{} TensorFlow version: {}".format(strftime("%H:%M:%S"),
+                                             tf.__version__))
+    print("{} Eager execution: {}".format(strftime("%H:%M:%S"),
+                                          tf.executing_eagerly()))
+    print("{} training started, pid:{}".format(strftime("%H:%M:%S"),
                                                os.getpid()))
 
     # Define folder paths
     # Define the checkpoint directory to store the checkpoints
     log_dir = os.path.join(base_dir, 'tblogs')
     best_dir = os.path.join(base_dir, 'best')
-
-    # Check if previous training progress exists
-    bno = 0
-    if os.path.exists(training_dir):
-        ckpts = sorted(Path(training_dir).iterdir(), key=os.path.getmtime)
-        if len(ckpts) > 0:
-            print("{} training folder exists. checkpoints: {}".format(
-                strftime("%H:%M:%S"), len(ckpts)))
-            ck_path = ckpts[-1]
-            print("{} latest model checkpoint path: {}".format(
-                strftime("%H:%M:%S"), ck_path))
-            # Extract from checkpoint filename
-            bno = int(os.path.basename(ck_path).split('_')[1])
-            print('{} resuming from last training, bno = {}'.format(
-                strftime("%H:%M:%S"), bno))
-            model = keras.models.load_model(ck_path)
-            initial_epoch = model.optimizer.iterations.numpy()
-            if bno != initial_epoch:
-                print(
-                    '{} bno({}) from checkpoint file inconsistent with optimizer iterations({}).'
-                    .format(strftime("%H:%M:%S"), bno, initial_epoch))
-            regressor.setModel(model)
-            # else:
-            #     print(
-            #         "{} model checkpoint path not found, cleaning training folder".
-            #         format(strftime("%H:%M:%S")))
-            #     tf.io.gfile.rmtree(training_dir)
-    else:
+    if not os.path.exists(training_dir):
         tf.io.gfile.makedirs(training_dir)
+    if not os.path.exists(best_dir):
         tf.io.gfile.makedirs(best_dir)
+    if not os.path.exists(log_dir):
         tf.io.gfile.makedirs(log_dir)
-
-    print('{} querying datasource...'.format(strftime("%H:%M:%S")))
-    input_dict = getInput(bno, args)
 
     # Function for decaying the learning rate.
     # You can define any decay function you need.
@@ -106,7 +84,7 @@ async def train(args, regressor, base_dir, training_dir):
     # )
 
     write_after_batches = input_dict[
-        'train_batch_size'] * STEPS_PER_EPOCH * VAL_SAVE_FREQ - 1
+        'train_batch_size'] * STEPS_PER_EPOCH * VAL_SAVE_FREQ
     tensorboard_cbk = keras.callbacks.TensorBoard(
         log_dir=log_dir,
         # how often to log histogram visualizations
@@ -124,52 +102,59 @@ async def train(args, regressor, base_dir, training_dir):
         # decay,
         tensorboard_cbk,
         tf.keras.callbacks.TerminateOnNaN(),
-        tf.keras.callbacks.ProgbarLogger(count_mode='steps',
-                                         stateful_metrics=None),
+        # tf.keras.callbacks.ProgbarLogger(count_mode='steps',
+        #                                  stateful_metrics=None),
         tf.keras.callbacks.ModelCheckpoint(
             filepath=os.path.join(training_dir,
-                                  "ckpt_{epoch}_{val_loss:.3f}.tf"),
-            #    monitor='val_mse',
-            # save_weights_only=True,
+                                  "cp_{epoch}_{val_loss:.3f}.ckpt"),
+            # monitor='val_loss',
+            save_weights_only=True,
             verbose=1,
             # 'epoch' or integer. When using 'epoch',
             # the callback saves the model after each epoch.
             # When using integer, the callback saves the model at end of a batch
             # at which this many samples have been seen since last saving.
-            save_freq=write_after_batches),
+            # save_freq='epoch',
+            period=VAL_SAVE_FREQ),
         tf.keras.callbacks.ModelCheckpoint(
-            filepath=os.path.join(best_dir, "ckpt_best.tf"),
-            #    monitor='val_mse',
-            verbose=0,
+            filepath=os.path.join(best_dir, "cp_best.ckpt"),
+            # monitor='val_loss',
+            verbose=1,
+            save_weights_only=True,
             save_best_only=True,
-            save_freq=write_after_batches)
+            # save_freq='epoch'
+            period=VAL_SAVE_FREQ),
+        keras.callbacks.LambdaCallback(
+            on_train_batch_end=lambda batch, logs: print('{} logs={}'.format(
+                strftime("%H:%M:%S"), logs)))
     ]
 
-    def val_freq():
-        i = 1
-        while True:
-            yield i
-            i += VAL_SAVE_FREQ
-
+    epochs = math.ceil(input_dict['train_batches'] / STEPS_PER_EPOCH)
+    val_freq = list(
+        chain(range(1, VAL_SAVE_FREQ + 1),
+              range(VAL_SAVE_FREQ, epochs, VAL_SAVE_FREQ)))
     model = regressor.getModel()
     # https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit
-    model.fit(
+    history = model.fit(
         x=input_dict['train'],
         verbose=2,
         # must we specify the epochs explicitly?
-        epochs=math.ceil(input_dict['train_batches'] / STEPS_PER_EPOCH),
+        epochs=epochs,
         # Avoids WARNING: Expected a shuffled dataset but input dataset `x` is not shuffled.
         # Please invoke `shuffle()` on input dataset.
         shuffle=False,
         # Epoch at which to start training (for resuming a previous training run)
-        initial_epoch=bno,
+        initial_epoch=input_dict['bno'],
         # If None, the epoch will run until the input dataset is exhausted.
         steps_per_epoch=STEPS_PER_EPOCH,
         validation_data=input_dict['test'],
         validation_steps=input_dict['test_batches'],
         # If an integer, specifies how many training epochs to run before a new validation run is performed
+        # If a Container, specifies the epochs on which to run validation
         validation_freq=VAL_SAVE_FREQ,
         callbacks=callbacks)
+
+    print('{} train history: {}'.format(strftime("%H:%M:%S"), history))
 
     # Export the finalized graph and the variables to the platform-agnostic SavedModel format.
     model.save(filepath=os.path.join(training_dir, 'final.tf'),
@@ -210,23 +195,69 @@ def create_regressor():
     return regressor, base_dir, training_dir
 
 
-async def main():
+def load_model(regressor, training_dir):
+    # Check if previous training progress exists
+    bno = 0
+    restored = False
+    if os.path.exists(training_dir):
+        ckpts = sorted(Path(training_dir).iterdir(), key=os.path.getmtime)
+        if len(ckpts) > 0:
+            print("{} training folder exists. #checkpoints: {}".format(
+                strftime("%H:%M:%S"), len(ckpts)))
+            # ck_path = ckpts[-1].resolve()
+            ck_path = tf.train.latest_checkpoint(training_dir)
+            print("{} latest model checkpoint path: {}".format(
+                strftime("%H:%M:%S"), ck_path))
+            # Extract from checkpoint filename
+            bno = int(os.path.basename(ck_path).split('_')[1])
+            print('{} resuming from last training, bno = {}'.format(
+                strftime("%H:%M:%S"), bno))
+            model = regressor.getModel()
+            model = model.load_weights(str(ck_path))
+            regressor.compile()
+            restored = True
+            initial_epoch = model.optimizer.iterations.numpy()
+            if bno != initial_epoch:
+                print(
+                    '{} bno({}) from checkpoint file inconsistent with optimizer iterations({}).'
+                    .format(strftime("%H:%M:%S"), bno, initial_epoch))
+
+            # else:
+            #     print(
+            #         "{} model checkpoint path not found, cleaning training folder".
+            #         format(strftime("%H:%M:%S")))
+            #     tf.io.gfile.rmtree(training_dir)
+    if not restored:
+        model = regressor.getModel()
+        regressor.compile()
+    return bno
+
+
+def main(args):
     regressor, base_dir, training_dir = create_regressor()
 
-    # loop = asyncio.get_event_loop()
-    main_task = asyncio.create_task(
-        train(args, regressor, base_dir, training_dir))
-    task2 = asyncio.create_task(cleanup(training_dir, keep=10))
+    bno = load_model(regressor, training_dir)
 
-    await main_task
+    print('{} querying datasource...'.format(strftime("%H:%M:%S")))
+    input_dict = getInput(bno, args)
+
+    train(args, regressor, input_dict, base_dir, training_dir)
+
+    # loop = asyncio.get_event_loop()
+    # main_task = asyncio.create_task(
+    #     train(args, regressor, input_dict, base_dir, training_dir))
+    # task2 = asyncio.create_task(cleanup(training_dir, keep=10))
+
+    # await main_task
 
 
 if __name__ == '__main__':
-    log.setLevel(logging.DEBUG)
+    log.setLevel(logging.WARN)
     args = parseArgs()
 
     # asyncio.run is new in Python 3.7 only
-    asyncio.run(main())
+    # asyncio.run(main())
+    main(args)
 
     # loop = asyncio.get_event_loop()
     # loop.run_until_complete(main())

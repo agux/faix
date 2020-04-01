@@ -84,7 +84,7 @@ class LastRelevant(keras.layers.Layer):
             tf.stack([tf.range(batch_size),
                       tf.reshape(seqlens, [-1]) - 1],
                      axis=1))
-        out = tf.reshape(out, shape=(-1, 1))
+        # out = tf.reshape(out, shape=(-1, 1))
         return out
 
     def get_config(self):
@@ -223,9 +223,6 @@ class LSTMRegressorV1:
     def getName(self):
         return self.__class__.__name__
 
-    def setModel(self, model):
-        self.model = model
-
     def getModel(self):
         if self.model is not None:
             return self.model
@@ -254,7 +251,8 @@ class LSTMRegressorV1:
         # RNN
         lstm = keras.layers.LSTM(units=self._layer_width,
                                  return_sequences=True)(feat)
-        lstm = keras.layers.LSTM(units=self._layer_width // 2)(lstm)
+        lstm = keras.layers.LSTM(units=self._layer_width // 2,
+                                 return_sequences=True)(lstm)
         # extract last_relevant timestep
         lstm = LastRelevant()((lstm, seqlens))
 
@@ -281,17 +279,23 @@ class LSTMRegressorV1:
         )(fcn)
         # outputs = tf.squeeze(outputs)
 
-        model = keras.Model(inputs=inputs, outputs=outputs)
+        self.model = keras.Model(inputs=inputs, outputs=outputs)
+        self.model._name = self.getName()
 
+        return self.model
+
+    def compile(self):
         # TODO study how to use ReduceLROnPlateau and CosineDecayRestarts on adam optimizer
         # decay = tf.keras.experimental.CosineDecayRestarts(self._lr,
         #                                                   self._lr_decay_steps,
         #                                                   t_mul=1.02,
         #                                                   m_mul=0.95,
         #                                                   alpha=0.095)
-        adam = tf.keras.optimizers.Adam(learning_rate=self._lr)
+        adam = tf.keras.optimizers.Adam(learning_rate=self._lr
+                                        # clipnorm=50
+                                        )
 
-        model.compile(
+        self.model.compile(
             optimizer=adam,
             loss='mse',
             # metrics=[
@@ -305,13 +309,9 @@ class LSTMRegressorV1:
             # trying to fix 'Inputs to eager execution function cannot be Keras symbolic tensors'
             # ref: https://github.com/tensorflow/probability/issues/519
             experimental_run_tf_function=False)
+
         #TypeError: Error converting shape to a TensorShape: Dimension value must be integer or None or have an __index__ method, got [35, 6].
         #input_shape = ([self._time_step, self._feat_size], None)
         # input_shape = {[self._time_step, self._feat_size], None}
         # self.model.build(input_shape)
-
-        print(model.summary())
-
-        self.model = model
-
-        return model
+        print(self.model.summary())
