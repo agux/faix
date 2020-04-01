@@ -1,23 +1,18 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
+# from __future__ import absolute_import, division, print_function, unicode_literals
 
 from time import strftime
 from mysql.connector.pooling import MySQLConnectionPool
-import tensorflow as tf
 import sys
-import os
 import ray
-import multiprocessing
 import numpy as np
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 cnxpool = None
 
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
-    print("{} [PID={}]: initializing mysql connection pool...".format(
-        strftime("%H:%M:%S"), os.getpid()))
+    print("{} initializing mysql connection pool...".format(
+        strftime("%H:%M:%S")))
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
         pool_size=db_pool_size or 5,
@@ -31,7 +26,7 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         connect_timeout=90000)
 
 
-@ray.remote(num_return_vals=3)
+@ray.remote
 def getSeries(code, klid, rcode, val, shared_args):
     # code, klid, rcode, val, max_step, time_shift, qk, qd = p
     max_step = shared_args['max_step']

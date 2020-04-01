@@ -23,6 +23,14 @@ log = logging.getLogger()
 log.setLevel(logging.INFO)
 
 
+def setupPath():
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    root_dir = os.path.dirname(parent_dir)
+    os.environ[
+        "PYTHONPATH"] = root_dir + ":" + parent_dir + ":" + os.environ.get(
+            "PYTHONPATH", "")
+
+
 def parseArgs():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ds',

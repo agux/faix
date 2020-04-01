@@ -4,7 +4,7 @@ from time import strftime
 # from joblib import Parallel, delayed
 # from loky import get_reusable_executor
 from mysql.connector.pooling import MySQLConnectionPool
-from wc_data.db import getSeries
+from wc_data.series import getSeries
 import tensorflow as tf
 import sys
 import ray
@@ -138,7 +138,7 @@ def _getSeries(p):
     return batch, val, total
 
 
-def _loadTestSet(max_step, ntest, vset=None, dbconf=None, query=None):
+def _loadTestSet(max_step, ntest, vset=None):
     global cnxpool, shared_args
     cnx = cnxpool.get_connection()
     # idxlst = _getIndex()
@@ -169,9 +169,10 @@ def _loadTestSet(max_step, ntest, vset=None, dbconf=None, query=None):
         # r = list(exc.map(_getSeries, params))
         # data, vals, seqlen = zip(*r)
 
-        tasks = list(
+        tasks = [
             getSeries.remote(code, klid, rcode, val, shared_args)
-            for code, klid, rcode, val in tset)
+            for code, klid, rcode, val in tset
+        ]
         r = list(ray.get(tasks))
         data, vals, seqlen = zip(*r)
         # data = [batch, max_step, feature*time_shift]
@@ -212,7 +213,7 @@ def _getIndex():
         cnx.close()
 
 
-def _loadTrainingData(bno, dbconf=None):
+def _loadTrainingData(bno):
     global cnxpool, shared_args
     # idxlst = _getIndex()
     flag = 'TR'
@@ -257,10 +258,16 @@ def _loadTrainingData(bno, dbconf=None):
         d = np.array(data, 'f')
         s = np.expand_dims(np.array(seqlen, 'i'), axis=1)
         v = np.expand_dims(np.array(vals, 'f'), axis=1)
-        # print('nan for data: {}'.format(np.argwhere(np.isnan(d))))
-        # if len(np.argwhere(np.isnan(d))) > 0:
-        #     print(d)
-        # print('nan for seqlens: {}'.format(np.argwhere(np.isnan(s))))
+
+        nanDat = np.argwhere(np.isnan(d))
+        if len(nanDat) > 0:
+            print('nan for data: {}'.format(nanDat))
+            print(d)
+        nanDat = np.argwhere(np.isnan(s))
+        if len(nanDat) > 0:
+            print('nan for seqlens: {}'.format(nanDat))
+            print(seqlen)
+
         return d, s, v
     except:
         print(sys.exc_info()[0])
@@ -370,7 +377,8 @@ def _getDataSetMeta(flag):
     return max_bno, batch_size
 
 
-def getInputs(shift=0,
+def getInputs(start_bno=0,
+              shift=0,
               cols=None,
               step=30,
               cores=multiprocessing.cpu_count(),
@@ -425,7 +433,7 @@ def getInputs(shift=0,
     train_batches, train_batch_size = _getDataSetMeta("TR")
     if train_batches is None:
         return None
-    bnums = [bno for bno in range(1, train_batches + 1)]
+    bnums = [bno for bno in range(start_bno, train_batches + 1)]
 
     def mapfunc(bno):
         ret = tf.numpy_function(func=_loadTrainingData,

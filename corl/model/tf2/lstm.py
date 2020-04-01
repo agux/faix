@@ -249,10 +249,18 @@ class LSTMRegressorV1:
         # gsm = GlobalStepMarker()(feat)
         # inputs = inputLayer.getInputs()
         # RNN
-        lstm = keras.layers.LSTM(units=self._layer_width,
-                                 return_sequences=True)(feat)
-        lstm = keras.layers.LSTM(units=self._layer_width // 2,
-                                 return_sequences=True)(lstm)
+        lstm = keras.layers.LSTM(
+            units=self._layer_width,
+            return_sequences=True,
+            kernel_regularizer=keras.regularizers.l2(0.01),
+            recurrent_regularizer=keras.regularizers.l2(0.01),
+        )(feat)
+        lstm = keras.layers.LSTM(
+            units=self._layer_width // 2,
+            return_sequences=True,
+            kernel_regularizer=keras.regularizers.l2(0.01),
+            recurrent_regularizer=keras.regularizers.l2(0.01),
+        )(lstm)
         # extract last_relevant timestep
         lstm = LastRelevant()((lstm, seqlens))
 
@@ -291,8 +299,9 @@ class LSTMRegressorV1:
         #                                                   t_mul=1.02,
         #                                                   m_mul=0.95,
         #                                                   alpha=0.095)
-        adam = tf.keras.optimizers.Adam(learning_rate=self._lr
-                                        # clipnorm=50
+        adam = tf.keras.optimizers.Adam(learning_rate=self._lr,
+                                        amsgrad=True
+                                        # clipnorm=32
                                         )
 
         self.model.compile(

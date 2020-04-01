@@ -8,7 +8,7 @@ import math
 import logging
 from itertools import chain
 from pathlib import Path
-from common import parseArgs, cleanup, LOG_DIR, log
+from common import parseArgs, cleanup, LOG_DIR, log, setupPath
 from wc_data import input_fn
 from time import strftime
 from model.tf2 import lstm
@@ -21,7 +21,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 # pylint: disable-msg=E0401
 
 VSET = 5
-LAYER_WIDTH = 512
+LAYER_WIDTH = 256
 MAX_STEP = 35
 TIME_SHIFT = 4
 DROPOUT_RATE = 0.5
@@ -42,17 +42,18 @@ feat_cols = ["close"]
 # pylint: disable-msg=E0601,E1101
 
 
-def getInput(start, args):
+def getInput(start_epoch, args):
     ds = args.ds.lower()
     print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
+    start_bno = start_epoch * STEPS_PER_EPOCH + 1
     input_dict = {}
     if ds == 'db':
-        input_dict = input_fn.getInputs(TIME_SHIFT, feat_cols, MAX_STEP,
-                                        args.parallel, args.prefetch,
+        input_dict = input_fn.getInputs(start_bno, TIME_SHIFT, feat_cols,
+                                        MAX_STEP, args.parallel, args.prefetch,
                                         args.db_pool, args.db_host,
                                         args.db_port, args.db_pwd, args.vset
                                         or VSET)
-    input_dict['bno'] = start
+    input_dict['start_epoch'] = start_epoch
     return input_dict
 
 
@@ -125,7 +126,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
             # save_freq='epoch'
             period=VAL_SAVE_FREQ),
         keras.callbacks.LambdaCallback(
-            on_train_batch_end=lambda batch, logs: print('{} logs={}'.format(
+            on_train_batch_end=lambda batch, logs: print('{} {}'.format(
                 strftime("%H:%M:%S"), logs)))
     ]
 
@@ -144,7 +145,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
         # Please invoke `shuffle()` on input dataset.
         shuffle=False,
         # Epoch at which to start training (for resuming a previous training run)
-        initial_epoch=input_dict['bno'],
+        initial_epoch=input_dict['start_epoch'],
         # If None, the epoch will run until the input dataset is exhausted.
         steps_per_epoch=STEPS_PER_EPOCH,
         validation_data=input_dict['test'],
@@ -197,7 +198,7 @@ def create_regressor():
 
 def load_model(regressor, training_dir):
     # Check if previous training progress exists
-    bno = 0
+    start_epoch = 0
     restored = False
     if os.path.exists(training_dir):
         ckpts = sorted(Path(training_dir).iterdir(), key=os.path.getmtime)
@@ -209,18 +210,20 @@ def load_model(regressor, training_dir):
             print("{} latest model checkpoint path: {}".format(
                 strftime("%H:%M:%S"), ck_path))
             # Extract from checkpoint filename
-            bno = int(os.path.basename(ck_path).split('_')[1])
+            start_epoch = int(os.path.basename(ck_path).split('_')[1])
             print('{} resuming from last training, bno = {}'.format(
-                strftime("%H:%M:%S"), bno))
+                strftime("%H:%M:%S"), start_epoch))
             model = regressor.getModel()
             model.load_weights(str(ck_path))
             regressor.compile()
             restored = True
-            initial_epoch = model.optimizer.iterations.numpy()
-            if bno != initial_epoch:
+            iterations = model.optimizer.iterations.numpy()
+            initial_epoch = iterations // STEPS_PER_EPOCH
+            if start_epoch != initial_epoch:
                 print(
-                    '{} bno({}) from checkpoint file inconsistent with optimizer iterations({}).'
-                    .format(strftime("%H:%M:%S"), bno, initial_epoch))
+                    '{} bno({}) from checkpoint file name inconsistent with saved model({}). optimizer iterations({}).'
+                    .format(strftime("%H:%M:%S"), start_epoch, initial_epoch,
+                            iterations))
 
             # else:
             #     print(
@@ -230,16 +233,16 @@ def load_model(regressor, training_dir):
     if not restored:
         model = regressor.getModel()
         regressor.compile()
-    return bno
+    return start_epoch
 
 
 def main(args):
     regressor, base_dir, training_dir = create_regressor()
 
-    bno = load_model(regressor, training_dir)
+    start_epoch = load_model(regressor, training_dir)
 
     print('{} querying datasource...'.format(strftime("%H:%M:%S")))
-    input_dict = getInput(bno, args)
+    input_dict = getInput(start_epoch, args)
 
     train(args, regressor, input_dict, base_dir, training_dir)
 
@@ -254,7 +257,7 @@ def main(args):
 if __name__ == '__main__':
     log.setLevel(logging.WARN)
     args = parseArgs()
-
+    setupPath()
     # asyncio.run is new in Python 3.7 only
     # asyncio.run(main())
     main(args)
