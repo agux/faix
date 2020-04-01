@@ -213,7 +213,7 @@ def load_model(regressor, training_dir):
             print('{} resuming from last training, bno = {}'.format(
                 strftime("%H:%M:%S"), bno))
             model = regressor.getModel()
-            model = model.load_weights(str(ck_path))
+            model.load_weights(str(ck_path))
             regressor.compile()
             restored = True
             initial_epoch = model.optimizer.iterations.numpy()

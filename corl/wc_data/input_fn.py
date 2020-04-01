@@ -2,10 +2,12 @@
 
 from time import strftime
 # from joblib import Parallel, delayed
-from loky import get_reusable_executor
+# from loky import get_reusable_executor
 from mysql.connector.pooling import MySQLConnectionPool
+from wc_data.db import getSeries
 import tensorflow as tf
 import sys
+import ray
 import os
 import multiprocessing
 import numpy as np
@@ -21,6 +23,7 @@ db_pool_size = None
 db_host = None
 db_port = None
 db_pwd = None
+shared_args = None
 
 k_cols = ["lr"]
 
@@ -135,31 +138,41 @@ def _getSeries(p):
     return batch, val, total
 
 
-def _loadTestSet(max_step, ntest, vset=None):
-    global parallel, time_shift, cnxpool
+def _loadTestSet(max_step, ntest, vset=None, dbconf=None, query=None):
+    global cnxpool, shared_args
     cnx = cnxpool.get_connection()
-    idxlst = _getIndex()
+    # idxlst = _getIndex()
     try:
         setno = vset or np.random.randint(ntest)
         flag = 'TS'
         print('{} selected test set: {}'.format(strftime("%H:%M:%S"), setno))
-        query = ("SELECT "
-                 "   code, klid, rcode, corl_stz "
-                 "FROM "
-                 "   wcc_trn "
-                 "WHERE "
-                 "   flag = %s "
-                 "   AND bno = %s")
+        q = ("SELECT "
+             "   code, klid, rcode, corl_stz "
+             "FROM "
+             "   wcc_trn "
+             "WHERE "
+             "   flag = %s "
+             "   AND bno = %s")
         cursor = cnx.cursor(buffered=True)
-        cursor.execute(query, (flag, setno))
+        cursor.execute(q, (flag, setno))
         tset = cursor.fetchall()
         cursor.close()
-        qk, qd, qd_idx = _getFtQuery()
-        exc = _getExecutor()
-        params = [(code, klid, rcode, val, max_step, time_shift, qk,
-                   qd_idx if rcode in idxlst else qd)
-                  for code, klid, rcode, val in tset]
-        r = list(exc.map(_getSeries, params))
+        # loky api breaks in the following setting:
+        # GPU - CuDNN 10.2
+        # Ubuntu 18.04 docker
+        # python 3.7.7, tf 2.1.0
+        # qk, qd, qd_idx = _getFtQuery()
+        # exc = _getExecutor()
+        # params = [(code, klid, rcode, val, max_step, time_shift, qk,
+        #            qd_idx if rcode in idxlst else qd)
+        #           for code, klid, rcode, val in tset]
+        # r = list(exc.map(_getSeries, params))
+        # data, vals, seqlen = zip(*r)
+
+        tasks = list(
+            getSeries.remote(code, klid, rcode, val, shared_args)
+            for code, klid, rcode, val in tset)
+        r = list(ray.get(tasks))
         data, vals, seqlen = zip(*r)
         # data = [batch, max_step, feature*time_shift]
         # vals = [batch]
@@ -199,9 +212,9 @@ def _getIndex():
         cnx.close()
 
 
-def _loadTrainingData(bno):
-    global max_step, parallel, time_shift, cnxpool
-    idxlst = _getIndex()
+def _loadTrainingData(bno, dbconf=None):
+    global cnxpool, shared_args
+    # idxlst = _getIndex()
     flag = 'TR'
     print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag,
                                                     bno))
@@ -224,13 +237,19 @@ def _loadTrainingData(bno):
         cursor.close()
         data, vals, seqlen = [], [], []
         if total > 0:
-            qk, qd, qd_idx = _getFtQuery()
-            # joblib doesn't support nested threading
-            exc = _getExecutor()
-            params = [(code, klid, rcode, val, max_step, time_shift, qk,
-                       qd_idx if rcode in idxlst else qd)
-                      for code, klid, rcode, val in train_set]
-            r = list(exc.map(_getSeries, params))
+            # issue using loky in Area51m
+            # qk, qd, qd_idx = _getFtQuery()
+            # exc = _getExecutor()
+            # params = [(code, klid, rcode, val, max_step, time_shift, qk,
+            #            qd_idx if rcode in idxlst else qd)
+            #           for code, klid, rcode, val in train_set]
+            # r = list(exc.map(_getSeries, params))
+            # data, vals, seqlen = zip(*r)
+            tasks = [
+                getSeries.remote(code, klid, rcode, val, shared_args)
+                for code, klid, rcode, val in train_set
+            ]
+            r = list(ray.get(tasks))
             data, vals, seqlen = zip(*r)
         # data = [batch, max_step, feature*time_shift]
         # seqlen = [batch]
@@ -290,12 +309,11 @@ def _getStats():
 
 
 def _getFtQuery():
-    global qk, qd, qd_idx, feat_cols
+    global qk, qd, qd_idx
     if qk is not None and qd is not None and qd_idx is not None:
         return qk, qd, qd_idx
 
     stats = _getStats()
-    k_cols = feat_cols
     p_kline = ""
     p_index = ""
     for k, v in stats.items():
@@ -376,7 +394,7 @@ def getInputs(shift=0,
         Where each dataset is a dictionary of {features,seqlens}.
     """
     # Create dataset for training
-    global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size, db_host, db_port, db_pwd
+    global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size, db_host, db_port, db_pwd, shared_args
     time_shift = shift
     feat_cols = cols or k_cols
     max_step = step
@@ -390,7 +408,19 @@ def getInputs(shift=0,
     print("{} Using parallel: {}, prefetch: {} db_host: {} port: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port))
     _init(db_pool_size, db_host, db_port, db_pwd)
-
+    ray.init(num_cpus=parallel)
+    qk, qd, qd_idx = _getFtQuery()
+    shared_args = ray.put({
+        'max_step': max_step,
+        'time_shift': time_shift,
+        'qk': qk,
+        'qd': qd,
+        'qd_idx': qd_idx,
+        'index_list': _getIndex(),
+        'db_host': db_host,
+        'db_port': db_port,
+        'db_pwd': db_pwd
+    })
     # query max flag from wcc_trn and fill a slice with flags between start and max
     train_batches, train_batch_size = _getDataSetMeta("TR")
     if train_batches is None:
@@ -419,6 +449,7 @@ def getInputs(shift=0,
         lambda bno: tuple(mapfunc(bno)),
         # _prefetch).batch(1).prefetch(_prefetch)
         _prefetch).prefetch(_prefetch)
+
     # Create dataset for testing
     test_batches, test_batch_size = _getDataSetMeta("TS")
     ds_test = tf.data.Dataset.from_tensor_slices(
