@@ -24,10 +24,12 @@ log.setLevel(logging.INFO)
 
 
 def setupPath():
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    root_dir = os.path.dirname(parent_dir)
+    p1 = os.path.dirname(os.path.abspath(__file__))
+    p2 = os.path.dirname(p1)
+    p3 = os.path.dirname(p2)
+    p4 = os.path.dirname(p3)
     os.environ[
-        "PYTHONPATH"] = root_dir + ":" + parent_dir + ":" + os.environ.get(
+        "PYTHONPATH"] = p1 + ":" + p2 + ":" + p3 + ":" + p4 + ":" + os.environ.get(
             "PYTHONPATH", "")
 
 
