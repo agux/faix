@@ -15,7 +15,6 @@ def f(x, s):
         port=3306,
         user='mysql',
         database='secu',
-        password='rap!It6Q=p!aS6z3PRl0',
         # ssl_ca='',
         # use_pure=True,
         connect_timeout=90000)
