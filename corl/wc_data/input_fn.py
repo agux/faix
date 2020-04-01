@@ -52,6 +52,8 @@ _executor = None
 
 cnxpool = None
 
+ray.init(num_cpus=parallel, webui_host='127.0.0.1')
+
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
@@ -416,7 +418,6 @@ def getInputs(start_bno=0,
     print("{} Using parallel: {}, prefetch: {} db_host: {} port: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port))
     _init(db_pool_size, db_host, db_port, db_pwd)
-    ray.init(num_cpus=parallel)
     qk, qd, qd_idx = _getFtQuery()
     shared_args = ray.put({
         'max_step': max_step,
