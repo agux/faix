@@ -253,11 +253,20 @@ def main(args):
 
     # await main_task
 
+def setupTensorflow():
+    physical_devices = tf.config.list_physical_devices('GPU') 
+    if len(physical_devices) > 0:
+        try: 
+            tf.config.experimental.set_memory_growth(physical_devices[0], True) 
+        except: 
+            print('Invalid device or cannot modify virtual devices once initialized.\n'+sys.exc_info()[0])
+            pass 
 
 if __name__ == '__main__':
     log.setLevel(logging.WARN)
     args = parseArgs()
     setupPath()
+    setupTensorflow()
     # asyncio.run is new in Python 3.7 only
     # asyncio.run(main())
     main(args)
