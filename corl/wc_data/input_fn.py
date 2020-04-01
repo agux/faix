@@ -4,7 +4,7 @@ from time import strftime
 # from joblib import Parallel, delayed
 # from loky import get_reusable_executor
 from mysql.connector.pooling import MySQLConnectionPool
-from wc_data.series import getSeries
+from corl.wc_data.series import getSeries
 import tensorflow as tf
 import sys
 import ray
