@@ -21,7 +21,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 # pylint: disable-msg=E0401
 
 VSET = 5
-LAYER_WIDTH = 256
+LAYER_WIDTH = 512
 MAX_STEP = 35
 TIME_SHIFT = 4
 DROPOUT_RATE = 0.5
@@ -33,7 +33,7 @@ DECAYED_DROPOUT_START = 40000
 SEED = 285139
 
 # validate and save the model every n epochs
-VAL_SAVE_FREQ = 2
+VAL_SAVE_FREQ = 5
 STEPS_PER_EPOCH = 10
 
 # feat_cols = ["close", "volume", "amount"]

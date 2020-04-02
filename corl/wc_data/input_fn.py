@@ -9,7 +9,7 @@ import tensorflow as tf
 import sys
 import ray
 import os
-import multiprocessing
+import psutil
 import numpy as np
 
 qk, qd, qd_idx = None, None, None
@@ -52,7 +52,7 @@ _executor = None
 
 cnxpool = None
 
-ray.init(num_cpus=parallel, webui_host='127.0.0.1')
+ray.init(num_cpus=psutil.cpu_count(logical=False), webui_host='127.0.0.1')
 
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
@@ -383,7 +383,7 @@ def getInputs(start_bno=0,
               shift=0,
               cols=None,
               step=30,
-              cores=multiprocessing.cpu_count(),
+              cores=psutil.cpu_count(logical=False),
               pfetch=2,
               pool=None,
               host=None,
