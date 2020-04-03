@@ -13,7 +13,7 @@ import psutil
 import numpy as np
 
 #FIXME for debugging purpose
-np.set_printoptions(threshold=np.inf)
+np.set_printoptions(threshold=np.inf, suppress=True)
 
 qk, qd, qd_idx = None, None, None
 parallel = None
@@ -265,16 +265,16 @@ def _loadTrainingData(bno):
         v = np.expand_dims(np.array(vals, 'f'), axis=1)
 
         # FIXME: DEBUG CODE
-        if 165 <= bno and bno <= 168:
-            print('{} d: {}'.format(bno, d))
-        nanDat = np.argwhere(np.isnan(d))
-        if len(nanDat) > 0:
-            print('nan for data: {}'.format(nanDat))
-            print(d)
-        nanDat = np.argwhere(np.isnan(s))
-        if len(nanDat) > 0:
-            print('nan for seqlens: {}'.format(nanDat))
-            print(seqlen)
+        # if 165 <= bno and bno <= 168:
+        #     print('{} d: {}'.format(bno, d))
+        # nanDat = np.argwhere(np.isnan(d))
+        # if len(nanDat) > 0:
+        #     print('nan for data: {}'.format(nanDat))
+        #     print(d)
+        # nanDat = np.argwhere(np.isnan(s))
+        # if len(nanDat) > 0:
+        #     print('nan for seqlens: {}'.format(nanDat))
+        #     print(seqlen)
 
         return d, s, v
     except:
