@@ -157,7 +157,7 @@ class DebugCallback(keras.callbacks.Callback):
         i = self.model.optimizer.iterations.numpy()
         tf.print('iteration: {}'.format(i),
                  output_stream='file://' + self.out_file)
-        tf.print(self.model.inputs,
+        tf.print(self.model.get_weights(),
                  output_stream='file://' + self.out_file,
                  summarize=-1)
         # if i in self.iterations:
