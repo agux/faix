@@ -81,18 +81,24 @@ def parseArgs():
                         type=int,
                         help='volume size for the dataset storage sub-folder',
                         default=None)
-    parser.add_argument('--terminate_on_nan',
-                        help='abort training process on NaN loss.',
-                        type=bool,
-                        default=False)
-    parser.add_argument('--check_input',
-                        help='check inputs for NaN or Inf.',
-                        type=bool,
-                        default=False)
-    parser.add_argument('--check_weights',
-                        help='check trainable weights for NaN or Inf.',
-                        type=bool,
-                        default=False)
+    parser.add_argument(
+        '--terminate_on_nan',
+        help='abort training process on NaN loss.',
+        dest='terminate_on_nan',
+        action='store_true',
+    )
+    parser.add_argument(
+        '--check_input',
+        help='check inputs for NaN or Inf.',
+        dest='check_input',
+        action='store_true',
+    )
+    parser.add_argument(
+        '--check_weights',
+        help='check trainable weights for NaN or Inf.',
+        dest='check_weights',
+        action='store_true',
+    )
     parser.add_argument(
         '--gpu_grow_mem',
         dest='gpu_grow_mem',
