@@ -252,23 +252,22 @@ class LSTMRegressorV1:
         # RNN
         # choice for regularizer:
         # https://machinelearningmastery.com/use-weight-regularization-lstm-networks-time-series-forecasting/
-        reg = keras.regularizers.l1_l2(0.01, 0.01)
         lstm = keras.layers.LSTM(
             units=self._layer_width,
             # stateful=True,
             return_sequences=True,
-            kernel_initializer=keras.initializers.VarianceScaling(),
+            # kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
-            kernel_regularizer=reg,
+            kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
             # recurrent_regularizer=reg,
         )(feat)
         lstm = keras.layers.LSTM(
             units=self._layer_width // 2,
             # stateful=True,
             return_sequences=True,
-            kernel_initializer=keras.initializers.VarianceScaling(),
+            # kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
-            kernel_regularizer=reg,
+            kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
             # recurrent_regularizer=reg,
         )(lstm)
         # extract last_relevant timestep
@@ -278,7 +277,7 @@ class LSTMRegressorV1:
         fcn = keras.layers.Dense(
             units=self._layer_width // 2,
             #  kernel_initializer='lecun_normal',
-            kernel_initializer='variance_scaling',
+            # kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
             activation='selu')(lstm)
         fsize = self._layer_width // 2
@@ -289,14 +288,14 @@ class LSTMRegressorV1:
             fcn = keras.layers.Dense(
                 units=fsize,
                 #  kernel_initializer='lecun_normal',
-                kernel_initializer='variance_scaling',
+                # kernel_initializer=keras.initializers.VarianceScaling(),
                 bias_initializer=tf.constant_initializer(0.1),
             )(fcn)
             fsize = fsize // 2
         fcn = keras.layers.Dense(
             units=fsize,
             #  kernel_initializer='lecun_normal',
-            kernel_initializer='variance_scaling',
+            # kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
             activation='selu')(fcn)
 
@@ -304,7 +303,7 @@ class LSTMRegressorV1:
         outputs = keras.layers.Dense(
             units=1,
             # kernel_initializer='lecun_normal',
-            kernel_initializer='variance_scaling',
+            # kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
         )(fcn)
         # outputs = tf.squeeze(outputs)
@@ -322,14 +321,14 @@ class LSTMRegressorV1:
         #                                                   m_mul=0.95,
         #                                                   alpha=0.095)
 
-        # optimizer = tf.keras.optimizers.Adam(
-        #     learning_rate=self._lr,
-        #     # amsgrad=True
-        #     # clipnorm=32
-        #     clipvalue=0.15)
+        optimizer = tf.keras.optimizers.Adam(
+            learning_rate=self._lr,
+            # amsgrad=True
+            # clipnorm=32
+            clipvalue=0.15)
 
-        optimizer = keras.optimizers.Nadam(learning_rate=self._lr,
-                                           clipvalue=0.15)
+        # optimizer = keras.optimizers.Nadam(learning_rate=self._lr,
+        #                                    clipvalue=0.15)
 
         self.model.compile(
             optimizer=optimizer,
