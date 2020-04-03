@@ -248,42 +248,64 @@ class LSTMRegressorV1:
         # seqlens = inputs[1]
         # gsm = GlobalStepMarker()(feat)
         # inputs = inputLayer.getInputs()
+
         # RNN
+        # choice for regularizer:
+        # https://machinelearningmastery.com/use-weight-regularization-lstm-networks-time-series-forecasting/
+        reg = keras.regularizers.l1_l2(0.01, 0.01)
         lstm = keras.layers.LSTM(
             units=self._layer_width,
-            return_sequences=True
-            # kernel_regularizer=keras.regularizers.l2(0.01),
-            # recurrent_regularizer=keras.regularizers.l2(0.01),
+            stateful=True,
+            return_sequences=True,
+            kernel_initializer=keras.initializers.VarianceScaling(),
+            bias_initializer=tf.constant_initializer(0.1),
+            kernel_regularizer=reg,
+            # recurrent_regularizer=reg,
         )(feat)
         lstm = keras.layers.LSTM(
             units=self._layer_width // 2,
-            return_sequences=True
-            # kernel_regularizer=keras.regularizers.l2(0.01),
-            # recurrent_regularizer=keras.regularizers.l2(0.01),
+            stateful=True,
+            return_sequences=True,
+            kernel_initializer=keras.initializers.VarianceScaling(),
+            bias_initializer=tf.constant_initializer(0.1),
+            kernel_regularizer=reg,
+            # recurrent_regularizer=reg,
         )(lstm)
         # extract last_relevant timestep
         lstm = LastRelevant()((lstm, seqlens))
 
         # FCN
-        fcn = keras.layers.Dense(units=self._layer_width // 2,
-                                 kernel_initializer='lecun_normal',
-                                 activation='selu')(lstm)
+        fcn = keras.layers.Dense(
+            units=self._layer_width // 2,
+            #  kernel_initializer='lecun_normal',
+            kernel_initializer='variance_scaling',
+            bias_initializer=tf.constant_initializer(0.1),
+            activation='selu')(lstm)
         fsize = self._layer_width // 2
         nlayer = 3
         for i in range(nlayer):
             if i == 0:
                 fcn = keras.layers.AlphaDropout(rate=self._dropout_rate)(fcn)
-            fcn = keras.layers.Dense(units=fsize,
-                                     kernel_initializer='lecun_normal')(fcn)
+            fcn = keras.layers.Dense(
+                units=fsize,
+                #  kernel_initializer='lecun_normal',
+                kernel_initializer='variance_scaling',
+                bias_initializer=tf.constant_initializer(0.1),
+            )(fcn)
             fsize = fsize // 2
-        fcn = keras.layers.Dense(units=fsize,
-                                 kernel_initializer='lecun_normal',
-                                 activation='selu')(fcn)
+        fcn = keras.layers.Dense(
+            units=fsize,
+            #  kernel_initializer='lecun_normal',
+            kernel_initializer='variance_scaling',
+            bias_initializer=tf.constant_initializer(0.1),
+            activation='selu')(fcn)
 
         # Output layer
         outputs = keras.layers.Dense(
             units=1,
-            kernel_initializer='lecun_normal',
+            # kernel_initializer='lecun_normal',
+            kernel_initializer='variance_scaling',
+            bias_initializer=tf.constant_initializer(0.1),
         )(fcn)
         # outputs = tf.squeeze(outputs)
 
@@ -299,13 +321,18 @@ class LSTMRegressorV1:
         #                                                   t_mul=1.02,
         #                                                   m_mul=0.95,
         #                                                   alpha=0.095)
-        adam = tf.keras.optimizers.Adam(learning_rate=self._lr
-                                        # amsgrad=True
-                                        # clipnorm=32
-                                        )
+
+        # optimizer = tf.keras.optimizers.Adam(
+        #     learning_rate=self._lr,
+        #     # amsgrad=True
+        #     # clipnorm=32
+        #     clipvalue=0.15)
+
+        optimizer = keras.optimizers.Nadam(learning_rate=self._lr,
+                                           clipvalue=0.15)
 
         self.model.compile(
-            optimizer=adam,
+            optimizer=optimizer,
             loss='mae',
             # metrics=[
             #     # Already in the "loss" metric
@@ -315,6 +342,7 @@ class LSTMRegressorV1:
             #     # keras.metrics.Precision(),
             #     # keras.metrics.Recall()
             # ],
+
             # trying to fix 'Inputs to eager execution function cannot be Keras symbolic tensors'
             # ref: https://github.com/tensorflow/probability/issues/519
             experimental_run_tf_function=False)
