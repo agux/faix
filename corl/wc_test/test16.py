@@ -8,10 +8,10 @@ import math
 import logging
 from itertools import chain
 from pathlib import Path
-from common import parseArgs, cleanup, LOG_DIR, log, setupPath, DebugCallback
-from wc_data import input_fn
+from corl.wc_test.common import parseArgs, cleanup, LOG_DIR, log, setupPath, DebugCallback
+from corl.wc_data import input_fn
 from time import strftime
-from model.tf2 import lstm
+from corl.model.tf2 import lstm
 import tensorflow as tf
 # Path hack.
 import sys
