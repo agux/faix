@@ -23,7 +23,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 ERROR_BATCH = {167}
 
 VSET = 5
-LAYER_WIDTH = 512
+LAYER_WIDTH = 128
 MAX_STEP = 35
 TIME_SHIFT = 19
 DROPOUT_RATE = 0.5
@@ -100,7 +100,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
         # When using 'batch', writes the losses and metrics to TensorBoard after each batch.
         # The same applies for 'epoch'. If using an integer, let's say 1000,
         # the callback will write the metrics and losses to TensorBoard every 1000 batches.
-        update_freq=write_after_batches)
+        update_freq='epoch')
     callbacks = [
         # decay,
         tensorboard_cbk,

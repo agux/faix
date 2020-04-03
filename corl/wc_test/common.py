@@ -81,6 +81,18 @@ def parseArgs():
                         type=int,
                         help='volume size for the dataset storage sub-folder',
                         default=None)
+    parser.add_argument('--terminate_on_nan',
+                        help='abort training process on NaN loss.',
+                        type=bool,
+                        default=False)
+    parser.add_argument('--check_input',
+                        help='check inputs for NaN or Inf.',
+                        type=bool,
+                        default=False)
+    parser.add_argument('--check_weights',
+                        help='check trainable weights for NaN or Inf.',
+                        type=bool,
+                        default=False)
     parser.add_argument(
         '--gpu_grow_mem',
         dest='gpu_grow_mem',
@@ -103,18 +115,6 @@ def parseArgs():
         dest='log_device',
         action='store_true',
         help='record device info such as CPU and GPU in tensorboard.')
-    parser.add_argument('--terminate_on_nan',
-                        dest='terminate_on_nan',
-                        action='store_false',
-                        help='abort training process on NaN loss.')
-    parser.add_argument('--check_input',
-                        dest='check_input',
-                        action='store_false',
-                        help='check inputs for NaN or Inf.')
-    parser.add_argument('--check_weights',
-                        dest='check_weights',
-                        action='store_false',
-                        help='check trainable weights for NaN or Inf.')
     parser.add_argument('--restart',
                         help='restart training',
                         action='store_true')

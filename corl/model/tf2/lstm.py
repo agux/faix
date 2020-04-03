@@ -256,7 +256,7 @@ class LSTMRegressorV1:
         # https://towardsdatascience.com/l1-and-l2-regularization-methods-ce25e7fc831c
         units = self._layer_width
         layer = feat
-        nlayer = 3
+        nlayer = 1
         for _ in range(nlayer):
             layer = keras.layers.LSTM(
                 units=units,
@@ -279,7 +279,7 @@ class LSTMRegressorV1:
             bias_initializer=tf.constant_initializer(0.1),
             activation='selu')(layer)
         units = units // 2
-        nlayer = 2
+        nlayer = 1
         for i in range(nlayer):
             if i == 0:
                 layer = keras.layers.AlphaDropout(
@@ -323,7 +323,7 @@ class LSTMRegressorV1:
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self._lr,
             # amsgrad=True
-            clipnorm=1.0
+            clipnorm=0.5
             # clipvalue=0.1
         )
 
@@ -332,7 +332,7 @@ class LSTMRegressorV1:
 
         self.model.compile(
             optimizer=optimizer,
-            loss='mae',
+            loss='huber_loss',
             # metrics=[
             #     # Already in the "loss" metric
             #     'mse',

@@ -272,25 +272,31 @@ def _loadTrainingData(bno):
         #     print('{} d: {}'.format(bno, d))
 
         if check_input:
+            if np.ma.is_masked(d):
+                print('batch[{}] masked feature'.format(bno))
+                print(d)
+            if np.ma.is_masked(s):
+                print('batch[{}] masked seqlens'.format(bno))
+                print(s)
             nanLoc = np.argwhere(np.isnan(d))
             found = False
             if len(nanLoc) > 0:
-                print('nan for data: {}'.format(nanLoc))
+                print('batch[{}] nan for feature: {}'.format(bno, nanLoc))
                 found = True
             infLoc = np.argwhere(np.isinf(d))
             if len(infLoc) > 0:
-                print('inf for data: {}'.format(infLoc))
+                print('batch[{}] inf for feature: {}'.format(bno, infLoc))
                 found = True
             if found:
                 print(d)
             found = False
             nanLoc = np.argwhere(np.isnan(s))
             if len(nanLoc) > 0:
-                print('nan for seqlens: {}'.format(nanLoc))
+                print('batch[{}] nan for seqlens: {}'.format(bno, nanLoc))
                 found = True
             infLoc = np.argwhere(np.isinf(s))
             if len(infLoc) > 0:
-                print('inf for data: {}'.format(infLoc))
+                print('batch[{}] inf for data: {}'.format(bno, infLoc))
                 found = True
             if found:
                 print(s)
