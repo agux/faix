@@ -106,7 +106,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
         tensorboard_cbk,
         DebugCallback(ERROR_BATCH) if args.check_weights else None,
         keras.callbacks.CSVLogger('train_perf.log'),
-        keras.callbacks.TerminateOnNaN(),
+        keras.callbacks.TerminateOnNaN() if args.terminate_on_nan else None,
         # tf.keras.callbacks.ProgbarLogger(count_mode='steps',
         #                                  stateful_metrics=None),
         keras.callbacks.ModelCheckpoint(
@@ -130,6 +130,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
             # save_freq='epoch'
             period=VAL_SAVE_FREQ)
     ]
+    callbacks = [c for c in callbacks if c is not None]
 
     epochs = math.ceil(input_dict['train_batches'] / STEPS_PER_EPOCH)
     val_freq = list(

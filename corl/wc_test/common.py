@@ -103,6 +103,10 @@ def parseArgs():
         dest='log_device',
         action='store_true',
         help='record device info such as CPU and GPU in tensorboard.')
+    parser.add_argument('--terminate_on_nan',
+                        dest='terminate_on_nan',
+                        action='store_false',
+                        help='abort training process on NaN loss.')
     parser.add_argument('--check_input',
                         dest='check_input',
                         action='store_false',
