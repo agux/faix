@@ -21,7 +21,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 # pylint: disable-msg=E0401
 
 VSET = 5
-LAYER_WIDTH = 512
+LAYER_WIDTH = 128
 MAX_STEP = 35
 TIME_SHIFT = 4
 DROPOUT_RATE = 0.5
@@ -155,7 +155,8 @@ def train(args, regressor, input_dict, base_dir, training_dir):
         validation_freq=VAL_SAVE_FREQ,
         callbacks=callbacks)
 
-    print('{} train history: {}'.format(strftime("%H:%M:%S"), history))
+    print('{} trained history.params: {}'.format(strftime("%H:%M:%S"),
+                                                 history.params))
 
     # Export the finalized graph and the variables to the platform-agnostic SavedModel format.
     model.save(filepath=os.path.join(training_dir, 'final.tf'),
@@ -253,14 +254,18 @@ def main(args):
 
     # await main_task
 
+
 def setupTensorflow():
-    physical_devices = tf.config.list_physical_devices('GPU') 
+    physical_devices = tf.config.list_physical_devices('GPU')
     if len(physical_devices) > 0:
-        try: 
-            tf.config.experimental.set_memory_growth(physical_devices[0], True) 
-        except: 
-            print('Invalid device or cannot modify virtual devices once initialized.\n'+sys.exc_info()[0])
-            pass 
+        try:
+            tf.config.experimental.set_memory_growth(physical_devices[0], True)
+        except:
+            print(
+                'Invalid device or cannot modify virtual devices once initialized.\n'
+                + sys.exc_info()[0])
+            pass
+
 
 if __name__ == '__main__':
     log.setLevel(logging.WARN)

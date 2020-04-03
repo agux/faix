@@ -252,24 +252,26 @@ class LSTMRegressorV1:
         # RNN
         # choice for regularizer:
         # https://machinelearningmastery.com/use-weight-regularization-lstm-networks-time-series-forecasting/
+        # L1 is to prune less important features, if we have a large feature set
+        # https://towardsdatascience.com/l1-and-l2-regularization-methods-ce25e7fc831c
         lstm = keras.layers.LSTM(
             units=self._layer_width,
             # stateful=True,
             return_sequences=True,
             # kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
-            kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
+            # kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
             # recurrent_regularizer=reg,
         )(feat)
-        lstm = keras.layers.LSTM(
-            units=self._layer_width // 2,
-            # stateful=True,
-            return_sequences=True,
-            # kernel_initializer=keras.initializers.VarianceScaling(),
-            bias_initializer=tf.constant_initializer(0.1),
-            kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
-            # recurrent_regularizer=reg,
-        )(lstm)
+        # lstm = keras.layers.LSTM(
+        #     units=self._layer_width // 2,
+        #     # stateful=True,
+        #     return_sequences=True,
+        #     # kernel_initializer=keras.initializers.VarianceScaling(),
+        #     bias_initializer=tf.constant_initializer(0.1),
+        #     # kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
+        #     # recurrent_regularizer=reg,
+        # )(lstm)
         # extract last_relevant timestep
         lstm = LastRelevant()((lstm, seqlens))
 
@@ -281,7 +283,7 @@ class LSTMRegressorV1:
             bias_initializer=tf.constant_initializer(0.1),
             activation='selu')(lstm)
         fsize = self._layer_width // 2
-        nlayer = 3
+        nlayer = 2
         for i in range(nlayer):
             if i == 0:
                 fcn = keras.layers.AlphaDropout(rate=self._dropout_rate)(fcn)
