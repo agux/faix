@@ -155,11 +155,14 @@ class DebugCallback(keras.callbacks.Callback):
 
     def on_train_batch_end(self, batch, logs=None):
         i = self.model.optimizer.iterations.numpy()
-        tf.print('iteration: {}'.format(i),
-                 output_stream='file://' + self.out_file)
-        tf.print(self.model.get_weights(),
-                 output_stream='file://' + self.out_file,
-                 summarize=-1)
+        print('iteration: {} LSTM weights:\n {}'.format(
+            i, self.model.layers[0].get_weights()))
+        # tf.print('iteration: {}'.format(i),
+        #          output_stream='file://' + self.out_file)
+        # tf.print(self.model.get_weights(),
+        #          output_stream='file://' + self.out_file,
+        #          summarize=-1)
+
         # if i in self.iterations:
         #     tf.print(self.model.inputs,
         #              output_stream='file://' + self.out_file,

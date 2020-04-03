@@ -104,7 +104,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
     callbacks = [
         # decay,
         tensorboard_cbk,
-        # DebugCallback(ERROR_BATCH),
+        DebugCallback(ERROR_BATCH),
         keras.callbacks.CSVLogger('train_perf.log'),
         keras.callbacks.TerminateOnNaN(),
         # tf.keras.callbacks.ProgbarLogger(count_mode='steps',
