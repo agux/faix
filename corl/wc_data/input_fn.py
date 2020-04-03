@@ -12,6 +12,9 @@ import os
 import psutil
 import numpy as np
 
+#FIXME for debugging purpose
+np.set_printoptions(threshold=np.inf)
+
 qk, qd, qd_idx = None, None, None
 parallel = None
 feat_cols = []
@@ -262,9 +265,8 @@ def _loadTrainingData(bno):
         v = np.expand_dims(np.array(vals, 'f'), axis=1)
 
         # FIXME: DEBUG CODE
-        if 165 < bno and bno < 168:
-            print('d: {}'.format(d))
-            print('s: {}'.format(s))
+        if 165 <= bno and bno <= 168:
+            print('{} d: {}'.format(bno, d))
         nanDat = np.argwhere(np.isnan(d))
         if len(nanDat) > 0:
             print('nan for data: {}'.format(nanDat))
