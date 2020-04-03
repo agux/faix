@@ -1,4 +1,4 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
+# from __future__ import absolute_import, division, print_function, unicode_literals
 
 from tensorflow import keras
 import asyncio
@@ -8,7 +8,7 @@ import math
 import logging
 from itertools import chain
 from pathlib import Path
-from common import parseArgs, cleanup, LOG_DIR, log, setupPath
+from common import parseArgs, cleanup, LOG_DIR, log, setupPath, DebugCallback
 from wc_data import input_fn
 from time import strftime
 from model.tf2 import lstm
@@ -19,6 +19,8 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 # pylint: disable-msg=E0401
+
+ERROR_BATCH = {167}
 
 VSET = 5
 LAYER_WIDTH = 128
@@ -102,10 +104,12 @@ def train(args, regressor, input_dict, base_dir, training_dir):
     callbacks = [
         # decay,
         tensorboard_cbk,
-        tf.keras.callbacks.TerminateOnNaN(),
+        DebugCallback(ERROR_BATCH),
+        keras.callbacks.CSVLogger('train_perf.log'),
+        keras.callbacks.TerminateOnNaN(),
         # tf.keras.callbacks.ProgbarLogger(count_mode='steps',
         #                                  stateful_metrics=None),
-        tf.keras.callbacks.ModelCheckpoint(
+        keras.callbacks.ModelCheckpoint(
             filepath=os.path.join(training_dir,
                                   "cp_{epoch}_{val_loss:.3f}.ckpt"),
             # monitor='val_loss',
@@ -117,17 +121,14 @@ def train(args, regressor, input_dict, base_dir, training_dir):
             # at which this many samples have been seen since last saving.
             # save_freq='epoch',
             period=VAL_SAVE_FREQ),
-        tf.keras.callbacks.ModelCheckpoint(
+        keras.callbacks.ModelCheckpoint(
             filepath=os.path.join(best_dir, "cp_best.ckpt"),
             # monitor='val_loss',
             verbose=1,
             save_weights_only=True,
             save_best_only=True,
             # save_freq='epoch'
-            period=VAL_SAVE_FREQ),
-        keras.callbacks.LambdaCallback(
-            on_train_batch_end=lambda batch, logs: print('{} {}'.format(
-                strftime("%H:%M:%S"), logs)))
+            period=VAL_SAVE_FREQ)
     ]
 
     epochs = math.ceil(input_dict['train_batches'] / STEPS_PER_EPOCH)
@@ -156,8 +157,8 @@ def train(args, regressor, input_dict, base_dir, training_dir):
         callbacks=callbacks)
 
     iterations = model.optimizer.iterations.numpy()
-    print('{} finished iterations: {}/{}'.format(strftime("%H:%M:%S"),
-                                                 iterations, input_dict['train_batches']))
+    print('{} Training ended. Finished iterations: {}/{}'.format(
+        strftime("%H:%M:%S"), iterations, input_dict['train_batches']))
     if iterations < input_dict['train_batches']:
         return
 

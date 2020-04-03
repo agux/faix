@@ -1,13 +1,14 @@
-from __future__ import print_function
-# Path hack.
-import sys
+# from __future__ import print_function
+
 import os
 import multiprocessing
 import shutil
 import asyncio
+import tensorflow as tf
 from pathlib import Path
 from time import strftime
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
+
+# sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 # from wc_data import input_fn
 # from wc_data import input_bq, input_file2
@@ -144,3 +145,16 @@ async def cleanup(dirpath, keep=5, interval=30):
                 shutil.rmtree(paths[i], ignore_errors=True)
 
         await asyncio.sleep(interval)
+
+
+class DebugCallback(keras.callbacks.Callback):
+    def __init__(self, iterations={}, out_file='debug.log'):
+        self.iterations = iterations
+        self.out_file = out_file
+
+    def on_train_batch_end(self, batch, logs=None):
+        i = self.model.optimizer.iterations.numpy()
+        if i in self.iterations:
+            tf.print(self.model.inputs,
+                     output_stream='file://' + self.out_file,
+                     summarize=-1)
