@@ -155,7 +155,11 @@ class DebugCallback(keras.callbacks.Callback):
 
     def on_train_batch_end(self, batch, logs=None):
         i = self.model.optimizer.iterations.numpy()
-        if i in self.iterations:
-            tf.print(self.model.inputs,
-                     output_stream='file://' + self.out_file,
-                     summarize=-1)
+        tf.print('iteration: {}'.format(i))
+        tf.print(self.model.inputs,
+                 output_stream='file://' + self.out_file,
+                 summarize=-1)
+        # if i in self.iterations:
+        #     tf.print(self.model.inputs,
+        #              output_stream='file://' + self.out_file,
+        #              summarize=-1)
