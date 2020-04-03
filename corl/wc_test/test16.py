@@ -136,7 +136,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
               range(VAL_SAVE_FREQ, epochs, VAL_SAVE_FREQ)))
     model = regressor.getModel()
     # https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit
-    history = model.fit(
+    model.fit(
         x=input_dict['train'],
         verbose=2,
         # must we specify the epochs explicitly?
@@ -155,8 +155,11 @@ def train(args, regressor, input_dict, base_dir, training_dir):
         validation_freq=VAL_SAVE_FREQ,
         callbacks=callbacks)
 
-    print('{} trained history.params: {}'.format(strftime("%H:%M:%S"),
-                                                 history.params))
+    iterations = model.optimizer.iterations.numpy()
+    print('{} finished iterations: {}/{}'.format(strftime("%H:%M:%S"),
+                                                 iterations, input_dict['train_batches']))
+    if iterations < input_dict['train_batches']:
+        return
 
     # Export the finalized graph and the variables to the platform-agnostic SavedModel format.
     model.save(filepath=os.path.join(training_dir, 'final.tf'),
