@@ -255,7 +255,7 @@ class LSTMRegressorV1:
         reg = keras.regularizers.l1_l2(0.01, 0.01)
         lstm = keras.layers.LSTM(
             units=self._layer_width,
-            stateful=True,
+            # stateful=True,
             return_sequences=True,
             kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
@@ -264,7 +264,7 @@ class LSTMRegressorV1:
         )(feat)
         lstm = keras.layers.LSTM(
             units=self._layer_width // 2,
-            stateful=True,
+            # stateful=True,
             return_sequences=True,
             kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
