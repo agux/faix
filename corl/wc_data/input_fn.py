@@ -13,7 +13,9 @@ import psutil
 import numpy as np
 
 #FIXME for debugging purpose
-np.set_printoptions(threshold=np.inf, suppress=True)
+np.set_printoptions(threshold=np.inf,
+                    suppress=True,
+                    formatter={'float': '{: 0.5f}'.format})
 
 qk, qd, qd_idx = None, None, None
 parallel = None
@@ -267,14 +269,23 @@ def _loadTrainingData(bno):
         # FIXME: DEBUG CODE
         # if 165 <= bno and bno <= 168:
         #     print('{} d: {}'.format(bno, d))
-        # nanDat = np.argwhere(np.isnan(d))
-        # if len(nanDat) > 0:
-        #     print('nan for data: {}'.format(nanDat))
-        #     print(d)
-        # nanDat = np.argwhere(np.isnan(s))
-        # if len(nanDat) > 0:
-        #     print('nan for seqlens: {}'.format(nanDat))
-        #     print(seqlen)
+
+        nanDat = np.argwhere(np.isnan(d))
+        if len(nanDat) > 0:
+            print('nan for data: {}'.format(nanDat))
+            print(d)
+        infDat = np.argwhere(np.isinf(d))
+        if len(infDat) > 0:
+            print('inf for data: {}'.format(infDat))
+            print(d)
+        nanDat = np.argwhere(np.isnan(s))
+        if len(nanDat) > 0:
+            print('nan for seqlens: {}'.format(nanDat))
+            print(seqlen)
+        infDat = np.argwhere(np.isinf(s))
+        if len(infDat) > 0:
+            print('inf for data: {}'.format(infDat))
+            print(s)
 
         return d, s, v
     except:

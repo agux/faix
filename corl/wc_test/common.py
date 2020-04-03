@@ -4,6 +4,7 @@ import os
 import multiprocessing
 import shutil
 import asyncio
+import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from pathlib import Path
@@ -149,16 +150,38 @@ async def cleanup(dirpath, keep=5, interval=30):
 
 
 class DebugCallback(keras.callbacks.Callback):
-    def __init__(self, iterations={}, out_file='debug.log'):
+    def __init__(self, iterations={}, exclude_layers={}, out_file='debug.log'):
         self.iterations = iterations
+        self.exclude_layers = exclude_layers
         self.out_file = out_file
 
     def on_train_batch_end(self, batch, logs=None):
         i = self.model.optimizer.iterations.numpy()
-        if 165 < i and i <= 168:
-            layer = self.model.layers[1]
-            print('iteration: {} {} weights:\n {}'.format(
-                i, layer.name, layer.get_weights()))
+        layers = self.model.layers
+        for layer in layers:
+            if layer.name in {'features', 'seqlens'}:
+                continue
+
+            weights = layer.get_weights()
+            for idx, w in enumerate(weights):
+                nanLoc = np.argwhere(np.isnan(w))
+                found = False
+                if len(nanLoc) > 0:
+                    print(
+                        'nan found at iteration {} for {}, weight[{}], location: {}'
+                        .format(i, layer.name, idx, nanLoc))
+                    found = True
+
+                infLoc = np.argwhere(np.isinf(w))
+                if len(infLoc) > 0:
+                    print(
+                        'inf found at iteration {} for {}, weight[{}], location: {}'
+                        .format(i, layer.name, idx, infLoc))
+                    found = True
+
+                if found:
+                    print(w)
+
         # tf.print('iteration: {}'.format(i),
         #          output_stream='file://' + self.out_file)
         # tf.print(self.model.get_weights(),
