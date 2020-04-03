@@ -261,6 +261,10 @@ def _loadTrainingData(bno):
         s = np.expand_dims(np.array(seqlen, 'i'), axis=1)
         v = np.expand_dims(np.array(vals, 'f'), axis=1)
 
+        # FIXME: DEBUG CODE
+        if 165 < bno and bno < 168:
+            print('d: {}'.format(d))
+            print('s: {}'.format(s))
         nanDat = np.argwhere(np.isnan(d))
         if len(nanDat) > 0:
             print('nan for data: {}'.format(nanDat))
