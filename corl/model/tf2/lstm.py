@@ -254,52 +254,49 @@ class LSTMRegressorV1:
         # https://machinelearningmastery.com/use-weight-regularization-lstm-networks-time-series-forecasting/
         # L1 is to prune less important features, if we have a large feature set
         # https://towardsdatascience.com/l1-and-l2-regularization-methods-ce25e7fc831c
-        lstm = keras.layers.LSTM(
-            units=self._layer_width,
-            # stateful=True,
-            return_sequences=True,
-            # kernel_initializer=keras.initializers.VarianceScaling(),
-            bias_initializer=tf.constant_initializer(0.1),
-            # kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
-            # recurrent_regularizer=reg,
-        )(feat)
-        # lstm = keras.layers.LSTM(
-        #     units=self._layer_width // 2,
-        #     # stateful=True,
-        #     return_sequences=True,
-        #     # kernel_initializer=keras.initializers.VarianceScaling(),
-        #     bias_initializer=tf.constant_initializer(0.1),
-        #     # kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
-        #     # recurrent_regularizer=reg,
-        # )(lstm)
+        units = self._layer_width
+        layer = feat
+        nlayer = 3
+        for _ in range(nlayer):
+            layer = keras.layers.LSTM(
+                units=units,
+                # stateful=True,
+                return_sequences=True,
+                # kernel_initializer=keras.initializers.VarianceScaling(),
+                bias_initializer=tf.constant_initializer(0.1),
+                # kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
+                # recurrent_regularizer=reg,
+            )(layer)
+            units = units // 2
         # extract last_relevant timestep
-        lstm = LastRelevant()((lstm, seqlens))
+        layer = LastRelevant()((layer, seqlens))
 
         # FCN
-        fcn = keras.layers.Dense(
-            units=self._layer_width // 2,
+        layer = keras.layers.Dense(
+            units=units,
             #  kernel_initializer='lecun_normal',
             # kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
-            activation='selu')(lstm)
-        fsize = self._layer_width // 2
+            activation='selu')(layer)
+        units = units // 2
         nlayer = 2
         for i in range(nlayer):
             if i == 0:
-                fcn = keras.layers.AlphaDropout(rate=self._dropout_rate)(fcn)
-            fcn = keras.layers.Dense(
-                units=fsize,
+                layer = keras.layers.AlphaDropout(
+                    rate=self._dropout_rate)(layer)
+            layer = keras.layers.Dense(
+                units=units,
                 #  kernel_initializer='lecun_normal',
                 # kernel_initializer=keras.initializers.VarianceScaling(),
                 bias_initializer=tf.constant_initializer(0.1),
-            )(fcn)
-            fsize = fsize // 2
-        fcn = keras.layers.Dense(
-            units=fsize,
+            )(layer)
+            units = units // 2
+        layer = keras.layers.Dense(
+            units=units,
             #  kernel_initializer='lecun_normal',
             # kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
-            activation='selu')(fcn)
+            activation='selu')(layer)
 
         # Output layer
         outputs = keras.layers.Dense(
@@ -307,7 +304,7 @@ class LSTMRegressorV1:
             # kernel_initializer='lecun_normal',
             # kernel_initializer=keras.initializers.VarianceScaling(),
             bias_initializer=tf.constant_initializer(0.1),
-        )(fcn)
+        )(layer)
         # outputs = tf.squeeze(outputs)
 
         self.model = keras.Model(inputs=inputs, outputs=outputs)
@@ -326,8 +323,9 @@ class LSTMRegressorV1:
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=self._lr,
             # amsgrad=True
-            # clipnorm=32
-            clipvalue=0.15)
+            clipnorm=1.0
+            # clipvalue=0.1
+        )
 
         # optimizer = keras.optimizers.Nadam(learning_rate=self._lr,
         #                                    clipvalue=0.15)

@@ -29,6 +29,7 @@ db_host = None
 db_port = None
 db_pwd = None
 shared_args = None
+check_input = False
 
 k_cols = ["lr"]
 
@@ -221,7 +222,7 @@ def _getIndex():
 
 
 def _loadTrainingData(bno):
-    global cnxpool, shared_args
+    global cnxpool, shared_args, check_input
     # idxlst = _getIndex()
     flag = 'TR'
     print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag,
@@ -270,22 +271,29 @@ def _loadTrainingData(bno):
         # if 165 <= bno and bno <= 168:
         #     print('{} d: {}'.format(bno, d))
 
-        nanDat = np.argwhere(np.isnan(d))
-        if len(nanDat) > 0:
-            print('nan for data: {}'.format(nanDat))
-            print(d)
-        infDat = np.argwhere(np.isinf(d))
-        if len(infDat) > 0:
-            print('inf for data: {}'.format(infDat))
-            print(d)
-        nanDat = np.argwhere(np.isnan(s))
-        if len(nanDat) > 0:
-            print('nan for seqlens: {}'.format(nanDat))
-            print(seqlen)
-        infDat = np.argwhere(np.isinf(s))
-        if len(infDat) > 0:
-            print('inf for data: {}'.format(infDat))
-            print(s)
+        if check_input:
+            nanLoc = np.argwhere(np.isnan(d))
+            found = False
+            if len(nanLoc) > 0:
+                print('nan for data: {}'.format(nanLoc))
+                found = True
+            infLoc = np.argwhere(np.isinf(d))
+            if len(infLoc) > 0:
+                print('inf for data: {}'.format(infLoc))
+                found = True
+            if found:
+                print(d)
+            found = False
+            nanLoc = np.argwhere(np.isnan(s))
+            if len(nanLoc) > 0:
+                print('nan for seqlens: {}'.format(nanLoc))
+                found = True
+            infLoc = np.argwhere(np.isinf(s))
+            if len(infLoc) > 0:
+                print('inf for data: {}'.format(infLoc))
+                found = True
+            if found:
+                print(s)
 
         return d, s, v
     except:
@@ -406,7 +414,8 @@ def getInputs(start_bno=0,
               host=None,
               port=None,
               pwd=None,
-              vset=None):
+              vset=None,
+              check=False):
     """Input function for the wcc training dataset.
 
     Returns:
@@ -421,7 +430,9 @@ def getInputs(start_bno=0,
         Where each dataset is a dictionary of {features,seqlens}.
     """
     # Create dataset for training
-    global feat_cols, max_step, time_shift, parallel, _prefetch, db_pool_size, db_host, db_port, db_pwd, shared_args
+    global feat_cols, max_step, time_shift
+    global parallel, _prefetch, db_pool_size
+    global db_host, db_port, db_pwd, shared_args, check_input
     time_shift = shift
     feat_cols = cols or k_cols
     max_step = step
@@ -432,6 +443,7 @@ def getInputs(start_bno=0,
     db_host = host
     db_port = port
     db_pwd = pwd
+    check_input = check
     print("{} Using parallel: {}, prefetch: {} db_host: {} port: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port))
     _init(db_pool_size, db_host, db_port, db_pwd)

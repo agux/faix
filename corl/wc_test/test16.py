@@ -23,11 +23,11 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 ERROR_BATCH = {167}
 
 VSET = 5
-LAYER_WIDTH = 128
+LAYER_WIDTH = 512
 MAX_STEP = 35
-TIME_SHIFT = 14
+TIME_SHIFT = 19
 DROPOUT_RATE = 0.5
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-4
 LR_DECAY_STEPS = 1000
 DECAYED_LR_START = 40000
 DROPOUT_DECAY_STEPS = 1000
@@ -54,7 +54,7 @@ def getInput(start_epoch, args):
                                         MAX_STEP, args.parallel, args.prefetch,
                                         args.db_pool, args.db_host,
                                         args.db_port, args.db_pwd, args.vset
-                                        or VSET)
+                                        or VSET, args.check_input)
     input_dict['start_epoch'] = start_epoch
     return input_dict
 
@@ -100,11 +100,11 @@ def train(args, regressor, input_dict, base_dir, training_dir):
         # When using 'batch', writes the losses and metrics to TensorBoard after each batch.
         # The same applies for 'epoch'. If using an integer, let's say 1000,
         # the callback will write the metrics and losses to TensorBoard every 1000 batches.
-        update_freq='epoch')
+        update_freq=write_after_batches)
     callbacks = [
         # decay,
         tensorboard_cbk,
-        DebugCallback(ERROR_BATCH),
+        DebugCallback(ERROR_BATCH) if args.check_weights else None,
         keras.callbacks.CSVLogger('train_perf.log'),
         keras.callbacks.TerminateOnNaN(),
         # tf.keras.callbacks.ProgbarLogger(count_mode='steps',
