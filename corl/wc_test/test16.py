@@ -20,10 +20,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 # pylint: disable-msg=E0401
 
-ERROR_BATCH = {167}
-
 VSET = 5
-LAYER_WIDTH = 128
+LAYER_WIDTH = 256
 MAX_STEP = 35
 TIME_SHIFT = 19
 DROPOUT_RATE = 0.5
@@ -88,6 +86,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
 
     write_after_batches = input_dict[
         'train_batch_size'] * STEPS_PER_EPOCH * VAL_SAVE_FREQ
+
     tensorboard_cbk = keras.callbacks.TensorBoard(
         log_dir=log_dir,
         # how often to log histogram visualizations
@@ -104,7 +103,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
     callbacks = [
         # decay,
         tensorboard_cbk,
-        DebugCallback(ERROR_BATCH) if args.check_weights else None,
+        DebugCallback() if args.check_weights else None,
         keras.callbacks.CSVLogger('train_perf.log'),
         keras.callbacks.TerminateOnNaN() if args.terminate_on_nan else None,
         # tf.keras.callbacks.ProgbarLogger(count_mode='steps',
@@ -128,14 +127,14 @@ def train(args, regressor, input_dict, base_dir, training_dir):
             save_weights_only=True,
             save_best_only=True,
             # save_freq='epoch'
-            period=VAL_SAVE_FREQ)
+            period='epoch')
     ]
     callbacks = [c for c in callbacks if c is not None]
 
     epochs = math.ceil(input_dict['train_batches'] / STEPS_PER_EPOCH)
-    val_freq = list(
-        chain(range(1, VAL_SAVE_FREQ + 1),
-              range(VAL_SAVE_FREQ, epochs, VAL_SAVE_FREQ)))
+    # val_freq = list(
+    #     chain(range(1, VAL_SAVE_FREQ + 1),
+    #           range(VAL_SAVE_FREQ, epochs, VAL_SAVE_FREQ)))
     model = regressor.getModel()
     # https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit
     model.fit(

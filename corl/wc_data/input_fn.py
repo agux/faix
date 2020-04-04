@@ -269,16 +269,20 @@ def _loadTrainingData(bno):
 
         if check_input:
             # FIXME: DEBUG CODE
-            if 165 <= bno and bno <= 168:
-                print('{} d: {}'.format(bno, d))
+            # if 165 <= bno and bno <= 168:
+            #     print('{} d: {}'.format(bno, d))
             if np.ma.is_masked(d):
                 print('batch[{}] masked feature'.format(bno))
                 print(d)
             if np.ma.is_masked(s):
                 print('batch[{}] masked seqlens'.format(bno))
                 print(s)
-            nanLoc = np.argwhere(np.isnan(d))
+            if np.ma.is_masked(v):
+                print('batch[{}] masked values'.format(bno))
+                print(v)
+
             found = False
+            nanLoc = np.argwhere(np.isnan(d))
             if len(nanLoc) > 0:
                 print('batch[{}] nan for feature: {}'.format(bno, nanLoc))
                 found = True
@@ -288,6 +292,7 @@ def _loadTrainingData(bno):
                 found = True
             if found:
                 print(d)
+
             found = False
             nanLoc = np.argwhere(np.isnan(s))
             if len(nanLoc) > 0:
@@ -295,10 +300,22 @@ def _loadTrainingData(bno):
                 found = True
             infLoc = np.argwhere(np.isinf(s))
             if len(infLoc) > 0:
-                print('batch[{}] inf for data: {}'.format(bno, infLoc))
+                print('batch[{}] inf for seqlens: {}'.format(bno, infLoc))
                 found = True
             if found:
                 print(s)
+
+            found = False
+            nanVal = np.argwhere(np.isnan(v))
+            if len(nanVal) > 0:
+                print('batch[{}] nan for values: {}'.format(bno, nanVal))
+                found = True
+            infVal = np.argwhere(np.isinf(v))
+            if len(infVal) > 0:
+                print('batch[{}] inf for values: {}'.format(bno, infVal))
+                found = True
+            if found:
+                print(v)
 
         return d, s, v
     except:
