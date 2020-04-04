@@ -43,7 +43,6 @@ feat_cols = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
-ray.init(num_cpus=psutil.cpu_count(logical=False), webui_host='127.0.0.1')
 
 def getInput(start_epoch, args):
     ds = args.ds.lower()

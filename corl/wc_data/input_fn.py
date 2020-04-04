@@ -12,6 +12,8 @@ import os
 import psutil
 import numpy as np
 
+ray.init(num_cpus=psutil.cpu_count(logical=False), webui_host='127.0.0.1')
+
 #FIXME for debugging purpose
 np.set_printoptions(threshold=np.inf,
                     suppress=True,
