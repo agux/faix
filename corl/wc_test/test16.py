@@ -156,7 +156,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
         validation_steps=input_dict['test_batches'],
         # If an integer, specifies how many training epochs to run before a new validation run is performed
         # If a Container, specifies the epochs on which to run validation
-        validation_freq=VAL_SAVE_FREQ,
+        validation_freq=1,
         callbacks=callbacks)
 
     iterations = model.optimizer.iterations.numpy()
