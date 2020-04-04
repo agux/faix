@@ -267,11 +267,10 @@ def _loadTrainingData(bno):
         s = np.expand_dims(np.array(seqlen, 'i'), axis=1)
         v = np.expand_dims(np.array(vals, 'f'), axis=1)
 
-        # FIXME: DEBUG CODE
-        # if 165 <= bno and bno <= 168:
-        #     print('{} d: {}'.format(bno, d))
-
         if check_input:
+            # FIXME: DEBUG CODE
+            if 165 <= bno and bno <= 168:
+                print('{} d: {}'.format(bno, d))
             if np.ma.is_masked(d):
                 print('batch[{}] masked feature'.format(bno))
                 print(d)

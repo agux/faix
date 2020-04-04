@@ -4,6 +4,7 @@ import os
 import multiprocessing
 import shutil
 import asyncio
+import math
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -169,21 +170,35 @@ async def cleanup(dirpath, keep=5, interval=30):
 
 class DebugCallback(keras.callbacks.Callback):
     def __init__(self, iterations={}, exclude_layers={}, out_file='debug.log'):
+        super(DebugCallback, self).__init__()
+        print('DebugCallback is enabled')
         self.iterations = iterations
         self.exclude_layers = exclude_layers
         self.out_file = out_file
 
     def on_train_batch_end(self, batch, logs=None):
         i = self.model.optimizer.iterations.numpy()
+        print('iteration: {}, logs={}'.format(i, logs))
+        if not math.isnan(logs['loss']):
+            return
+        print(
+            'encountered NaN loss. checking layer weights. iteration {}, logs = {}'
+            .format(i, logs))
         layers = self.model.layers
         for layer in layers:
-            if layer.name in {'features', 'seqlens'}:
-                continue
-
+            # if layer.name in {'features', 'seqlens'}:
+            #     continue
             weights = layer.get_weights()
             for idx, w in enumerate(weights):
-                nanLoc = np.argwhere(np.isnan(w))
                 found = False
+
+                if np.ma.is_masked(d):
+                    print(
+                        'masked array found at iteration {} for {}, weight[{}]'
+                        .format(i, layer, idx))
+                    found = True
+
+                nanLoc = np.argwhere(np.isnan(w))
                 if len(nanLoc) > 0:
                     print(
                         'nan found at iteration {} for {}, weight[{}], location: {}'
@@ -199,6 +214,10 @@ class DebugCallback(keras.callbacks.Callback):
 
                 if found:
                     print(w)
+
+                tf.debugging.check_numerics(
+                    w, 'invalid weight found at iteration {} for {}, idx[{}]'.
+                    format(i, layer.name, idx))
 
         # tf.print('iteration: {}'.format(i),
         #          output_stream='file://' + self.out_file)
