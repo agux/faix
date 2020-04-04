@@ -321,7 +321,7 @@ class LSTMRegressorV1:
         #                                                   alpha=0.095)
 
         optimizer = tf.keras.optimizers.Adam(
-            learning_rate=self._lr,
+            learning_rate=self._lr
             # amsgrad=True
             # clipnorm=0.5
             # clipvalue=0.1

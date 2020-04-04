@@ -14,7 +14,6 @@ import numpy as np
 
 ray.init(num_cpus=psutil.cpu_count(logical=False), webui_host='127.0.0.1')
 
-#FIXME for debugging purpose
 np.set_printoptions(threshold=np.inf,
                     suppress=True,
                     formatter={'float': '{: 0.5f}'.format})
@@ -77,16 +76,16 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         connect_timeout=90000)
 
 
-def _getExecutor():
-    global parallel, _executor, _prefetch, db_pool_size, db_host, db_port, db_pwd
-    if _executor is not None:
-        return _executor
-    _executor = get_reusable_executor(max_workers=parallel * _prefetch,
-                                      initializer=_init,
-                                      initargs=(db_pool_size, db_host, db_port,
-                                                db_pwd),
-                                      timeout=450)
-    return _executor
+# def _getExecutor():
+#     global parallel, _executor, _prefetch, db_pool_size, db_host, db_port, db_pwd
+#     if _executor is not None:
+#         return _executor
+#     _executor = get_reusable_executor(max_workers=parallel * _prefetch,
+#                                       initializer=_init,
+#                                       initargs=(db_pool_size, db_host, db_port,
+#                                                 db_pwd),
+#                                       timeout=450)
+#     return _executor
 
 
 def _getBatch(code, s, e, rcode, max_step, time_shift, qk, qd):
@@ -267,9 +266,6 @@ def _loadTrainingData(bno):
         v = np.expand_dims(np.array(vals, 'f'), axis=1)
 
         if check_input:
-            # FIXME: DEBUG CODE
-            # if 165 <= bno and bno <= 168:
-            #     print('{} d: {}'.format(bno, d))
             if np.ma.is_masked(d):
                 print('batch[{}] masked feature'.format(bno))
                 print(d)

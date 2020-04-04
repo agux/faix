@@ -128,8 +128,9 @@ def train(args, regressor, input_dict, base_dir, training_dir):
             verbose=1,
             save_weights_only=True,
             save_best_only=True,
-            # save_freq='epoch'
-            period='epoch')
+            save_freq='epoch'
+            # period='epoch'
+        )
     ]
     callbacks = [c for c in callbacks if c is not None]
 
