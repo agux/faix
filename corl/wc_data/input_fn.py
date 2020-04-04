@@ -58,9 +58,6 @@ _executor = None
 
 cnxpool = None
 
-ray.init(num_cpus=psutil.cpu_count(logical=False), webui_host='127.0.0.1')
-
-
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
     print("{} [PID={}]: initializing mysql connection pool...".format(

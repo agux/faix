@@ -171,19 +171,20 @@ async def cleanup(dirpath, keep=5, interval=30):
 class DebugCallback(keras.callbacks.Callback):
     def __init__(self, iterations={}, exclude_layers={}, out_file='debug.log'):
         super(DebugCallback, self).__init__()
-        print('DebugCallback is enabled')
+        print('{} DebugCallback is enabled'.format(strftime("%H:%M:%S")))
         self.iterations = iterations
         self.exclude_layers = exclude_layers
         self.out_file = out_file
 
     def on_train_batch_end(self, batch, logs=None):
         i = self.model.optimizer.iterations.numpy()
-        print('iteration: {}, logs={}'.format(i, logs))
+        print('{} iteration: {}, logs={}'.format(strftime("%H:%M:%S"), i,
+                                                 logs))
         if not math.isnan(logs['loss']):
             return
         print(
-            'encountered NaN loss. checking layer weights. iteration {}, logs = {}'
-            .format(i, logs))
+            '{} encountered NaN loss. checking layer weights. iteration {}, logs = {}'
+            .format(strftime("%H:%M:%S"), i, logs))
         layers = self.model.layers
         for layer in layers:
             # if layer.name in {'features', 'seqlens'}:
@@ -192,7 +193,7 @@ class DebugCallback(keras.callbacks.Callback):
             for idx, w in enumerate(weights):
                 found = False
 
-                if np.ma.is_masked(d):
+                if np.ma.is_masked(w):
                     print(
                         'masked array found at iteration {} for {}, weight[{}]'
                         .format(i, layer, idx))

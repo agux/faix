@@ -6,6 +6,8 @@ import random
 import shutil
 import math
 import logging
+import ray
+import psutil
 from itertools import chain
 from pathlib import Path
 from corl.wc_test.common import parseArgs, cleanup, LOG_DIR, log, setupPath, DebugCallback
@@ -41,6 +43,7 @@ feat_cols = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
+ray.init(num_cpus=psutil.cpu_count(logical=False), webui_host='127.0.0.1')
 
 def getInput(start_epoch, args):
     ds = args.ds.lower()
