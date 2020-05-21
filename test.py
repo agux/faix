@@ -370,7 +370,7 @@ def testTasklist():
     # r = Parallel(n_jobs=8)(delayed(delayed_write_talst)(i, talst) for i in range(50))
     # if len(r) == 50:
     #     print("job done")
-    
+
 
 
 # testGatherND()
@@ -381,6 +381,8 @@ def testTasklist():
 
 
 # testTensorShape()
-testTasklist()
+# testTasklist()
 
 # filterTensor()
+
+
