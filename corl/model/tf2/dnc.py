@@ -16,9 +16,8 @@ class OutputLayer(keras.layers.Layer):
 
         Returns: TF tensor, predictions
     """
-    def __init__(self, dtype, output_function, output_size, seed):
+    def __init__(self, output_function, output_size, seed):
         super(OutputLayer, self).__init__()
-        self.dtype = dtype
         self.output_function = output_function
         self.output_size = output_size
         self.seed = seed
@@ -80,9 +79,8 @@ class BidirectionalLayer(keras.layers.Layer):
         Returns:        TF tensor, output sequence
 
     """
-    def __init__(self, dtype, controller_config, memory_unit_config, seed):
+    def __init__(self, controller_config, memory_unit_config, seed):
         super(BidirectionalLayer, self).__init__()
-        self.dtype = dtype
         self.controller_config = controller_config
         self.memory_unit_config = memory_unit_config
         self.seed = seed
