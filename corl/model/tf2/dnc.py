@@ -100,8 +100,8 @@ class BidirectionalLayer(keras.layers.Layer):
         self.cell_fw = keras.layers.StackedRNNCells(list_fw)
         self.cell_bw = keras.layers.StackedRNNCells(list_bw)
 
-        memory_input_size = cell_fw.output_size + cell_bw.output_size
-        self.cell_mu = get_memory_unit(memory_input_size, memory_unit_config,
+        memory_input_size = self.cell_fw.output_size + self.cell_bw.output_size
+        self.cell_mu = get_memory_unit(memory_input_size, self.memory_unit_config,
                                        'memory_unit')
 
     def call(self, inputs):
