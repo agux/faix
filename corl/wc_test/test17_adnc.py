@@ -56,6 +56,7 @@ if __name__ == '__main__':
         controller_config,
         memory_unit_config,
         time_step=MAX_STEP,
+        feat_size=len(feat_cols) * 2 * (TIME_SHIFT + 1),
         dropout_rate=DROPOUT_RATE,
         decayed_dropout_start=DECAYED_DROPOUT_START,
         dropout_decay_steps=DROPOUT_DECAY_STEPS,

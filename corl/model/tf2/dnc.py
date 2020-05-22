@@ -166,6 +166,7 @@ class MANN_Model():
                  memory_unit_config,
                  name='mann',
                  time_step=30,
+                 feat_size=None,
                  dropout_rate=0.5,
                  decayed_dropout_start=None,
                  dropout_decay_steps=None,
@@ -174,7 +175,7 @@ class MANN_Model():
                  lr_decay_steps=None,
                  seed=None,
                  dtype=tf.float32):
-                 
+
         self.seed = seed
         self.rng = np.random.RandomState(seed=self.seed)
         self.dtype = dtype
@@ -183,6 +184,7 @@ class MANN_Model():
         self.memory_unit_config = memory_unit_config
 
         self._time_step = time_step
+        self._feat_size = feat_size
         self._dropout_rate = dropout_rate
         self._decayed_dropout_start = decayed_dropout_start
         self._dropout_decay_steps = dropout_decay_steps
