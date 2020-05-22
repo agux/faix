@@ -39,90 +39,90 @@ def setupPath():
 
 def parseArgs():
     parser = argparse.ArgumentParser()
-    parser._parseArgs('--ds',
+    parser.parseArgs('--ds',
                         type=str,
                         help='datasource. such as file, db, or BigQuery.',
                         default='db')
-    parser._parseArgs('--dir',
+    parser.parseArgs('--dir',
                         type=str,
                         help='directory path for training and test set.')
-    parser._parseArgs('--parallel',
+    parser.parseArgs('--parallel',
                         type=int,
                         help='database operation parallel level',
                         default=multiprocessing.cpu_count())
-    parser._parseArgs('--prefetch',
+    parser.parseArgs('--prefetch',
                         type=int,
                         help='dataset prefetch batches',
                         default=2)
-    parser._parseArgs('--db_host',
+    parser.parseArgs('--db_host',
                         type=str,
                         help='database host address',
                         default=None)
-    parser._parseArgs('--db_port',
+    parser.parseArgs('--db_port',
                         type=int,
                         help='database listening port',
                         default=None)
-    parser._parseArgs('--db_pwd',
+    parser.parseArgs('--db_pwd',
                         type=str,
                         help='database password',
                         default=None)
-    parser._parseArgs('--vset',
+    parser.parseArgs('--vset',
                         type=int,
                         help='validation set number',
                         default=None)
-    parser._parseArgs('--db_pool',
+    parser.parseArgs('--db_pool',
                         type=int,
                         help='database connection pool size',
                         default=multiprocessing.cpu_count())
-    parser._parseArgs('--start',
+    parser.parseArgs('--start',
                         type=int,
                         help='start training at specified batch no',
                         default=None)
-    parser._parseArgs('--vol_size',
+    parser.parseArgs('--vol_size',
                         type=int,
                         help='volume size for the dataset storage sub-folder',
                         default=None)
-    parser._parseArgs(
+    parser.parseArgs(
         '--terminate_on_nan',
         help='abort training process on NaN loss.',
         dest='terminate_on_nan',
         action='store_true',
     )
-    parser._parseArgs(
+    parser.parseArgs(
         '--check_input',
         help='check inputs for NaN or Inf.',
         dest='check_input',
         action='store_true',
     )
-    parser._parseArgs(
+    parser.parseArgs(
         '--check_weights',
         help='check trainable weights for NaN or Inf.',
         dest='check_weights',
         action='store_true',
     )
-    parser._parseArgs(
+    parser.parseArgs(
         '--gpu_grow_mem',
         dest='gpu_grow_mem',
         action='store_true',
         help='allow gpu to allocate mem dynamically at runtime.')
-    parser._parseArgs('--trace',
+    parser.parseArgs('--trace',
                         dest='trace',
                         action='store_true',
                         help='record full trace in validation step.')
-    parser._parseArgs('--profile',
+    parser.parseArgs('--profile',
                         dest='profile',
                         action='store_true',
                         help='profile CG execution.')
-    parser._parseArgs('--skip_init_test',
+    parser.parseArgs('--skip_init_test',
                         dest='skip_init_test',
                         action='store_true',
                         help='whether to skip the initial test.')
-    parser._parseArgs(
+    parser.parseArgs(
         '--log_device',
         dest='log_device',
         action='store_true',
         help='record device info such as CPU and GPU in tensorboard.')
-    parser._parseArgs('--restart',
+    parser.parseArgs('--restart',
                         help='restart training',
                         action='store_true')
     return parser.parse_args()
