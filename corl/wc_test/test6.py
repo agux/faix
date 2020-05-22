@@ -33,25 +33,25 @@ LOG_DIR = 'logdir'
 
 def parseArgs():
     parser = argparse.ArgumentParser()
-    parser._parseArgs('--ds', type=str, help='datasource. such as db, or BigQuery.',
+    parser.add_argument('--ds', type=str, help='datasource. such as db, or BigQuery.',
                         default='db')
-    parser._parseArgs('--parallel', type=int, help='database operation parallel level',
+    parser.add_argument('--parallel', type=int, help='database operation parallel level',
                         default=multiprocessing.cpu_count())
-    parser._parseArgs('--prefetch', type=int, help='dataset prefetch batches',
+    parser.add_argument('--prefetch', type=int, help='dataset prefetch batches',
                         default=2)
-    parser._parseArgs('--db_host', type=str, help='database host address',
+    parser.add_argument('--db_host', type=str, help='database host address',
                         default=None)
-    parser._parseArgs('--db_port', type=int, help='database listening port',
+    parser.add_argument('--db_port', type=int, help='database listening port',
                         default=None)
-    parser._parseArgs('--db_pwd', type=str, help='database password',
+    parser.add_argument('--db_pwd', type=str, help='database password',
                         default=None)
-    parser._parseArgs('--vset', type=int, help='validation set number',
+    parser.add_argument('--vset', type=int, help='validation set number',
                         default=None)
-    parser._parseArgs('--db_pool', type=int, help='database connection pool size',
+    parser.add_argument('--db_pool', type=int, help='database connection pool size',
                         default=multiprocessing.cpu_count())
-    parser._parseArgs('--start', type=int, help='start training at specified batch no',
+    parser.add_argument('--start', type=int, help='start training at specified batch no',
                         default=None)
-    parser._parseArgs(
+    parser.add_argument(
         '--restart', help='restart training', action='store_true')
     return parser.parse_args()
 
