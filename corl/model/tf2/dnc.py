@@ -162,7 +162,8 @@ class BidirectionalLayer(keras.layers.Layer):
 
 class MANN_Model():
     def __init__(self,
-                 config,
+                 controller_config,
+                 memory_unit_config,
                  name='mann',
                  time_step=30,
                  dropout_rate=0.5,
@@ -171,28 +172,15 @@ class MANN_Model():
                  learning_rate=1e-3,
                  decayed_lr_start=None,
                  lr_decay_steps=None,
+                 seed=None,
                  dtype=tf.float32):
-        """
-        Args:
-            config:     dict, configuration of the whole model
-            analyse:    bool, is analyzer is used or not
-            reuse:      bool, reuse model or not
-        """
-        self.seed = config["seed"]
+                 
+        self.seed = seed
         self.rng = np.random.RandomState(seed=self.seed)
         self.dtype = dtype
 
-        self.input_size = config["input_size"]
-        self.output_size = config["output_size"]
-        self.batch_size = config["batch_size"]
-
-        self.input_embedding = config["input_embedding"]
-        self.architecture = config['architecture']
-        self.controller_config = config["controller_config"]
-        self.memory_unit_config = config["memory_unit_config"]
-        self.output_function = config["output_function"]
-        self.output_mask = config["output_mask"]
-        self.loss_function = config['loss_function']
+        self.controller_config = controller_config
+        self.memory_unit_config = memory_unit_config
 
         self._time_step = time_step
         self._dropout_rate = dropout_rate
@@ -233,8 +221,8 @@ class MANN_Model():
             seed=self.seed)(feat)
 
         prediction = OutputLayer(dtype=tf.float32,
-                                 output_function=self.output_function,
-                                 output_size=self.output_size,
+                                 output_function='linear',
+                                 output_size=0,
                                  seed=self.seed)(unweighted_outputs)
 
         self.model = keras.Model(inputs=inputs, outputs=prediction)

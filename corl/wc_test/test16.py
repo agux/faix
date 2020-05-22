@@ -10,7 +10,7 @@ import ray
 import psutil
 from itertools import chain
 from pathlib import Path
-from corl.wc_test.common import parseArgs, cleanup, LOG_DIR, log, setupPath, DebugCallback
+from corl.wc_test.common import parseArgs, cleanup, LOG_DIR, log, _setupPath, DebugCallback
 from corl.wc_data import input_fn
 from time import strftime
 from corl.model.tf2 import lstm
@@ -277,7 +277,7 @@ def setupTensorflow():
 if __name__ == '__main__':
     log.setLevel(logging.WARN)
     args = parseArgs()
-    setupPath()
+    _setupPath()
     setupTensorflow()
     # asyncio.run is new in Python 3.7 only
     # asyncio.run(main())

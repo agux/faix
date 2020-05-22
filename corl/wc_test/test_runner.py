@@ -41,8 +41,14 @@ feat_cols = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
+def run(regressor):
+    log.setLevel(logging.WARN)
+    args = parseArgs()
+    setupPath()
+    _setupTensorflow()
+    _main(args, regressor)
 
-def getInput(start_epoch, args):
+def _getInput(start_epoch, args):
     ds = args.ds.lower()
     print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
     start_bno = start_epoch * STEPS_PER_EPOCH + 1
@@ -57,7 +63,7 @@ def getInput(start_epoch, args):
     return input_dict
 
 
-def train(args, regressor, input_dict, base_dir, training_dir):
+def _train(args, regressor, input_dict, base_dir, training_dir):
     # tf.compat.v1.disable_eager_execution()
     print("{} TensorFlow version: {}".format(strftime("%H:%M:%S"),
                                              tf.__version__))
@@ -182,32 +188,7 @@ def train(args, regressor, input_dict, base_dir, training_dir):
                                                  trained))
 
 
-def create_regressor():
-    regressor = lstm.LSTMRegressorV1(
-        layer_width=LAYER_WIDTH,
-        time_step=MAX_STEP,
-        feat_size=len(feat_cols) * 2 * (TIME_SHIFT + 1),
-        dropout_rate=DROPOUT_RATE,
-        decayed_dropout_start=DECAYED_DROPOUT_START,
-        dropout_decay_steps=DROPOUT_DECAY_STEPS,
-        learning_rate=LEARNING_RATE,
-        decayed_lr_start=DECAYED_LR_START,
-        lr_decay_steps=LR_DECAY_STEPS,
-        seed=SEED)
-    model_name = regressor.getName()
-    print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
-
-    # Define folder paths
-    f = __file__
-    testn = f[f.rfind('/') + 1:f.rindex('.py')]
-    base_name = "{}_{}".format(testn, model_name)
-    base_dir = os.path.join(LOG_DIR, base_name)
-    training_dir = os.path.join(base_dir, 'training')
-
-    return regressor, base_dir, training_dir
-
-
-def load_model(regressor, training_dir):
+def _load_model(regressor, training_dir):
     # Check if previous training progress exists
     start_epoch = 0
     restored = False
@@ -235,7 +216,6 @@ def load_model(regressor, training_dir):
                     '{} bno({}) from checkpoint file name inconsistent with saved model({}). optimizer iterations({}).'
                     .format(strftime("%H:%M:%S"), start_epoch, initial_epoch,
                             iterations))
-
             # else:
             #     print(
             #         "{} model checkpoint path not found, cleaning training folder".
@@ -247,25 +227,24 @@ def load_model(regressor, training_dir):
     return start_epoch
 
 
-def main(args):
-    regressor, base_dir, training_dir = create_regressor()
+def _main(args, regressor):
+    model_name = regressor.getName()
+    print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
 
-    start_epoch = load_model(regressor, training_dir)
+    # Define folder paths
+    f = __file__
+    testn = f[f.rfind('/') + 1:f.rindex('.py')]
+    base_name = "{}_{}".format(testn, model_name)
+    base_dir = os.path.join(LOG_DIR, base_name)
+    training_dir = os.path.join(base_dir, 'training')
+
+    start_epoch = _load_model(regressor, training_dir)
 
     print('{} querying datasource...'.format(strftime("%H:%M:%S")))
-    input_dict = getInput(start_epoch, args)
+    input_dict = _getInput(start_epoch, args)
+    _train(args, regressor, input_dict, base_dir, training_dir)
 
-    train(args, regressor, input_dict, base_dir, training_dir)
-
-    # loop = asyncio.get_event_loop()
-    # main_task = asyncio.create_task(
-    #     train(args, regressor, input_dict, base_dir, training_dir))
-    # task2 = asyncio.create_task(cleanup(training_dir, keep=10))
-
-    # await main_task
-
-
-def setupTensorflow():
+def _setupTensorflow():
     physical_devices = tf.config.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         try:
@@ -276,15 +255,3 @@ def setupTensorflow():
                 + sys.exc_info()[0])
             pass
 
-
-if __name__ == '__main__':
-    log.setLevel(logging.WARN)
-    args = parseArgs()
-    setupPath()
-    setupTensorflow()
-    # asyncio.run is new in Python 3.7 only
-    # asyncio.run(main())
-    main(args)
-
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(main())

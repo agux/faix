@@ -39,39 +39,39 @@ bst_saver, bst_score, bst_file, bst_ckpt = None, None, None, None
 
 def parseArgs():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ds', type=str, help='datasource. such as file, db, or BigQuery.',
+    parser._parseArgs('--ds', type=str, help='datasource. such as file, db, or BigQuery.',
                         default='db')
-    parser.add_argument('--dir', type=str,
+    parser._parseArgs('--dir', type=str,
                         help='directory path for training and test set.')
-    parser.add_argument('--parallel', type=int, help='database operation parallel level',
+    parser._parseArgs('--parallel', type=int, help='database operation parallel level',
                         default=multiprocessing.cpu_count())
-    parser.add_argument('--prefetch', type=int, help='dataset prefetch batches',
+    parser._parseArgs('--prefetch', type=int, help='dataset prefetch batches',
                         default=2)
-    parser.add_argument('--db_host', type=str, help='database host address',
+    parser._parseArgs('--db_host', type=str, help='database host address',
                         default=None)
-    parser.add_argument('--db_port', type=int, help='database listening port',
+    parser._parseArgs('--db_port', type=int, help='database listening port',
                         default=None)
-    parser.add_argument('--db_pwd', type=str, help='database password',
+    parser._parseArgs('--db_pwd', type=str, help='database password',
                         default=None)
-    parser.add_argument('--vset', type=int, help='validation set number',
+    parser._parseArgs('--vset', type=int, help='validation set number',
                         default=None)
-    parser.add_argument('--db_pool', type=int, help='database connection pool size',
+    parser._parseArgs('--db_pool', type=int, help='database connection pool size',
                         default=multiprocessing.cpu_count())
-    parser.add_argument('--start', type=int, help='start training at specified batch no',
+    parser._parseArgs('--start', type=int, help='start training at specified batch no',
                         default=None)
-    parser.add_argument('--vol_size', type=int, help='volume size for the dataset storage sub-folder',
+    parser._parseArgs('--vol_size', type=int, help='volume size for the dataset storage sub-folder',
                         default=None)
-    parser.add_argument('--gpu_grow_mem', dest='gpu_grow_mem', action='store_true',
+    parser._parseArgs('--gpu_grow_mem', dest='gpu_grow_mem', action='store_true',
                         help='allow gpu to allocate mem dynamically at runtime.')
-    parser.add_argument('--trace', dest='trace', action='store_true',
+    parser._parseArgs('--trace', dest='trace', action='store_true',
                         help='record full trace in validation step.')
-    parser.add_argument('--profile', dest='profile', action='store_true',
+    parser._parseArgs('--profile', dest='profile', action='store_true',
                         help='profile CG execution.')
-    parser.add_argument('--skip_init_test', dest='skip_init_test', action='store_true',
+    parser._parseArgs('--skip_init_test', dest='skip_init_test', action='store_true',
                         help='whether to skip the initial test.')
-    parser.add_argument('--log_device', dest='log_device', action='store_true',
+    parser._parseArgs('--log_device', dest='log_device', action='store_true',
                         help='record device info such as CPU and GPU in tensorboard.')
-    parser.add_argument(
+    parser._parseArgs(
         '--restart', help='restart training', action='store_true')
     return parser.parse_args()
 
