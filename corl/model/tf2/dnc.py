@@ -108,11 +108,12 @@ class BidirectionalLayer(keras.layers.Layer):
         # transpose into time-major input
         inputs = tf.transpose(inputs, [1, 0, 2])
         time_step = inputs.get_shape()[0]
+        feat_size = inputs.get_shape()[2]
         with tf.name_scope("bw") as bw_scope:
             rnn_bw = keras.layers.RNN(cell=self.cell_bw,
                                       time_major=True,
                                       return_sequences=True,
-                                      input_shape=(None, time_step),
+                                      input_shape=(time_step, None, feat_size),
                                       go_backwards=True)
             output_bw = rnn_bw(inputs)
 
