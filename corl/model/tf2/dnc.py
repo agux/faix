@@ -207,8 +207,7 @@ class MANN_Model():
                                                 self.getName()))
 
         feat = keras.Input(
-            # A shape tuple (integers), not including the batch size.
-            shape=(self._time_step, self._feat_size),
+            shape=(None, self._time_step, self._feat_size),
             name='features',
             dtype='float32')
         seqlens = keras.Input(shape=(1), name='seqlens', dtype='int32')
