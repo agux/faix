@@ -107,10 +107,12 @@ class BidirectionalLayer(keras.layers.Layer):
     def call(self, inputs):
         # transpose into time-major input
         inputs = tf.transpose(inputs, [1, 0, 2])
+        time_step = inputs.get_shape()[0]
         with tf.name_scope("bw") as bw_scope:
             rnn_bw = keras.layers.RNN(cell=self.cell_bw,
                                       time_major=True,
                                       return_sequences=True,
+                                      input_shape=(None, time_step),
                                       go_backwards=True)
             output_bw = rnn_bw(inputs)
 
@@ -207,7 +209,7 @@ class MANN_Model():
                                                 self.getName()))
 
         feat = keras.Input(
-            shape=(None, self._time_step, self._feat_size),
+            shape=(self._time_step, self._feat_size),
             name='features',
             dtype='float32')
         seqlens = keras.Input(shape=(1), name='seqlens', dtype='int32')
