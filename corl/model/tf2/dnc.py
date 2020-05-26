@@ -76,6 +76,7 @@ class BackwardRNNLayer(keras.layers.Layer):
         self.seed = seed
 
     def build(self, input_shape):
+        print("Backward RNN input_shape:{}".format(input_shape))
         super(BackwardRNNLayer, self).build(input_shape)
         with tf.name_scope("controller"):
             list_bw = get_rnn_cell_list(self.controller_config,
@@ -98,6 +99,7 @@ class BackwardRNNLayer(keras.layers.Layer):
         return self.output_size
 
     def call(self, inputs):
+        print("Backward RNN inputs in call func:{}".format(inputs))
         inputs = tf.transpose(inputs, [1, 0, 2])
         return self.rnn_bw(inputs)
 
