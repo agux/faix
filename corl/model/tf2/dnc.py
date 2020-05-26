@@ -68,6 +68,48 @@ class OutputLayer(keras.layers.Layer):
         })
         return config
 
+class BackwardRNNLayer(keras.layers.Layer):
+
+    def __init__(self, controller_config, seed, **kwargs):
+        super(BackwardRNNLayer, self).__init__(**kwargs)
+        self.controller_config = controller_config
+        self.seed = seed
+
+    def build(self, input_shape):
+        super(BackwardRNNLayer, self).build(input_shape)
+        with tf.name_scope("controller"):
+            list_bw = get_rnn_cell_list(self.controller_config,
+                                        name='con_bw',
+                                        seed=self.seed,
+                                        dtype=self.dtype)
+
+        self.cell_bw = keras.layers.StackedRNNCells(list_bw)
+        self.output_size = self.cell_bw.output_size
+        # time_step = input_shape[1]
+        # feat_size = input_shape[2]
+        with tf.name_scope("bw") as bw_scope:
+            self.rnn_bw = keras.layers.RNN(cell=self.cell_bw,
+                                      time_major=True,
+                                      return_sequences=True,
+                                    #   input_shape=(time_step, None, feat_size),
+                                      go_backwards=True)
+
+    def output_size(self):
+        return self.output_size
+
+    def call(self, inputs):
+        inputs = tf.transpose(inputs, [1, 0, 2])
+        return self.rnn_bw(inputs)
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'dtype': self.dtype,
+            'controller_config': self.controller_config,
+            'seed': self.seed
+        })
+        return config
+    
 
 class BidirectionalLayer(keras.layers.Layer):
     """
@@ -92,32 +134,20 @@ class BidirectionalLayer(keras.layers.Layer):
                                         name='con_fw',
                                         seed=self.seed,
                                         dtype=self.dtype)
-            list_bw = get_rnn_cell_list(self.controller_config,
-                                        name='con_bw',
-                                        seed=self.seed,
-                                        dtype=self.dtype)
 
         self.cell_fw = keras.layers.StackedRNNCells(list_fw)
-        self.cell_bw = keras.layers.StackedRNNCells(list_bw)
 
-        memory_input_size = self.cell_fw.output_size + self.cell_bw.output_size
+        # memory_input_size = self.cell_fw.output_size + self.cell_bw.output_size
+        memory_input_size = self.cell_fw.output_size * 2
         self.cell_mu = get_memory_unit(memory_input_size, self.memory_unit_config,
                                        'memory_unit')
 
     def call(self, inputs):
+        input_feat, input_bw = inputs
         # transpose into time-major input
-        inputs = tf.transpose(inputs, [1, 0, 2])
-        time_step = inputs.get_shape()[0]
-        feat_size = inputs.get_shape()[2]
-        with tf.name_scope("bw") as bw_scope:
-            rnn_bw = keras.layers.RNN(cell=self.cell_bw,
-                                      time_major=True,
-                                      return_sequences=True,
-                                      input_shape=(time_step, None, feat_size),
-                                      go_backwards=True)
-            output_bw = rnn_bw(inputs)
+        input_feat = tf.transpose(input_feat, [1, 0, 2])
 
-        batch_size = inputs.get_shape()[0].value
+        batch_size = input_feat.get_shape()[0].value
         cell_fw_init_states = self.cell_fw.get_initial_state(batch_size,
                                                              dtype=self.dtype)
         cell_mu_init_states = self.cell_mu.get_initial_state(batch_size,
@@ -126,7 +156,7 @@ class BidirectionalLayer(keras.layers.Layer):
                                dtype=self.dtype)
 
         init_states = (output_init, cell_fw_init_states, cell_mu_init_states)
-        coupled_inputs = (inputs, output_bw)
+        coupled_inputs = (input_feat, input_bw)
 
         with tf.name_scope("fw") as fw_scope:
 
@@ -214,19 +244,23 @@ class MANN_Model():
             name='features',
             dtype='float32')
         seqlens = keras.Input(shape=(1), name='seqlens', dtype='int32')
-        inputs = {'features': feat, 'seqlens': seqlens}
+
+        rnn_bw = BackwardRNNLayer(dtype=tf.float32,
+            controller_config=self.controller_config,
+            seed=self.seed)(feat)
 
         unweighted_outputs = BidirectionalLayer(
             dtype=tf.float32,
             controller_config=self.controller_config,
             memory_unit_config=self.memory_unit_config,
-            seed=self.seed)(feat)
+            seed=self.seed)((feat,rnn_bw))
 
         prediction = OutputLayer(dtype=tf.float32,
                                  output_function='linear',
                                  output_size=0,
                                  seed=self.seed)(unweighted_outputs)
 
+        inputs = {'features': feat, 'seqlens': seqlens}
         self.model = keras.Model(inputs=inputs, outputs=prediction)
         self.model._name = self.getName()
 
