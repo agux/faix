@@ -59,12 +59,11 @@ class DNC_Model():
             word_size=self.word_size,
             num_read_heads=self.num_read_heads
         )
-        dnc_initial_state = dnc_cell.get_initial_state()
         rnn = keras.layers.RNN(
             dnc_cell, 
             return_sequences=True
         )
-        predictions = rnn(feat, initial_state=dnc_initial_state)
+        predictions = rnn(feat)
 
         inputs = {'features': feat, 'seqlens': seqlens}
         self.model = keras.Model(inputs=inputs, outputs=predictions)
