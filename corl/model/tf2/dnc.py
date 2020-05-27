@@ -71,16 +71,13 @@ class OutputLayer(keras.layers.Layer):
 class BackwardRNN(keras.layers.RNN):
 
     def __init__(self, controller_config, seed, **kwargs):
-        super(BackwardRNN, self).__init__(**kwargs)
         self.controller_config = controller_config
         self.seed = seed
-
         with tf.name_scope("controller"):
             list_bw = get_rnn_cell_list(self.controller_config,
                                         name='con_bw',
                                         seed=self.seed,
                                         dtype=self.dtype)
-
         cell = keras.layers.StackedRNNCells(list_bw)
         super(BackwardRNN, self).__init__(
             cell,
