@@ -68,45 +68,38 @@ class OutputLayer(keras.layers.Layer):
         })
         return config
 
-class BackwardRNNLayer(keras.layers.Layer):
+class BackwardRNN(keras.layers.RNN):
 
     def __init__(self, controller_config, seed, **kwargs):
-        super(BackwardRNNLayer, self).__init__(**kwargs)
+        super(BackwardRNN, self).__init__(**kwargs)
         self.controller_config = controller_config
         self.seed = seed
 
-    def build(self, input_shape):
-        print("Backward RNN input_shape:{}".format(input_shape))
-        super(BackwardRNNLayer, self).build(input_shape)
         with tf.name_scope("controller"):
             list_bw = get_rnn_cell_list(self.controller_config,
                                         name='con_bw',
                                         seed=self.seed,
                                         dtype=self.dtype)
 
-        self.cell_bw = keras.layers.StackedRNNCells(list_bw)
-        self.output_size = self.cell_bw.output_size
-        # time_step = input_shape[1]
-        # feat_size = input_shape[2]
-        with tf.name_scope("bw") as bw_scope:
-            self.rnn_bw = keras.layers.RNN(cell=self.cell_bw,
-                                      time_major=True,
-                                      return_sequences=True,
-                                    #   input_shape=(time_step, None, feat_size),
-                                      go_backwards=True)
+        cell = keras.layers.StackedRNNCells(list_bw)
+        super(BackwardRNN, self).__init__(
+            cell,
+            return_sequences=True,
+            return_state=False,
+            go_backwards=True,
+            stateful=False,
+            unroll=False,
+            time_major=True,
+            **kwargs)
 
-    def output_size(self):
-        return self.output_size
-
-    def call(self, inputs):
-        print("Backward RNN inputs in call func:{}".format(inputs))
+    def call(self, inputs, mask=None, training=None, initial_state=None):
         inputs = tf.transpose(inputs, [1, 0, 2])
-        return self.rnn_bw(inputs)
+        return super(BackwardRNN, self).call(
+            inputs, training=training, initial_state=initial_state)
 
     def get_config(self):
         config = super().get_config().copy()
         config.update({
-            'dtype': self.dtype,
             'controller_config': self.controller_config,
             'seed': self.seed
         })
@@ -247,7 +240,7 @@ class MANN_Model():
             dtype='float32')
         seqlens = keras.Input(shape=(1), name='seqlens', dtype='int32')
 
-        rnn_bw = BackwardRNNLayer(dtype=tf.float32,
+        rnn_bw = BackwardRNN(dtype=tf.float32,
             controller_config=self.controller_config,
             seed=self.seed)(feat)
 
