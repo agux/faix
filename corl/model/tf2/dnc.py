@@ -70,7 +70,7 @@ class OutputLayer(keras.layers.Layer):
 
 class BackwardRNN(keras.layers.RNN):
 
-    def __init__(self, dtype, controller_config, seed, **kwargs):
+    def __init__(self, controller_config, seed, **kwargs):
         self.controller_config = controller_config
         self.seed = seed
         with tf.name_scope("controller"):
@@ -237,9 +237,10 @@ class MANN_Model():
             dtype='float32')
         seqlens = keras.Input(shape=(1), name='seqlens', dtype='int32')
 
-        rnn_bw = BackwardRNN(dtype=tf.float32,
+        rnn_bw = BackwardRNN(
             controller_config=self.controller_config,
-            seed=self.seed)(feat)
+            seed=self.seed,
+            dtype=tf.float32)(feat)
 
         unweighted_outputs = BidirectionalLayer(
             dtype=tf.float32,
