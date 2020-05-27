@@ -88,6 +88,7 @@ class BackwardRNN(keras.layers.RNN):
             unroll=False,
             time_major=True,
             **kwargs)
+        self.input_spec = [keras.layers.InputSpec(ndim=3)]
 
     def call(self, inputs, mask=None, training=None, initial_state=None):
         inputs = tf.transpose(inputs, [1, 0, 2])
