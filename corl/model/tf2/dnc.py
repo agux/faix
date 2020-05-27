@@ -91,9 +91,9 @@ class BackwardRNN(keras.layers.RNN):
         self.input_spec = [keras.layers.InputSpec(ndim=3)]
 
     def call(self, inputs, mask=None, training=None, initial_state=None):
-        inputs = tf.transpose(inputs, [1, 0, 2])
+        # inputs = tf.transpose(inputs, [1, 0, 2])
         return super(BackwardRNN, self).call(
-            inputs, training=training, initial_state=initial_state)
+            inputs, mask=mask, training=training, initial_state=initial_state)
 
     def get_config(self):
         config = super().get_config().copy()
@@ -235,8 +235,8 @@ class MANN_Model():
         feat = keras.Input(
             shape=(self._time_step, self._feat_size),
             name='features',
-            dtype='float32')
-        seqlens = keras.Input(shape=(1), name='seqlens', dtype='int32')
+            dtype=tf.float32)
+        seqlens = keras.Input(shape=(1), name='seqlens', dtype=tf.int32)
 
         rnn_bw = BackwardRNN(
             controller_config=self.controller_config,
