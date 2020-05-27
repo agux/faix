@@ -38,10 +38,7 @@ class DNC_Model():
         self.model = None
 
     def getName(self):
-        if self.name is not None:
-            return self.name
-        else:
-            return self.__class__.__name__
+        return self.__class__.__name__
 
     def getModel(self):
         if self.model is not None:
