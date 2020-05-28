@@ -206,10 +206,10 @@ class AllocationAdressing:
         # indices_inverted = tf.stack(
         #     [tf.math.invert_permutation(permutation) for permutation in unpacked]
         # )
-        indices_inverted = batch_invert_permutation(indices)
+        indices_inverted = AllocationAdressing.batch_invert_permutation(indices)
         # unpacked = zip(tf.unstack(tensor), tf.unstack(indices_inverted))
         # return tf.stack([tf.gather(value, index) for value, index in unpacked])
-        return batch_gather(tensor, indices_inverted)
+        return AllocationAdressing.batch_gather(tensor, indices_inverted)
 
     @staticmethod
     def weighting(usage_vector):
