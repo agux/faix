@@ -179,9 +179,9 @@ class AllocationAdressing:
             rg = tf.tile(rg, [1, dim])
             perm = tf.add(perm, rg)
             flat = tf.reshape(perm, [-1])
-            perm = tf.invert_permutation(tf.cast(flat, tf.int32))
+            perm = tf.math.invert_permutation(tf.cast(flat, tf.int32))
             perm = tf.reshape(perm, [-1, dim])
-            return tf.subtract(perm, tf.cast(rg, tf.int32))
+            return tf.math.subtract(perm, tf.cast(rg, tf.int32))
 
     @staticmethod
     def batch_gather(values, indices):
