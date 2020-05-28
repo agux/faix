@@ -63,7 +63,8 @@ class DNC_Model():
             dnc_cell, 
             return_sequences=True
         )
-        predictions = rnn(feat)
+        dnc_initial_state = dnc_cell.get_initial_state(batch_size=tf.shape(feat)[0])
+        predictions = rnn(feat, initial_state=dnc_initial_state)
 
         inputs = {'features': feat, 'seqlens': seqlens}
         self.model = keras.Model(inputs=inputs, outputs=predictions)
