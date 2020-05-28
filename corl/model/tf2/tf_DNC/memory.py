@@ -87,20 +87,21 @@ class TemporalLinkAddressing:
         Returns:
             Tensor [B, N, N]: temporal link matrix to use at next time step
         """
-        batch_size = prev_link_matrix.shape[0]
-        words_num = prev_link_matrix.shape[1]
+        with tf.name_scope("update_link_matrix"):
+            batch_size = prev_link_matrix.shape[0]
+            words_num = prev_link_matrix.shape[1]
 
-        write_weighting_i = tf.expand_dims(write_weighting, 2)  # [b x N x 1 ] duplicate columns
-        write_weighting_j = tf.expand_dims(write_weighting, 1)  # [b x 1 X N ] duplicate rows
-        prev_precedence_vector_j = tf.expand_dims(prev_precedence_vector, 1)  # [b x 1 X N]
+            write_weighting_i = tf.expand_dims(write_weighting, 2)  # [b x N x 1 ] duplicate columns
+            write_weighting_j = tf.expand_dims(write_weighting, 1)  # [b x 1 X N ] duplicate rows
+            prev_precedence_vector_j = tf.expand_dims(prev_precedence_vector, 1)  # [b x 1 X N]
 
-        link_matrix = (
-            (1 - write_weighting_i - write_weighting_j) * prev_link_matrix
-            + (write_weighting_i * prev_precedence_vector_j)
-        )
-        zero_diagonal = tf.zeros([batch_size, words_num], dtype=link_matrix.dtype)
+            link_matrix = (
+                (1 - write_weighting_i - write_weighting_j) * prev_link_matrix
+                + (write_weighting_i * prev_precedence_vector_j)
+            )
+            zero_diagonal = tf.zeros([batch_size, words_num], dtype=link_matrix.dtype)
 
-        return tf.linalg.set_diag(link_matrix, zero_diagonal)
+            return tf.linalg.set_diag(link_matrix, zero_diagonal)
 
     @staticmethod
     def weightings(link_matrix, prev_read_weightings):
@@ -385,11 +386,17 @@ class Memory:
             write_weighting = tf.fill(dims=[batch_size, self._N], value=EPSILON)
         with tf.name_scope("read_weightings"):
             read_weightings = tf.fill(dims=[batch_size, self._N, self._R], value=EPSILON)
+        with tf.name_scope("usage_vector"):
+            usage_vector = tf.zeros(shape=[batch_size, self._N], dtype=dtype)
+        with tf.name_scope("link_matrix"):
+            link_matrix = tf.zeros(shape=[batch_size, self._N, self._N], dtype=dtype)
+        with tf.name_scope("precedence_vector"):
+            precedence_vector = tf.zeros(shape=[batch_size, self._N], dtype=dtype)
         return Memory.state(
             memory_matrix=memory_matrix,
-            usage_vector=tf.zeros(name="usage_vector", shape=[batch_size, self._N], dtype=dtype),
-            link_matrix=tf.zeros(name="link_matrix", shape=[batch_size, self._N, self._N], dtype=dtype),
-            precedence_vector=tf.zeros(name="precedence_vector", shape=[batch_size, self._N], dtype=dtype),
+            usage_vector=usage_vector,
+            link_matrix=link_matrix,
+            precedence_vector=precedence_vector,
             write_weighting=write_weighting,
             read_weightings=read_weightings
         )
