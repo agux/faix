@@ -379,11 +379,17 @@ class Memory:
         )
 
     def get_initial_state(self, batch_size, dtype=tf.float32):
+        with tf.name_scope("memory_matrix"):
+            memory_matrix = tf.fill(dims=[batch_size, self._N, self._W], value=EPSILON)
+        with tf.name_scope("write_weighting"):
+            write_weighting = tf.fill(dims=[batch_size, self._N], value=EPSILON)
+        with tf.name_scope("write_weighting"):
+            read_weightings = tf.fill(dims=[batch_size, self._N, self._R], value=EPSILON)
         return Memory.state(
-            memory_matrix=tf.fill(name="memory_matrix", dims=[batch_size, self._N, self._W], value=EPSILON),
+            memory_matrix=memory_matrix,
             usage_vector=tf.zeros(name="usage_vector", shape=[batch_size, self._N], dtype=dtype),
             link_matrix=tf.zeros(name="link_matrix", shape=[batch_size, self._N, self._N], dtype=dtype),
             precedence_vector=tf.zeros(name="precedence_vector", shape=[batch_size, self._N], dtype=dtype),
-            write_weighting=tf.fill(name="write_weighting", dims=[batch_size, self._N], value=EPSILON),
-            read_weightings=tf.fill(name="read_weightings", dims=[batch_size, self._N, self._R], value=EPSILON),
+            write_weighting=write_weighting,
+            read_weightings=read_weightings
         )
