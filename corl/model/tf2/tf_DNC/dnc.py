@@ -142,13 +142,12 @@ class DNC(tf.keras.layers.Layer):
         return nest.flatten(self.state_size_nested)
 
     def get_initial_state(self, inputs=None, batch_size=None, dtype=tf.float32):
-        # del inputs
-        batch_size = tf.shape(inputs)[0]
+        del inputs
         with tf.name_scope("read_vectors"):
             read_vectors = tf.fill(dims=[batch_size, self._W, self._R], value=EPSILON)
         initial_state_nested = DNC.state(
             memory_state=self._memory.get_initial_state(batch_size, dtype=dtype),
-            controller_state=self._controller.get_initial_state(inputs=inputs, dtype=dtype),
+            controller_state=self._controller.get_initial_state(batch_size=batch_size, dtype=dtype),
             read_vectors=read_vectors,
         )
         return nest.flatten(initial_state_nested)
