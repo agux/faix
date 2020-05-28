@@ -65,7 +65,7 @@ class DNC(tf.keras.layers.Layer):
         self._interface_vector_size = self._R * self._W + 3 * self._W + 5 * self._R + 3
         self._clip = 20.0
 
-        self._controller = tf.keras.layers.LSTMCell(units=controller_units)
+        self._controller = tf.keras.layers.LSTMCell(units=controller_units, name="controller")
         self._controller_to_interface_dense = tf.keras.layers.Dense(
             self._interface_vector_size,
             name='controller_to_interface'
