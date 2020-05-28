@@ -63,7 +63,7 @@ class DNC_Model():
             dnc_cell, 
             return_sequences=True
         )
-        dnc_initial_state = dnc_cell.get_initial_state(batch_size=tf.shape(feat)[0])
+        dnc_initial_state = dnc_cell.get_initial_state(inputs=feat)
         predictions = rnn(feat, initial_state=dnc_initial_state)
 
         inputs = {'features': feat, 'seqlens': seqlens}
