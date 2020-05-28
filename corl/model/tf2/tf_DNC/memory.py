@@ -88,8 +88,9 @@ class TemporalLinkAddressing:
             Tensor [B, N, N]: temporal link matrix to use at next time step
         """
         with tf.name_scope("update_link_matrix"):
-            batch_size = prev_link_matrix.shape[0]
-            words_num = prev_link_matrix.shape[1]
+            plm_shape = tf.shape(prev_link_matrix)
+            batch_size = plm_shape[0]
+            words_num = plm_shape[1]
 
             write_weighting_i = tf.expand_dims(write_weighting, 2)  # [b x N x 1 ] duplicate columns
             write_weighting_j = tf.expand_dims(write_weighting, 1)  # [b x 1 X N ] duplicate rows
