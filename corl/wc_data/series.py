@@ -55,7 +55,6 @@ def _getBatch(code, s, e, rcode, shared_args):
         'index_list'] else shared_args['qd']
 
     cnx = cnxpool.get_connection()
-
     fcursor = cnx.cursor(buffered=True)
     try:
         fcursor.execute(qk, (code, s, e, max_step + time_shift))
@@ -68,7 +67,9 @@ def _getBatch(code, s, e, rcode, shared_args):
         raise
     finally:
         fcursor.close()
+        cnx.close()
 
+    cnx = cnxpool.get_connection()
     fcursor = cnx.cursor(buffered=True)
     try:
         # extract dates and transform to sql 'in' query
@@ -89,6 +90,8 @@ def _getBatch(code, s, e, rcode, shared_args):
         cnx.close()
     
     if total != rtotal:
+        print("qd: {}".format(qd))
+        print("max_step: {}, time_shift: {}".format(max_step,time_shift))
         raise ValueError("{} prior data size {} != {}'s: {}".format(
             rcode, rtotal, code, total))
     batch = []
