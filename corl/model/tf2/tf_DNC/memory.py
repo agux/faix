@@ -383,7 +383,7 @@ class Memory:
             memory_matrix = tf.fill(dims=[batch_size, self._N, self._W], value=EPSILON)
         with tf.name_scope("write_weighting"):
             write_weighting = tf.fill(dims=[batch_size, self._N], value=EPSILON)
-        with tf.name_scope("write_weighting"):
+        with tf.name_scope("read_weightings"):
             read_weightings = tf.fill(dims=[batch_size, self._N, self._R], value=EPSILON)
         return Memory.state(
             memory_matrix=memory_matrix,
