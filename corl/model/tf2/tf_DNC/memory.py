@@ -380,10 +380,10 @@ class Memory:
 
     def get_initial_state(self, batch_size, dtype=tf.float32):
         return Memory.state(
-            memory_matrix=tf.fill(name="memory_matrix", shape=[batch_size, self._N, self._W], value=EPSILON),
+            memory_matrix=tf.fill(name="memory_matrix", dims=[batch_size, self._N, self._W], value=EPSILON),
             usage_vector=tf.zeros(name="usage_vector", shape=[batch_size, self._N], dtype=dtype),
             link_matrix=tf.zeros(name="link_matrix", shape=[batch_size, self._N, self._N], dtype=dtype),
             precedence_vector=tf.zeros(name="precedence_vector", shape=[batch_size, self._N], dtype=dtype),
-            write_weighting=tf.fill(name="write_weighting", shape=[batch_size, self._N], value=EPSILON),
-            read_weightings=tf.fill(name="read_weightings", shape=[batch_size, self._N, self._R], value=EPSILON),
+            write_weighting=tf.fill(name="write_weighting", dims=[batch_size, self._N], value=EPSILON),
+            read_weightings=tf.fill(name="read_weightings", dims=[batch_size, self._N, self._R], value=EPSILON),
         )
