@@ -53,7 +53,9 @@ def _getBatch(code, s, e, rcode, shared_args):
     qk = shared_args['qk']
     qd = shared_args['qd_idx'] if rcode in shared_args[
         'index_list'] else shared_args['qd']
+
     cnx = cnxpool.get_connection()
+
     fcursor = cnx.cursor(buffered=True)
     try:
         fcursor.execute(qk, (code, s, e, max_step + time_shift))
@@ -61,6 +63,14 @@ def _getBatch(code, s, e, rcode, shared_args):
         featSize = (len(col_names) - 1) * 2
         total = fcursor.rowcount
         rows = fcursor.fetchall()
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        fcursor.close()
+
+    fcursor = cnx.cursor(buffered=True)
+    try:
         # extract dates and transform to sql 'in' query
         dates = [r[0] for r in rows]
         dateStr = "'{}'".format("','".join(dates))
@@ -71,26 +81,28 @@ def _getBatch(code, s, e, rcode, shared_args):
         fcursor.execute(qd, (rcode, max_step + time_shift))
         rtotal = fcursor.rowcount
         r_rows = fcursor.fetchall()
-        if total != rtotal:
-            raise ValueError("{} prior data size {} != {}'s: {}".format(
-                rcode, rtotal, code, total))
-        batch = []
-        for t in range(time_shift + 1):
-            steps = np.zeros((max_step, featSize), dtype='f')
-            offset = max_step + time_shift - total
-            s = max(0, t - offset)
-            e = total - time_shift + t
-            for i, row in enumerate(rows[s:e]):
-                for j, col in enumerate(row[1:]):
-                    steps[i + offset][j] = col
-            for i, row in enumerate(r_rows[s:e]):
-                for j, col in enumerate(row[1:]):
-                    steps[i + offset][j + featSize // 2] = col
-            batch.append(steps)
-        return np.concatenate(batch, 1), total - time_shift
     except:
         print(sys.exc_info()[0])
         raise
     finally:
         fcursor.close()
         cnx.close()
+    
+    if total != rtotal:
+        raise ValueError("{} prior data size {} != {}'s: {}".format(
+            rcode, rtotal, code, total))
+    batch = []
+    for t in range(time_shift + 1):
+        steps = np.zeros((max_step, featSize), dtype='f')
+        offset = max_step + time_shift - total
+        s = max(0, t - offset)
+        e = total - time_shift + t
+        for i, row in enumerate(rows[s:e]):
+            for j, col in enumerate(row[1:]):
+                steps[i + offset][j] = col
+        for i, row in enumerate(r_rows[s:e]):
+            for j, col in enumerate(row[1:]):
+                steps[i + offset][j + featSize // 2] = col
+        batch.append(steps)
+    return np.concatenate(batch, 1), total - time_shift
+    
