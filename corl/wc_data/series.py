@@ -72,10 +72,9 @@ def _getBatch(code, s, e, rcode, shared_args):
         rtotal = fcursor.rowcount
         r_rows = fcursor.fetchall()
         if total != rtotal:
-            print("qd: {}".format(qd))
-            print("rcode: {}, max_step: {}, time_shift: {}".format(rcode, max_step,time_shift))
-            raise ValueError("{} prior data size {} != {}'s: {}".format(
-                rcode, rtotal, code, total))
+            raise ValueError("{} prior data size {} != {}'s: {}\n"
+                +"rcode: {}, max_step: {}, time_shift: {}, query: {}".format(
+                rcode, rtotal, code, total, rcode, max_step, time_shift, qd))
         batch = []
         for t in range(time_shift + 1):
             steps = np.zeros((max_step, featSize), dtype='f')
