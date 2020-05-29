@@ -16,7 +16,7 @@ class DelayedCosineDecayRestarts(keras.optimizers.schedules.LearningRateSchedule
         self.t_mul = t_mul
         self.m_mul = m_mul
         self.alpha = alpha
-        self.name = name
+        self.name = name or  "DelayedCosineDecayRestarts"
         self.cdr = keras.experimental.CosineDecayRestarts(
             initial_learning_rate, 
             first_decay_steps, 
