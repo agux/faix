@@ -11,7 +11,11 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 # pylint: disable-msg=E0401
 
-LAYER_WIDTH = 256
+CONTROLLER_UNITS = 256
+WORD_SIZE = 64
+MEMORY_SIZE = 64
+NUM_READ_HEADS = 16
+
 MAX_STEP = 35
 TIME_SHIFT = 4
 DROPOUT_RATE = 0.5
@@ -33,6 +37,8 @@ if __name__ == '__main__':
     np.random.seed(SEED)
 
     regressor = dnc_regressor.DNC_Model(
+        controller_units=CONTROLLER_UNITS, memory_size=MEMORY_SIZE,
+        word_size=WORD_SIZE, num_read_heads=NUM_READ_HEADS,
         time_step=MAX_STEP,
         feat_size=len(FEAT_COLS) * 2 * (TIME_SHIFT + 1),
         dropout_rate=DROPOUT_RATE,
