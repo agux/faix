@@ -26,11 +26,15 @@ class DelayedCosineDecayRestarts(keras.optimizers.schedules.LearningRateSchedule
             self.name+"_cdr")
 
     def __call__(self, step):
-        return tf.cond(
-            tf.less(step, self.decay_start),
-            self.initial_learning_rate,
-            self.cdr(step-self.decay_start+1)
-        )
+        # return tf.cond(
+        #     tf.less(step, self.decay_start),
+        #     self.initial_learning_rate,
+        #     self.cdr(step-self.decay_start+1)
+        # )
+        return self.initial_learning_rate \
+            if step < self.decay_start \
+            else self.cdr(step-self.decay_start+1)
+
     
     def get_config(self):
         return {
