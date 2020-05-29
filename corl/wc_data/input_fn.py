@@ -206,7 +206,7 @@ def _getIndex():
     cnx = cnxpool.get_connection()
     try:
         cursor = cnx.cursor(buffered=True)
-        query = ('SELECT distinct code FROM idxlst')
+        query = ('SELECT distinct code COLLATE utf8mb4_0900_as_cs FROM idxlst')
         cursor.execute(query)
         rows = cursor.fetchall()
         cursor.close()
