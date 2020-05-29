@@ -7,7 +7,7 @@ from time import strftime
 class DelayedCosineDecayRestarts(keras.optimizers.schedules.LearningRateSchedule):
 
     def __init__(self, decay_start, *args, **kwargs):
-        super(DelayedCosineDecayRestarts, self).__init__(*args, **kwargs)
+        super(DelayedCosineDecayRestarts, self).__init__(**kwargs)
         self._decay_start = decay_start
         self.cdr = keras.experimental.CosineDecayRestarts(*args, **kwargs)
 
