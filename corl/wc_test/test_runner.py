@@ -21,16 +21,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 # pylint: disable-msg=E0401
 
 VSET = 5
-LAYER_WIDTH = 256
 MAX_STEP = 35
-TIME_SHIFT = 19
-DROPOUT_RATE = 0.5
-LEARNING_RATE = 1e-4
-LR_DECAY_STEPS = 1000
-DECAYED_LR_START = 40000
-DROPOUT_DECAY_STEPS = 1000
-DECAYED_DROPOUT_START = 40000
-SEED = 285139
+TIME_SHIFT = 4
 
 # validate and save the model every n epochs
 VAL_SAVE_FREQ = 5
@@ -41,7 +33,12 @@ feat_cols = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
-def run(regressor):
+def run(regressor, vset=None, max_step=None, time_shift=None):
+    global VSET, MAX_STEP, TIME_SHIFT
+    VSET = vset or VSET
+    MAX_STEP = max_step or MAX_STEP
+    TIME_SHIFT = time_shift or TIME_SHIFT
+    
     log.setLevel(logging.WARN)
     args = parseArgs()
     setupPath()

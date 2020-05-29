@@ -13,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 LAYER_WIDTH = 256
 MAX_STEP = 35
-TIME_SHIFT = 19
+TIME_SHIFT = 4
 DROPOUT_RATE = 0.5
 LEARNING_RATE = 1e-4
 LR_DECAY_STEPS = 1000
@@ -43,4 +43,4 @@ if __name__ == '__main__':
         lr_decay_steps=LR_DECAY_STEPS
     )
     
-    run(regressor)
+    run(regressor, max_step=MAX_STEP, time_shift=TIME_SHIFT)
