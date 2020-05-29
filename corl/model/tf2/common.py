@@ -23,7 +23,7 @@ class DelayedCosineDecayRestarts(keras.optimizers.schedules.LearningRateSchedule
             t_mul, 
             m_mul, 
             alpha,
-            name+"_cdr")
+            self.name+"_cdr")
 
     def __call__(self, step):
         return tf.cond(
