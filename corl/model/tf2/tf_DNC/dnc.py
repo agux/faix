@@ -76,19 +76,39 @@ class DNC(tf.keras.layers.Layer):
     def _parse_interface_vector(self, interface_vector):
         r, w = self._R, self._W
 
-        sizes = [r * w, r, w, 1, w, w, r, 1, 1, 3 * r]
+        def read_keys(v):
+            return tf.reshape(v, (-1, w, r))
+        def read_strengths(v):
+            return 1 + tf.nn.softplus((tf.reshape(v, (-1, r))))
+        def write_key(v):
+            return tf.reshape(v, (-1, w, 1))
+        def write_strength(v):
+            return 1 + tf.nn.softplus((tf.reshape(v, (-1, 1))))
+        def erase_vector(v):
+            return tf.nn.sigmoid(tf.reshape(v, (-1, w)))
+        def write_vector(v):
+            return tf.reshape(v, (-1, w))
+        def free_gates(v):
+            return tf.nn.sigmoid(tf.reshape(v, (-1, r)))
+        def allocation_gate(v):
+            return tf.nn.sigmoid(tf.reshape(v, (-1, 1)))
+        def write_gate(v):
+            return tf.nn.sigmoid(tf.reshape(v, (-1, 1)))
+        def read_modes(v):
+            return tf.nn.softmax(tf.reshape(v, (-1, 3, r)), axis=1)
         fns = OrderedDict([
-            ("read_keys", lambda v: tf.reshape(v, (-1, w, r))),
-            ("read_strengths", lambda v: 1 + tf.nn.softplus((tf.reshape(v, (-1, r))))),
-            ("write_key", lambda v: tf.reshape(v, (-1, w, 1))),
-            ("write_strength", lambda v: 1 + tf.nn.softplus((tf.reshape(v, (-1, 1))))),
-            ("erase_vector", lambda v: tf.nn.sigmoid(tf.reshape(v, (-1, w)))),
-            ("write_vector", lambda v: tf.reshape(v, (-1, w))),
-            ("free_gates", lambda v: tf.nn.sigmoid(tf.reshape(v, (-1, r)))),
-            ("allocation_gate", lambda v: tf.nn.sigmoid(tf.reshape(v, (-1, 1)))),
-            ("write_gate", lambda v: tf.nn.sigmoid(tf.reshape(v, (-1, 1)))),
-            ("read_modes", lambda v: tf.nn.softmax(tf.reshape(v, (-1, 3, r)), axis=1)),
+            ("read_keys", read_keys),
+            ("read_strengths", read_strengths),
+            ("write_key", write_key),
+            ("write_strength", write_strength),
+            ("erase_vector", erase_vector),
+            ("write_vector", write_vector),
+            ("free_gates", free_gates),
+            ("allocation_gate", allocation_gate),
+            ("write_gate", write_gate),
+            ("read_modes", read_modes)
         ])
+        sizes = [r * w, r, w, 1, w, w, r, 1, 1, 3 * r]
         indices = [[sum(sizes[:i]), sum(sizes[:i + 1])] for i in range(len(sizes))]
         zipped_items = zip(fns.keys(), fns.values(), indices)
         interface = {name: fn(interface_vector[:, i[0]:i[1]]) for name, fn, i in zipped_items}
