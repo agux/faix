@@ -12,8 +12,6 @@ import os
 import psutil
 import numpy as np
 
-ray.init(num_cpus=psutil.cpu_count(logical=False), webui_host='127.0.0.1')
-
 np.set_printoptions(threshold=np.inf,
                     suppress=True,
                     formatter={'float': '{: 0.5f}'.format})
@@ -74,6 +72,7 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         # ssl_ca='',
         # use_pure=True,
         connect_timeout=90000)
+    ray.init(num_cpus=psutil.cpu_count(logical=False), webui_host='127.0.0.1')
 
 
 # def _getExecutor():
