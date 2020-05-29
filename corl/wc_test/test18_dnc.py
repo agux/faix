@@ -24,7 +24,7 @@ SEED = 285139
 
 
 # feat_cols = ["close", "volume", "amount"]
-feat_cols = ["close"]
+FEAT_COLS = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     regressor = dnc_regressor.DNC_Model(
         time_step=MAX_STEP,
-        feat_size=len(feat_cols) * 2 * (TIME_SHIFT + 1),
+        feat_size=len(FEAT_COLS) * 2 * (TIME_SHIFT + 1),
         dropout_rate=DROPOUT_RATE,
         decayed_dropout_start=DECAYED_DROPOUT_START,
         dropout_decay_steps=DROPOUT_DECAY_STEPS,
@@ -43,4 +43,4 @@ if __name__ == '__main__':
         lr_decay_steps=LR_DECAY_STEPS
     )
     
-    run(regressor, max_step=MAX_STEP, time_shift=TIME_SHIFT)
+    run(regressor, max_step=MAX_STEP, time_shift=TIME_SHIFT, feat_cols=FEAT_COLS)

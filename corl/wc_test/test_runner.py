@@ -29,16 +29,17 @@ VAL_SAVE_FREQ = 5
 STEPS_PER_EPOCH = 10
 
 # feat_cols = ["close", "volume", "amount"]
-feat_cols = ["close"]
+FEAT_COLS = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
-def run(regressor, vset=None, max_step=None, time_shift=None):
-    global VSET, MAX_STEP, TIME_SHIFT
+def run(regressor, vset=None, max_step=None, time_shift=None, feat_cols=None):
+    global VSET, MAX_STEP, TIME_SHIFT, FEAT_COLS
     VSET = vset or VSET
     MAX_STEP = max_step or MAX_STEP
     TIME_SHIFT = time_shift or TIME_SHIFT
-    
+    FEAT_COLS = feat_cols or FEAT_COLS
+
     log.setLevel(logging.WARN)
     args = parseArgs()
     setupPath()
@@ -51,7 +52,7 @@ def _getInput(start_epoch, args):
     start_bno = start_epoch * STEPS_PER_EPOCH + 1
     input_dict = {}
     if ds == 'db':
-        input_dict = input_fn.getInputs(start_bno, TIME_SHIFT, feat_cols,
+        input_dict = input_fn.getInputs(start_bno, TIME_SHIFT, FEAT_COLS,
                                         MAX_STEP, args.parallel, args.prefetch,
                                         args.db_pool, args.db_host,
                                         args.db_port, args.db_pwd, args.vset
