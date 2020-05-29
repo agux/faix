@@ -14,7 +14,7 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
         return tf.cond(
             tf.less(step, self._decay_start), 
             self.initial_learning_rate,
-            super(DelayedCosineDecayRestarts, self).__call__(step-self._decay_start+1)
+            super(DelayedCosineDecayRestarts, self)(step-self._decay_start+1)
         )
     
     def get_config(self):
