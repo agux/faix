@@ -98,7 +98,7 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
         #Profile the batch to sample compute characteristics. 
         # By default, it will profile the second batch. 
         # Set profile_batch=0 to disable profiling. Must run in TensorFlow eager mode.
-        profile_batch=0,
+        profile_batch='50,100',
         #the log file can become quite large when write_graph is set to True.
         # write_graph=True,
         #whether to write model weights to visualize as image in TensorBoard.
