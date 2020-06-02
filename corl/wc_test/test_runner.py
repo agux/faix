@@ -231,7 +231,7 @@ def _main(args, regressor):
 
     # Define folder paths
     f = __file__
-    testn = f[f.rfind('/') + 1:f.rindex('.py')]
+    testn = args.id or (f[f.rfind('/') + 1:f.rindex('.py')])
     base_name = "{}_{}".format(testn, model_name)
     base_dir = os.path.join(LOG_DIR, base_name)
     training_dir = os.path.join(base_dir, 'training')
