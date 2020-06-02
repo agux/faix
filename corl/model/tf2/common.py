@@ -19,9 +19,7 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
         )
 
     def decay(self, step):
-        if step >= self._decay_start and not self.started:
-            print("DelayedCosineDecayRestarts activated at step {}".format(step))
-            self.started = True
+        tf.print("DelayedCosineDecayRestarts activated at step {}".format(step))
         return super(DelayedCosineDecayRestarts, self).__call__(step-self._decay_start+1)
 
     def get_config(self):
