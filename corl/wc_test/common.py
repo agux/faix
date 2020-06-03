@@ -43,6 +43,10 @@ def parseArgs():
                         type=str,
                         help='directory path for the logdir.',
                         default=None)
+    parser.add_argument('--profile_batch',
+                        type=str,
+                        help='batches to profile.',
+                        default=None)
     parser.add_argument('--ds',
                         type=str,
                         help='datasource. such as file, db, or BigQuery.',

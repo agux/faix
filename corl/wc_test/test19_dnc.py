@@ -30,8 +30,6 @@ SEED = 285139
 VAL_SAVE_FREQ = 100
 STEPS_PER_EPOCH = 100
 
-PROFILE_BATCH = "120,130"
-
 # feat_cols = ["close", "volume", "amount"]
 FEAT_COLS = ["close"]
 
@@ -63,5 +61,4 @@ if __name__ == '__main__':
         feat_cols=FEAT_COLS,
         val_save_freq=VAL_SAVE_FREQ,
         steps_per_epoch=STEPS_PER_EPOCH,
-        profile_batch=PROFILE_BATCH
     )

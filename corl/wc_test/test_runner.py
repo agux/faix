@@ -40,8 +40,7 @@ def run(id=None,
     time_shift=None, 
     feat_cols=None, 
     val_save_freq=None, 
-    steps_per_epoch=None,
-    profile_batch=None):
+    steps_per_epoch=None):
 
     global VSET, MAX_STEP, TIME_SHIFT, FEAT_COLS, VAL_SAVE_FREQ, STEPS_PER_EPOCH
     VSET = vset or VSET
@@ -55,7 +54,7 @@ def run(id=None,
     args = parseArgs()
     setupPath()
     _setupTensorflow()
-    _main(args, regressor, id, profile_batch)
+    _main(args, regressor, id)
 
 def _getInput(start_epoch, args):
     ds = args.ds.lower()
@@ -72,7 +71,7 @@ def _getInput(start_epoch, args):
     return input_dict
 
 
-def _train(args, regressor, input_dict, base_dir, training_dir, profile_batch=None):
+def _train(args, regressor, input_dict, base_dir, training_dir):
     # tf.compat.v1.disable_eager_execution()
     print("{} TensorFlow version: {}".format(strftime("%H:%M:%S"),
                                              tf.__version__))
@@ -106,7 +105,7 @@ def _train(args, regressor, input_dict, base_dir, training_dir, profile_batch=No
         #Profile the batch to sample compute characteristics. 
         # By default, it will profile the second batch. 
         # Set profile_batch=0 to disable profiling. Must run in TensorFlow eager mode.
-        profile_batch=profile_batch or '50,100',
+        profile_batch=args.profile_batch or 0,
         #the log file can become quite large when write_graph is set to True.
         # write_graph=True,
         #whether to write model weights to visualize as image in TensorBoard.
@@ -234,7 +233,7 @@ def _load_model(regressor, training_dir):
     return start_epoch
 
 
-def _main(args, regressor, id=None, profile_batch=None):
+def _main(args, regressor, id=None):
     model_name = regressor.getName()
     print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
 
@@ -249,7 +248,7 @@ def _main(args, regressor, id=None, profile_batch=None):
 
     print('{} querying datasource...'.format(strftime("%H:%M:%S")))
     input_dict = _getInput(start_epoch, args)
-    _train(args, regressor, input_dict, base_dir, training_dir, profile_batch)
+    _train(args, regressor, input_dict, base_dir, training_dir)
 
 def _setupTensorflow():
     physical_devices = tf.config.list_physical_devices('GPU')
