@@ -242,7 +242,7 @@ def _main(args, regressor, id=None, profile_batch=None):
     f = __file__
     testn = id or (f[f.rfind('/') + 1:f.rindex('.py')])
     base_name = "{}_{}".format(testn, model_name)
-    base_dir = os.path.join(LOG_DIR, base_name)
+    base_dir = os.path.join(args.logdir or LOG_DIR, base_name)
     training_dir = os.path.join(base_dir, 'training')
 
     start_epoch = _load_model(regressor, training_dir)
