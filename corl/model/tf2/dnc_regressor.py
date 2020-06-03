@@ -17,7 +17,8 @@ class DNC_Model():
                  dropout_decay_steps=None,
                  learning_rate=1e-3,
                  decayed_lr_start=None,
-                 lr_decay_steps=None
+                 lr_decay_steps=None,
+                 clipvalue=10
                 ):
 
         self.output_size = output_size
@@ -34,6 +35,7 @@ class DNC_Model():
         self._lr = learning_rate
         self._decayed_lr_start = decayed_lr_start
         self._lr_decay_steps = lr_decay_steps
+        self._clipvalue = clipvalue
 
         self.model = None
 
@@ -86,11 +88,11 @@ class DNC_Model():
             # amsgrad=True
             # clipnorm=0.5
             # clipvalue=0.1
-            clipvalue=10)
+            clipvalue=self._clipvalue)
         self.model.compile(
             optimizer=optimizer,
             loss='huber_loss',
             # trying to fix 'Inputs to eager execution function cannot be Keras symbolic tensors'
             # ref: https://github.com/tensorflow/probability/issues/519
             experimental_run_tf_function=False)
-        print(self.model.summary())
+        self.model.summary()

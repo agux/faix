@@ -19,8 +19,9 @@ NUM_READ_HEADS = 16
 MAX_STEP = 35
 TIME_SHIFT = 4
 DROPOUT_RATE = 0.5
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-3
 LR_DECAY_STEPS = 1000
+CLIP_VALUE = 50
 DECAYED_LR_START = 40000
 DROPOUT_DECAY_STEPS = 1000
 DECAYED_DROPOUT_START = 40000
@@ -50,7 +51,8 @@ if __name__ == '__main__':
         dropout_decay_steps=DROPOUT_DECAY_STEPS,
         learning_rate=LEARNING_RATE,
         decayed_lr_start=DECAYED_LR_START,
-        lr_decay_steps=LR_DECAY_STEPS
+        lr_decay_steps=LR_DECAY_STEPS,
+        clipvalue=CLIP_VALUE
     )
     
     run(
