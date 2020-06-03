@@ -506,7 +506,7 @@ def getInputs(start_bno=0,
             num_parallel_calls=tf.data.experimental.AUTOTUNE
         ).prefetch(
             # _prefetch
-            num_parallel_calls=tf.data.experimental.AUTOTUNE
+            tf.data.experimental.AUTOTUNE
         )
 
     # Create dataset for testing
