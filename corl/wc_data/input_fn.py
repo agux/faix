@@ -502,13 +502,18 @@ def getInputs(start_bno=0,
 
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
         lambda bno: tuple(mapfunc(bno)),
-        _prefetch).prefetch(_prefetch)
+            # _prefetch
+            num_parallel_calls=tf.data.experimental.AUTOTUNE
+        ).prefetch(
+            # _prefetch
+            num_parallel_calls=tf.data.experimental.AUTOTUNE
+        )
 
     # Create dataset for testing
     test_batches, test_batch_size = _getDataSetMeta("TS")
     ds_test = tf.data.Dataset.from_tensor_slices(
         _loadTestSet(step, test_batches + 1,
-                     vset)).batch(test_batch_size).repeat()
+                     vset)).batch(test_batch_size).cache().repeat()
 
     return {
         'train': ds_train,
