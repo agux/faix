@@ -217,7 +217,7 @@ def _getIndex():
     finally:
         cnx.close()
 
-
+# @tf.function
 def _loadTrainingData(bno):
     global cnxpool, shared_args, check_input
     # idxlst = _getIndex()
@@ -482,24 +482,23 @@ def getInputs(start_bno=0,
     bnums = [bno for bno in range(start_bno, train_batches + 1)]
 
     def mapfunc(bno):
-        # ret = tf.numpy_function(func=_loadTrainingData,
-        #                         inp=[bno],
-        #                         Tout=[tf.float32, tf.int32, tf.float32])
-        #         # f = py_function(func=_loadTrainingData,
-        #         #                 inp=[bno],
-        #         #                 Tout=[{
-        #         #                     'features': tf.float32,
-        #         #                     'seqlens': tf.int32
-        #         #                 }, tf.float32])
-        # feat, seqlens, corl = ret
+        with tf.device('/CPU:0'):
+            ret = tf.numpy_function(func=_loadTrainingData,
+                                    inp=[bno],
+                                    Tout=[tf.float32, tf.int32, tf.float32])
+                    # f = py_function(func=_loadTrainingData,
+                    #                 inp=[bno],
+                    #                 Tout=[{
+                    #                     'features': tf.float32,
+                    #                     'seqlens': tf.int32
+                    #                 }, tf.float32])
+            feat, seqlens, corl = ret
 
-        feat, seqlens, corl = _loadTrainingData(bno)
+            feat.set_shape((None, max_step, feat_size))
+            seqlens.set_shape((None, 1))
+            corl.set_shape((None, 1))
 
-        feat.set_shape((None, max_step, feat_size))
-        seqlens.set_shape((None, 1))
-        corl.set_shape((None, 1))
-
-        return {'features': feat, 'seqlens': seqlens}, corl
+            return {'features': feat, 'seqlens': seqlens}, corl
 
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
         lambda bno: tuple(mapfunc(bno)),
