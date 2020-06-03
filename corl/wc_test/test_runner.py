@@ -33,7 +33,16 @@ FEAT_COLS = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
-def run(id=None, regressor=None, vset=None, max_step=None, time_shift=None, feat_cols=None, val_save_freq=None, steps_per_epoch=None):
+def run(id=None, 
+    regressor=None, 
+    vset=None, 
+    max_step=None, 
+    time_shift=None, 
+    feat_cols=None, 
+    val_save_freq=None, 
+    steps_per_epoch=None,
+    profile_batch=None):
+
     global VSET, MAX_STEP, TIME_SHIFT, FEAT_COLS, VAL_SAVE_FREQ, STEPS_PER_EPOCH
     VSET = vset or VSET
     MAX_STEP = max_step or MAX_STEP
@@ -46,7 +55,7 @@ def run(id=None, regressor=None, vset=None, max_step=None, time_shift=None, feat
     args = parseArgs()
     setupPath()
     _setupTensorflow()
-    _main(args, regressor, id)
+    _main(args, regressor, id, profile_batch)
 
 def _getInput(start_epoch, args):
     ds = args.ds.lower()
@@ -63,7 +72,7 @@ def _getInput(start_epoch, args):
     return input_dict
 
 
-def _train(args, regressor, input_dict, base_dir, training_dir):
+def _train(args, regressor, input_dict, base_dir, training_dir, profile_batch=None):
     # tf.compat.v1.disable_eager_execution()
     print("{} TensorFlow version: {}".format(strftime("%H:%M:%S"),
                                              tf.__version__))
@@ -97,7 +106,7 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
         #Profile the batch to sample compute characteristics. 
         # By default, it will profile the second batch. 
         # Set profile_batch=0 to disable profiling. Must run in TensorFlow eager mode.
-        profile_batch='50,100',
+        profile_batch='50,100' or profile_batch,
         #the log file can become quite large when write_graph is set to True.
         # write_graph=True,
         #whether to write model weights to visualize as image in TensorBoard.
@@ -126,8 +135,9 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
             # the callback saves the model after each epoch.
             # When using integer, the callback saves the model at end of a batch
             # at which this many samples have been seen since last saving.
-            # save_freq='epoch',
-            period=VAL_SAVE_FREQ),
+            save_freq='epoch',
+            # period=VAL_SAVE_FREQ
+        ),
         keras.callbacks.ModelCheckpoint(
             filepath=os.path.join(best_dir, "cp_best.ckpt"),
             # monitor='val_loss',
@@ -224,7 +234,7 @@ def _load_model(regressor, training_dir):
     return start_epoch
 
 
-def _main(args, regressor, id=None):
+def _main(args, regressor, id=None, profile_batch=None):
     model_name = regressor.getName()
     print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
 
@@ -239,7 +249,7 @@ def _main(args, regressor, id=None):
 
     print('{} querying datasource...'.format(strftime("%H:%M:%S")))
     input_dict = _getInput(start_epoch, args)
-    _train(args, regressor, input_dict, base_dir, training_dir)
+    _train(args, regressor, input_dict, base_dir, training_dir, profile_batch)
 
 def _setupTensorflow():
     physical_devices = tf.config.list_physical_devices('GPU')
