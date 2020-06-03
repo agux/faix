@@ -39,10 +39,6 @@ def setupPath():
 
 def parseArgs():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--id',
-                        type=str,
-                        help='identifier for the test run.',
-                        default=None)
     parser.add_argument('--ds',
                         type=str,
                         help='datasource. such as file, db, or BigQuery.',
