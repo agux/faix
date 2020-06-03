@@ -33,18 +33,20 @@ FEAT_COLS = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
-def run(regressor, vset=None, max_step=None, time_shift=None, feat_cols=None):
-    global VSET, MAX_STEP, TIME_SHIFT, FEAT_COLS
+def run(id=None, regressor=None, vset=None, max_step=None, time_shift=None, feat_cols=None, val_save_freq=None, steps_per_epoch=None):
+    global VSET, MAX_STEP, TIME_SHIFT, FEAT_COLS, VAL_SAVE_FREQ, STEPS_PER_EPOCH
     VSET = vset or VSET
     MAX_STEP = max_step or MAX_STEP
     TIME_SHIFT = time_shift or TIME_SHIFT
     FEAT_COLS = feat_cols or FEAT_COLS
+    VAL_SAVE_FREQ = val_save_freq or VAL_SAVE_FREQ
+    STEPS_PER_EPOCH = steps_per_epoch or STEPS_PER_EPOCH
 
     log.setLevel(logging.WARN)
     args = parseArgs()
     setupPath()
     _setupTensorflow()
-    _main(args, regressor)
+    _main(args, regressor, id)
 
 def _getInput(start_epoch, args):
     ds = args.ds.lower()
@@ -87,9 +89,6 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
     #     monitor='val_loss', factor=0.1, patience=10, verbose=0, mode='auto',
     #     min_delta=0.0001, cooldown=0, min_lr=0, **kwargs
     # )
-
-    write_after_batches = input_dict[
-        'train_batch_size'] * STEPS_PER_EPOCH * VAL_SAVE_FREQ
 
     tensorboard_cbk = keras.callbacks.TensorBoard(
         log_dir=log_dir,
@@ -225,13 +224,13 @@ def _load_model(regressor, training_dir):
     return start_epoch
 
 
-def _main(args, regressor):
+def _main(args, regressor, id=None):
     model_name = regressor.getName()
     print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
 
     # Define folder paths
     f = __file__
-    testn = args.id or (f[f.rfind('/') + 1:f.rindex('.py')])
+    testn = id or (f[f.rfind('/') + 1:f.rindex('.py')])
     base_name = "{}_{}".format(testn, model_name)
     base_dir = os.path.join(LOG_DIR, base_name)
     training_dir = os.path.join(base_dir, 'training')
@@ -246,6 +245,7 @@ def _setupTensorflow():
     physical_devices = tf.config.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         try:
+            print('{} enabling memory growth for {}'.format(strftime("%H:%M:%S"), physical_devices[0]))
             tf.config.experimental.set_memory_growth(physical_devices[0], True)
         except:
             print(

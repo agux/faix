@@ -26,6 +26,8 @@ DROPOUT_DECAY_STEPS = 1000
 DECAYED_DROPOUT_START = 40000
 SEED = 285139
 
+VAL_SAVE_FREQ = 50
+STEPS_PER_EPOCH = 100
 
 # feat_cols = ["close", "volume", "amount"]
 FEAT_COLS = ["close"]
@@ -49,4 +51,12 @@ if __name__ == '__main__':
         lr_decay_steps=LR_DECAY_STEPS
     )
     
-    run("test18_dnc", regressor, max_step=MAX_STEP, time_shift=TIME_SHIFT, feat_cols=FEAT_COLS)
+    run(
+        id="test19",
+        regressor=regressor, 
+        max_step=MAX_STEP, 
+        time_shift=TIME_SHIFT, 
+        feat_cols=FEAT_COLS,
+        val_save_freq=VAL_SAVE_FREQ,
+        steps_per_epoch=STEPS_PER_EPOCH
+    )
