@@ -482,16 +482,18 @@ def getInputs(start_bno=0,
     bnums = [bno for bno in range(start_bno, train_batches + 1)]
 
     def mapfunc(bno):
-        ret = tf.numpy_function(func=_loadTrainingData,
-                                inp=[bno],
-                                Tout=[tf.float32, tf.int32, tf.float32])
-        # f = py_function(func=_loadTrainingData,
-        #                 inp=[bno],
-        #                 Tout=[{
-        #                     'features': tf.float32,
-        #                     'seqlens': tf.int32
-        #                 }, tf.float32])
-        feat, seqlens, corl = ret
+        # ret = tf.numpy_function(func=_loadTrainingData,
+        #                         inp=[bno],
+        #                         Tout=[tf.float32, tf.int32, tf.float32])
+        #         # f = py_function(func=_loadTrainingData,
+        #         #                 inp=[bno],
+        #         #                 Tout=[{
+        #         #                     'features': tf.float32,
+        #         #                     'seqlens': tf.int32
+        #         #                 }, tf.float32])
+        # feat, seqlens, corl = ret
+
+        feat, seqlens, corl = _loadTrainingData(bno)
 
         feat.set_shape((None, max_step, feat_size))
         seqlens.set_shape((None, 1))
@@ -501,7 +503,6 @@ def getInputs(start_bno=0,
 
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
         lambda bno: tuple(mapfunc(bno)),
-        # _prefetch).batch(1).prefetch(_prefetch)
         _prefetch).prefetch(_prefetch)
 
     # Create dataset for testing
