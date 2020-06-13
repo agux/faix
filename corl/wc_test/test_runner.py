@@ -53,7 +53,7 @@ def run(id=None,
     log.setLevel(logging.WARN)
     args = parseArgs()
     setupPath()
-    _setupTensorflow()
+    _setupTensorflow(args)
     _main(args, regressor, id)
 
 def _getInput(start_epoch, args):
@@ -250,7 +250,9 @@ def _main(args, regressor, id=None):
     input_dict = _getInput(start_epoch, args)
     _train(args, regressor, input_dict, base_dir, training_dir)
 
-def _setupTensorflow():
+def _setupTensorflow(args):
+    # if args.check_weights:
+    #     tf.debugging.enable_check_numerics()
     physical_devices = tf.config.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         try:
@@ -261,4 +263,10 @@ def _setupTensorflow():
                 'Invalid device or cannot modify virtual devices once initialized.\n'
                 + sys.exc_info()[0])
             pass
+    
+    # enalbe XLA
+    tf.config.optimizer.set_jit(True)
+    # use mixed precision
+    policy  = tf.keras.mixed_precision.experimental.Policy('mixed_float16')   # 'mixed_float16' or 'float32'
+    tf.keras.mixed_precision.experimental.set_policy(policy)
 
