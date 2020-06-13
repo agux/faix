@@ -266,7 +266,7 @@ def _setupTensorflow(args):
     
     # enalbe XLA
     tf.config.optimizer.set_jit(True)
-    # use mixed precision
-    policy  = tf.keras.mixed_precision.experimental.Policy('mixed_float16')   # 'mixed_float16' or 'float32'
-    tf.keras.mixed_precision.experimental.set_policy(policy)
+    # use of mixed precision gives TypeError: Tensors in list passed to 'values' of 'ConcatV2' Op have types [float16, float32] that don't all match.
+    # policy  = tf.keras.mixed_precision.experimental.Policy('mixed_float16')   # 'mixed_float16' or 'float32'
+    # tf.keras.mixed_precision.experimental.set_policy(policy)
 
