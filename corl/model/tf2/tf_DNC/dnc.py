@@ -54,9 +54,9 @@ class DNC(tf.keras.layers.Layer):
         "read_modes",
     ])
 
-    def __init__(self, output_size, controller_units=256, memory_size=256,
+    def __init__(self, name='DNC', output_size=None, controller_units=256, memory_size=256,
                  word_size=64, num_read_heads=4, **kwargs):
-        super().__init__(name='DNC', **kwargs)
+        super().__init__(name=name, **kwargs)
 
         self._output_size = output_size
         self._N = memory_size

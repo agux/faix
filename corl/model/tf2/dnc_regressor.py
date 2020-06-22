@@ -118,7 +118,8 @@ class DNC_Model_V2(DNC_Model):
 
         rnn1 = keras.layers.RNN(
             cell = dnc.DNC(
-                self.output_size,
+                name='DNC_1',
+                output_size=self.output_size,
                 controller_units=self.controller_units,
                 memory_size=self.memory_size,
                 word_size=self.word_size,
@@ -132,7 +133,8 @@ class DNC_Model_V2(DNC_Model):
 
         rnn2 = keras.layers.RNN(
             cell = dnc.DNC(
-                self.output_size,
+                name='DNC_2',
+                output_size=self.output_size,
                 controller_units=self.controller_units,
                 memory_size=self.memory_size,
                 word_size=self.word_size,
