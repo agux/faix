@@ -125,7 +125,7 @@ class DNC_Model_V2(DNC_Model):
                 word_size=self.word_size,
                 num_read_heads=self.num_read_heads
             ),
-            # return_sequences=True
+            return_sequences=True
         )
         # dnc_initial_state = dnc_cell.get_initial_state(inputs=feat)
         # predictions = rnn(feat, initial_state=dnc_initial_state)
@@ -140,6 +140,7 @@ class DNC_Model_V2(DNC_Model):
                 word_size=self.word_size,
                 num_read_heads=self.num_read_heads
             ),
+            return_sequences=True
         )
         rnn2_out = keras.layers.Bidirectional(rnn2)(rnn1_out)
         rnn2_out = keras.layers.Dropout(self._dropout_rate)(rnn2_out)
