@@ -59,6 +59,7 @@ class DNC(tf.keras.layers.Layer):
         super().__init__(name=name, **kwargs)
 
         self._output_size = output_size
+        self._controller_units = controller_units
         self._N = memory_size
         self._R = num_read_heads
         self._W = word_size
@@ -178,17 +179,23 @@ class DNC(tf.keras.layers.Layer):
 
     def get_config(self):
         config = {
-            'controller': {
-                'class_name': self._controller.__class__.__name__,
-                'config': self._controller.get_config()
-            },
-            'memory': {
-                'read_heads_num': self._R,
-                'word_size': self._W,
-                'words_num': self._N,
-            },
-            'clip': self._clip,
+            'name': self.name,
             'output_size': self._output_size,
+            'controller_units': self._controller_units,
+            'memory_size': self._N,
+            'word_size': self._W,
+            'num_read_heads': self._R,
+            # 'controller': {
+            #     'class_name': self._controller.__class__.__name__,
+            #     'config': self._controller.get_config()
+            # },
+            # 'memory': {
+            #     'read_heads_num': self._R,
+            #     'word_size': self._W,
+            #     'words_num': self._N,
+            # },
+            # 'clip': self._clip,
+            # 'output_size': self._output_size,
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
