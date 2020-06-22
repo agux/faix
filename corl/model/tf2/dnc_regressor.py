@@ -94,5 +94,57 @@ class DNC_Model():
             loss='huber_loss',
             # trying to fix 'Inputs to eager execution function cannot be Keras symbolic tensors'
             # ref: https://github.com/tensorflow/probability/issues/519
-            experimental_run_tf_function=False)
+            experimental_run_tf_function=False,
+            metrics=["mse", "mae"])
         self.model.summary()
+
+
+class DNC_Model_V2(DNC_Model):
+
+    def __init__(self, *args, **kwargs):
+        super(DNC_Model_V2, self).__init__(*args, **kwargs)
+
+    def getModel(self):
+        if self.model is not None:
+            return self.model
+        print('{} constructing model {}'.format(strftime("%H:%M:%S"),
+                                                self.getName()))
+
+        feat = keras.Input(
+            shape=(self._time_step, self._feat_size),
+            name='features',
+            dtype=tf.float32)
+        seqlens = keras.Input(shape=(1), name='seqlens', dtype=tf.int32)
+
+        rnn1 = keras.layers.RNN(
+            cell = dnc.DNC(
+                self.output_size,
+                controller_units=self.controller_units,
+                memory_size=self.memory_size,
+                word_size=self.word_size,
+                num_read_heads=self.num_read_heads
+            ),
+            # return_sequences=True
+        )
+        # dnc_initial_state = dnc_cell.get_initial_state(inputs=feat)
+        # predictions = rnn(feat, initial_state=dnc_initial_state)
+        rnn1_out = keras.layers.Bidirectional(rnn1)(feat)
+
+        rnn2 = keras.layers.RNN(
+            cell = dnc.DNC(
+                self.output_size,
+                controller_units=self.controller_units,
+                memory_size=self.memory_size,
+                word_size=self.word_size,
+                num_read_heads=self.num_read_heads
+            ),
+        )
+        rnn2_out = keras.layers.Bidirectional(rnn2)(rnn1_out)
+        rnn2_out = keras.layers.Dropout(self._dropout_rate)(rnn2_out)
+        predictions = keras.layers.Dense(1)(rnn2_out)
+
+        inputs = {'features': feat, 'seqlens': seqlens}
+        self.model = keras.Model(inputs=inputs, outputs=predictions)
+        self.model._name = self.getName()
+
+        return self.model

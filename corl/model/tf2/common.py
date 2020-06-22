@@ -9,7 +9,6 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
     def __init__(self, decay_start, *args, **kwargs):
         super(DelayedCosineDecayRestarts, self).__init__(*args, **kwargs)
         self._decay_start = decay_start
-        self.started = False
 
     def __call__(self, step):
         return tf.cond(
@@ -19,8 +18,9 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
         )
 
     def decay(self, step):
-        tf.print("DelayedCosineDecayRestarts activated at step {}".format(step))
-        return super(DelayedCosineDecayRestarts, self).__call__(step-self._decay_start+1)
+        lr = super(DelayedCosineDecayRestarts, self).__call__(step-self._decay_start+1)
+        tf.print("DelayedCosineDecayRestarts activated at step {}, lr={}".format(step, lr))
+        return lr
 
     def get_config(self):
         return {

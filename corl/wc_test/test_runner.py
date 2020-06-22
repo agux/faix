@@ -172,7 +172,8 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
         # If an integer, specifies how many training epochs to run before a new validation run is performed
         # If a Container, specifies the epochs on which to run validation
         validation_freq=1,
-        callbacks=callbacks)
+        callbacks=callbacks,
+        )
 
     iterations = model.optimizer.iterations.numpy()
     print('{} Training ended. Finished iterations: {}/{}'.format(
