@@ -190,7 +190,7 @@ class DNC_Model_V3(DNC_Model):
 
         # create sequence of FCN layers
         units = self.output_size
-        for i in range(self._num_fcn_layer):
+        for i in range(self._num_fcn_layers):
             layer = keras.layers.Dense(
                 units=units,
                 bias_initializer=tf.constant_initializer(0.1),
