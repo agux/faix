@@ -175,7 +175,7 @@ class DNC_Model_V3(DNC_Model):
         for i in range(self._num_dnc_layers):
             rnn = keras.layers.RNN(
                 cell = dnc.DNC(
-                    name='DNC_' + i,
+                    name='DNC_{}'.format(i),
                     output_size=self.output_size,
                     controller_units=self.controller_units,
                     memory_size=self.memory_size,
