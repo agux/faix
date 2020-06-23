@@ -40,7 +40,8 @@ def run(id=None,
     time_shift=None, 
     feat_cols=None, 
     val_save_freq=None, 
-    steps_per_epoch=None):
+    steps_per_epoch=None,
+    include_seqlens=True):
 
     global VSET, MAX_STEP, TIME_SHIFT, FEAT_COLS, VAL_SAVE_FREQ, STEPS_PER_EPOCH
     VSET = vset or VSET
@@ -54,19 +55,26 @@ def run(id=None,
     args = parseArgs()
     setupPath()
     _setupTensorflow(args)
-    _main(args, regressor, id)
+    _main(args, regressor, id, include_seqlens)
 
-def _getInput(start_epoch, args):
+def _getInput(start_epoch, args, include_seqlens):
     ds = args.ds.lower()
     print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
     start_bno = start_epoch * STEPS_PER_EPOCH + 1
     input_dict = {}
     if ds == 'db':
-        input_dict = input_fn.getInputs(start_bno, TIME_SHIFT, FEAT_COLS,
-                                        MAX_STEP, args.parallel, args.prefetch,
-                                        args.db_pool, args.db_host,
-                                        args.db_port, args.db_pwd, args.vset
-                                        or VSET, args.check_input)
+        if include_seqlens:
+            input_dict = input_fn.getInputs(start_bno, TIME_SHIFT, FEAT_COLS,
+                                            MAX_STEP, args.parallel, args.prefetch,
+                                            args.db_pool, args.db_host,
+                                            args.db_port, args.db_pwd, args.vset
+                                            or VSET, args.check_input)
+        else:
+            input_dict = input_fn.getInputs_v2(start_bno, TIME_SHIFT, FEAT_COLS,
+                                            MAX_STEP, args.parallel, args.prefetch,
+                                            args.db_pool, args.db_host,
+                                            args.db_port, args.db_pwd, args.vset
+                                            or VSET, args.check_input)
     input_dict['start_epoch'] = start_epoch
     return input_dict
 
@@ -234,7 +242,7 @@ def _load_model(regressor, training_dir):
     return start_epoch
 
 
-def _main(args, regressor, id=None):
+def _main(args, regressor, id=None, include_seqlens=True):
     model_name = regressor.getName()
     print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
 
@@ -248,7 +256,7 @@ def _main(args, regressor, id=None):
     start_epoch = _load_model(regressor, training_dir)
 
     print('{} querying datasource...'.format(strftime("%H:%M:%S")))
-    input_dict = _getInput(start_epoch, args)
+    input_dict = _getInput(start_epoch, args, include_seqlens)
     _train(args, regressor, input_dict, base_dir, training_dir)
 
 def _setupTensorflow(args):

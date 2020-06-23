@@ -59,4 +59,5 @@ if __name__ == '__main__':
         feat_cols=FEAT_COLS,
         val_save_freq=VAL_SAVE_FREQ,
         steps_per_epoch=STEPS_PER_EPOCH,
+        include_seqlens=False
     )

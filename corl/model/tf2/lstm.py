@@ -399,12 +399,6 @@ class LSTMRegressorV2:
             # The name becomes a key in the dict.
             name='features',
             dtype='float32')
-        seqlens = keras.Input(
-            shape=(1),
-            # The name becomes a key in the dict.
-            name='seqlens',
-            dtype='int32')
-        inputs = {'features': feat, 'seqlens': seqlens}
 
         # RNN
         # choice for regularizer:
@@ -412,11 +406,11 @@ class LSTMRegressorV2:
         # L1 is to prune less important features, if we have a large feature set
         # https://towardsdatascience.com/l1-and-l2-regularization-methods-ce25e7fc831c
         layer = feat
-        for _ in range(self._num_lstm_layer):
+        for i in range(self._num_lstm_layer):
             layer = keras.layers.Bidirectional(keras.layers.LSTM(
                 units=self._layer_width,
                 # stateful=True,
-                return_sequences=True,
+                return_sequences=True if i+1 < self._num_lstm_layer else False,
                 # kernel_initializer=keras.initializers.VarianceScaling(),
                 bias_initializer=tf.constant_initializer(0.1),
                 # kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
@@ -443,7 +437,7 @@ class LSTMRegressorV2:
             bias_initializer=tf.constant_initializer(0.1),
         )(layer)
 
-        self.model = keras.Model(inputs=inputs, outputs=outputs)
+        self.model = keras.Model(inputs=feat, outputs=outputs)
         self.model._name = self.getName()
 
         return self.model

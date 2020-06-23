@@ -4,7 +4,7 @@ from time import strftime
 # from joblib import Parallel, delayed
 # from loky import get_reusable_executor
 from mysql.connector.pooling import MySQLConnectionPool
-from corl.wc_data.series import getSeries
+from corl.wc_data.series import getSeries, getSeries_v2
 import tensorflow as tf
 import sys
 import ray
@@ -193,6 +193,37 @@ def _loadTestSet(max_step, ntest, vset=None):
     finally:
         cnx.close()
 
+def _loadTestSet_v2(max_step, ntest, vset=None):
+    global cnxpool, shared_args
+    cnx = cnxpool.get_connection()
+    try:
+        setno = vset or np.random.randint(ntest)
+        flag = 'TS'
+        print('{} selected test set: {}'.format(strftime("%H:%M:%S"), setno))
+        q = ("SELECT "
+             "   code, klid, rcode, corl_stz "
+             "FROM "
+             "   wcc_trn "
+             "WHERE "
+             "   flag = %s "
+             "   AND bno = %s")
+        cursor = cnx.cursor(buffered=True)
+        cursor.execute(q, (flag, setno))
+        tset = cursor.fetchall()
+        cursor.close()
+        tasks = [
+            getSeries_v2.remote(code, klid, rcode, val, shared_args)
+            for code, klid, rcode, val in tset
+        ]
+        r = list(ray.get(tasks))
+        data, vals = zip(*r)
+        return np.array(data, 'f'), np.expand_dims(np.array(vals, 'f'), axis=1)
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        cnx.close()
+
 
 def _getIndex():
     '''
@@ -318,6 +349,79 @@ def _loadTrainingData(bno):
     finally:
         cnx.close()
 
+
+def _loadTrainingData_v2(bno):
+    global cnxpool, shared_args, check_input
+    # idxlst = _getIndex()
+    flag = 'TR'
+    print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag,
+                                                    bno))
+    cnx = cnxpool.get_connection()
+    try:
+        cursor = cnx.cursor(buffered=True)
+        query = ('SELECT '
+                 "   code, klid, rcode, corl_stz "
+                 'FROM '
+                 '   wcc_trn '
+                 'WHERE '
+                 "   flag = %s "
+                 "   AND bno = %s")
+        cursor.execute(query, (
+            flag,
+            int(bno),
+        ))
+        train_set = cursor.fetchall()
+        total = cursor.rowcount
+        cursor.close()
+        data, vals = [], []
+        if total > 0:
+            tasks = [
+                getSeries_v2.remote(code, klid, rcode, val, shared_args)
+                for code, klid, rcode, val in train_set
+            ]
+            r = list(ray.get(tasks))
+            data, vals = zip(*r)
+        d = np.array(data, 'f')
+        v = np.expand_dims(np.array(vals, 'f'), axis=1)
+
+        if check_input:
+            if np.ma.is_masked(d):
+                print('batch[{}] masked feature'.format(bno))
+                print(d)
+            if np.ma.is_masked(v):
+                print('batch[{}] masked values'.format(bno))
+                print(v)
+
+            found = False
+            nanLoc = np.argwhere(np.isnan(d))
+            if len(nanLoc) > 0:
+                print('batch[{}] nan for feature: {}'.format(bno, nanLoc))
+                found = True
+            infLoc = np.argwhere(np.isinf(d))
+            if len(infLoc) > 0:
+                print('batch[{}] inf for feature: {}'.format(bno, infLoc))
+                found = True
+            if found:
+                print(d)
+
+            found = False
+            nanVal = np.argwhere(np.isnan(v))
+            if len(nanVal) > 0:
+                print('batch[{}] nan for values: {}'.format(bno, nanVal))
+                found = True
+            infVal = np.argwhere(np.isinf(v))
+            if len(infVal) > 0:
+                print('batch[{}] inf for values: {}'.format(bno, infVal))
+                found = True
+            if found:
+                print(v)
+
+        return d, v
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        cnx.close()
 
 def _getStats():
     '''
@@ -513,6 +617,99 @@ def getInputs(start_bno=0,
     test_batches, test_batch_size = _getDataSetMeta("TS")
     ds_test = tf.data.Dataset.from_tensor_slices(
         _loadTestSet(step, test_batches + 1,
+                     vset)).batch(test_batch_size).cache().repeat()
+
+    return {
+        'train': ds_train,
+        'test': ds_test,
+        'train_batches': train_batches,
+        'test_batches': test_batches,
+        'train_batch_size': train_batch_size,
+        'test_batch_size': test_batch_size
+    }
+
+def getInputs_v2(start_bno=0,
+              shift=0,
+              cols=None,
+              step=30,
+              cores=psutil.cpu_count(logical=False),
+              pfetch=2,
+              pool=None,
+              host=None,
+              port=None,
+              pwd=None,
+              vset=None,
+              check=False):
+    """Input function for the wcc training dataset.
+
+    Returns:
+        A dictionary of the following:
+        'train': dataset for training
+        'test': dataset for test/validation
+        'train_batches': total batch of train set
+        'test_batches': total batch of test set
+        'train_batch_size': size of a single train set batch
+        'test_batch_size': size of a single test set batch
+    """
+    # Create dataset for training
+    global feat_cols, max_step, time_shift
+    global parallel, _prefetch, db_pool_size
+    global db_host, db_port, db_pwd, shared_args, check_input
+    time_shift = shift
+    feat_cols = cols or k_cols
+    max_step = step
+    feat_size = len(feat_cols) * 2 * (time_shift + 1)
+    parallel = cores
+    _prefetch = pfetch
+    db_pool_size = pool
+    db_host = host
+    db_port = port
+    db_pwd = pwd
+    check_input = check
+    print("{} Using parallel: {}, prefetch: {} db_host: {} port: {}".format(
+        strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port))
+    _init(db_pool_size, db_host, db_port, db_pwd)
+    qk, qd, qd_idx = _getFtQuery()
+    shared_args = ray.put({
+        'max_step': max_step,
+        'time_shift': time_shift,
+        'qk': qk,
+        'qd': qd,
+        'qd_idx': qd_idx,
+        'index_list': _getIndex(),
+        'db_host': db_host,
+        'db_port': db_port,
+        'db_pwd': db_pwd
+    })
+    # query max flag from wcc_trn and fill a slice with flags between start and max
+    train_batches, train_batch_size = _getDataSetMeta("TR")
+    if train_batches is None:
+        return None
+    bnums = [bno for bno in range(start_bno, train_batches + 1)]
+
+    def mapfunc(bno):
+        with tf.device('/CPU:0'):
+            ret = tf.numpy_function(func=_loadTrainingData_v2,
+                                    inp=[bno],
+                                    Tout=[tf.float32, tf.float32])
+            feat, corl = ret
+
+            feat.set_shape((None, max_step, feat_size))
+            corl.set_shape((None, 1))
+
+            return feat, corl
+
+    ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
+        lambda bno: tuple(mapfunc(bno)),
+            num_parallel_calls=tf.data.experimental.AUTOTUNE
+        ).prefetch(
+            tf.data.experimental.AUTOTUNE
+        )
+
+    # Create dataset for testing
+    test_batches, test_batch_size = _getDataSetMeta("TS")
+    ds_test = tf.data.Dataset.from_tensor_slices(
+        _loadTestSet_v2(step, test_batches + 1,
                      vset)).batch(test_batch_size).cache().repeat()
 
     return {
