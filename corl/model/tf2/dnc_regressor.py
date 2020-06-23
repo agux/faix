@@ -96,7 +96,7 @@ class DNC_Model():
             # ref: https://github.com/tensorflow/probability/issues/519
             experimental_run_tf_function=False,
             metrics=["mse", "mae"])
-        self.model.summary()
+        print(self.model.summary())
 
 
 class DNC_Model_V2(DNC_Model):

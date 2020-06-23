@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from tensorflow import keras
 from time import strftime
+from corl.model.tf2.common import DelayedCosineDecayRestarts
 
 
 class GlobalStepMarker(keras.layers.Layer):
@@ -350,4 +351,124 @@ class LSTMRegressorV1:
         #input_shape = ([self._time_step, self._feat_size], None)
         # input_shape = {[self._time_step, self._feat_size], None}
         # self.model.build(input_shape)
+        print(self.model.summary())
+
+
+class LSTMRegressorV2:
+    '''
+
+    '''
+    def __init__(self,
+                 layer_width=200,
+                 num_lstm_layer=3,
+                 num_fcn_layer=3,
+                 time_step=30,
+                 feat_size=3,
+                 dropout_rate=0.5,
+                 decayed_dropout_start=None,
+                 dropout_decay_steps=None,
+                 learning_rate=1e-3,
+                 decayed_lr_start=None,
+                 lr_decay_steps=None,
+                 seed=None):
+        self._layer_width = layer_width
+        self._num_lstm_layer = num_lstm_layer
+        self._num_fcn_layer = num_fcn_layer
+        self._time_step = time_step
+        self._feat_size = feat_size
+        self._dropout_rate = dropout_rate
+        self._decayed_dropout_start = decayed_dropout_start
+        self._dropout_decay_steps = dropout_decay_steps
+        self._lr = learning_rate
+        self._decayed_lr_start = decayed_lr_start
+        self._lr_decay_steps = lr_decay_steps
+        self._seed = seed
+        self.model = None
+
+    def getName(self):
+        return self.__class__.__name__
+
+    def getModel(self):
+        if self.model is not None:
+            return self.model
+        print('{} constructing model {}'.format(strftime("%H:%M:%S"),
+                                                self.getName()))
+        feat = keras.Input(
+            # A shape tuple (integers), not including the batch size.
+            shape=(self._time_step, self._feat_size),
+            # The name becomes a key in the dict.
+            name='features',
+            dtype='float32')
+        seqlens = keras.Input(
+            shape=(1),
+            # The name becomes a key in the dict.
+            name='seqlens',
+            dtype='int32')
+        inputs = {'features': feat, 'seqlens': seqlens}
+
+        # RNN
+        # choice for regularizer:
+        # https://machinelearningmastery.com/use-weight-regularization-lstm-networks-time-series-forecasting/
+        # L1 is to prune less important features, if we have a large feature set
+        # https://towardsdatascience.com/l1-and-l2-regularization-methods-ce25e7fc831c
+        layer = feat
+        for _ in range(self._num_lstm_layer):
+            layer = keras.layers.Bidirectional(keras.layers.LSTM(
+                units=self._layer_width,
+                # stateful=True,
+                return_sequences=True,
+                # kernel_initializer=keras.initializers.VarianceScaling(),
+                bias_initializer=tf.constant_initializer(0.1),
+                # kernel_regularizer=keras.regularizers.l1_l2(0.01, 0.01),
+                # recurrent_regularizer=reg,
+            ))(layer)
+        # extract last_relevant timestep
+        # layer = LastRelevant()((layer, seqlens))
+
+        layer = keras.layers.AlphaDropout(self._dropout_rate)(layer)
+
+        # FCN
+        units = self._layer_width
+        for i in range(self._num_fcn_layer):
+            layer = keras.layers.Dense(
+                units=units,
+                bias_initializer=tf.constant_initializer(0.1),
+                activation='selu'
+            )(layer)
+            units = units // 2
+
+        # Output layer
+        outputs = keras.layers.Dense(
+            units=1,
+            bias_initializer=tf.constant_initializer(0.1),
+        )(layer)
+
+        self.model = keras.Model(inputs=inputs, outputs=outputs)
+        self.model._name = self.getName()
+
+        return self.model
+
+    def compile(self):
+        decay_lr = DelayedCosineDecayRestarts(
+            initial_learning_rate=self._lr,
+            first_decay_steps=self._lr_decay_steps,
+            decay_start=self._decayed_lr_start,
+            t_mul=1.02,
+            m_mul=0.95,
+            alpha=0.095)
+        optimizer = tf.keras.optimizers.Adam(
+            learning_rate=decay_lr
+            # amsgrad=True
+            # clipnorm=0.5
+            # clipvalue=0.1
+        )
+
+        self.model.compile(
+            optimizer=optimizer,
+            loss='huber_loss',
+            # trying to fix 'Inputs to eager execution function cannot be Keras symbolic tensors'
+            # ref: https://github.com/tensorflow/probability/issues/519
+            experimental_run_tf_function=False,
+            metrics=["mse", "mae"])
+
         print(self.model.summary())
