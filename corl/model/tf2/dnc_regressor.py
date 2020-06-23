@@ -155,7 +155,7 @@ class DNC_Model_V2(DNC_Model):
 class DNC_Model_V3(DNC_Model):
 
     def __init__(self, num_dnc_layers=3, num_fcn_layers=3, *args, **kwargs):
-        super(DNC_Model_V2, self).__init__(*args, **kwargs)
+        super(DNC_Model_V3, self).__init__(*args, **kwargs)
         self._num_dnc_layers = num_dnc_layers
         self._num_fcn_layers = num_fcn_layers
 
