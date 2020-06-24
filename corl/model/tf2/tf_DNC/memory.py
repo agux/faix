@@ -139,7 +139,7 @@ class AllocationAdressing:
         '''
         with tf.name_scope(name or "c_reduce_prod"):
             cp=tf.math.cumprod(x, axis, reverse=True)
-            shape = tf.shape(cp).numpy()
+            shape = cp.shape.as_list()
             r = len(shape)
             begin = np.zeros([r], np.int)
             size = shape
