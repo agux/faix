@@ -141,7 +141,7 @@ class AllocationAdressing:
             cp=tf.math.cumprod(x, axis, reverse=True)
             shape = cp.shape.as_list()
             r = len(shape)
-            begin = np.zeros([r], np.int)
+            begin = np.zeros([r], np.int32)
             size = [-1 if e is None else e for e in shape]
             size[-1] = 1
             sliced = tf.slice(cp, begin, size)
