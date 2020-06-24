@@ -176,8 +176,8 @@ class AllocationAdressing:
             #     axis=2,
             # )
             retention_vector = AllocationAdressing.reduce_prod(
-                input_tensor=1 - tf.expand_dims(free_gates, 1) * prev_read_weightings,
-                axis=2,
+                1 - tf.expand_dims(free_gates, 1) * prev_read_weightings,
+                2,
             )
             usage_vector = (
                 (prev_usage_vector + prev_write_weighting
