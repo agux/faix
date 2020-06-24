@@ -97,6 +97,12 @@ def parseArgs():
         action='store_true',
     )
     parser.add_argument(
+        '--enable_xla',
+        help='enable XLA feature',
+        dest='enable_xla',
+        action='store_true',
+    )
+    parser.add_argument(
         '--check_input',
         help='check inputs for NaN or Inf.',
         dest='check_input',
