@@ -142,7 +142,7 @@ class AllocationAdressing:
             shape = cp.shape.as_list()
             r = len(shape)
             begin = np.zeros([r], np.int)
-            size = shape
+            size = [-1 if e is None else e for e in shape]
             size[-1] = 1
             sliced = tf.slice(cp, begin, size)
             return tf.squeeze(sliced, -1)
