@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 
 def reduce_prod(x, axis, name=None):
@@ -8,10 +9,11 @@ def reduce_prod(x, axis, name=None):
     '''
     with tf.name_scope(name or "c_reduce_prod"):
         cp=tf.math.cumprod(x, axis, reverse=True)
-        shape = tf.shape(cp)
-        r = tf.size(shape)
-        begin = tf.zeros([r], tf.int32)
-        size = tf.tensor_scatter_nd_update(shape, [[r-1]], [1])
+        shape = tf.shape(cp).numpy()
+        r = len(shape)
+        begin = np.zeros([r], np.int)
+        size = shape
+        size[-1] = 1
         sliced = tf.slice(cp, begin, size)
         return tf.squeeze(sliced, -1)
         # size=tf.shape(cp)[0]
