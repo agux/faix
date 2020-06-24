@@ -132,6 +132,20 @@ class AllocationAdressing:
     """
 
     @staticmethod
+    def reduce_prod(x, axis, name=None):
+        '''
+        Uses tf.cumprod and tf.gather_nd as a workaround to the poor performance of calculating tf.reduce_prod's gradient
+        on CPU.
+        '''
+        with tf.variable_scope(name or "c_reduce_prod"):
+            cp=tf.math.cumprod(x, axis, reverse=True)
+            size=tf.shape(cp)[0]
+            idx1=tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
+            idx2=tf.zeros([size], tf.float32)
+            indices = tf.stack([idx1, idx2], 1)
+            return tf.gather_nd(cp, tf.cast(indices, tf.int32))
+
+    @staticmethod
     def update_usage_vector(free_gates, prev_read_weightings,
                             prev_write_weighting, prev_usage_vector):
         """Adjust the usage vector based on reads and writes from previous time
@@ -156,7 +170,12 @@ class AllocationAdressing:
             Tensor [B, N]: new usage vector
         """
         with tf.name_scope('allocation_addressing'):
-            retention_vector = tf.reduce_prod(
+            # back prob of tf.reduce_prod runs in CPU
+            # retention_vector = tf.reduce_prod(
+            #     input_tensor=1 - tf.expand_dims(free_gates, 1) * prev_read_weightings,
+            #     axis=2,
+            # )
+            retention_vector = AllocationAdressing.reduce_prod(
                 input_tensor=1 - tf.expand_dims(free_gates, 1) * prev_read_weightings,
                 axis=2,
             )
