@@ -11,8 +11,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 # pylint: disable-msg=E0401
 
-NUM_DNC_LAYERS = 4
-NUM_FCN_LAYERS = 4
+NUM_DNC_LAYERS = 1
+NUM_FCN_LAYERS = 0
 CONTROLLER_UNITS = 128
 DNC_OUTPUT_SIZE = 256
 WORD_SIZE = 32
@@ -21,7 +21,7 @@ NUM_READ_HEADS = 8
 
 MAX_STEP = 35
 TIME_SHIFT = 4
-DROPOUT_RATE = 0.35
+DROPOUT_RATE = 0
 LEARNING_RATE = 1e-4
 LR_DECAY_STEPS = 1000
 CLIP_VALUE = 50

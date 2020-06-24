@@ -296,15 +296,15 @@ class DNC_Model_V5(DNC_Model):
         print('{} constructing model {}'.format(strftime("%H:%M:%S"),
                                                 self.getName()))
 
-        feat = keras.Input(
+        inputs = keras.Input(
             shape=(self._time_step, self._feat_size),
-            name='features',
+            # name='features',
             dtype=tf.float32)
 
         #TODO add CNN before RNN?
 
         # create sequence of DNC layers
-        layer = feat
+        layer = inputs
         for i in range(self._num_dnc_layers):
             rnn = keras.layers.RNN(
                 cell = dnc.DNC(
@@ -323,7 +323,8 @@ class DNC_Model_V5(DNC_Model):
         
         # TODO add batch normalization layer before FCN?
 
-        layer = keras.layers.AlphaDropout(self._dropout_rate)(layer)
+        if self._dropout_rate > 0:
+            layer = keras.layers.AlphaDropout(self._dropout_rate)(layer)
 
         # create sequence of FCN layers
         units = self.output_size
@@ -343,7 +344,7 @@ class DNC_Model_V5(DNC_Model):
             name='output',
         )(layer)
 
-        self.model = keras.Model(inputs=feat, outputs=outputs)
+        self.model = keras.Model(inputs=inputs, outputs=outputs)
         self.model._name = self.getName()
 
         return self.model

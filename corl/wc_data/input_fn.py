@@ -352,7 +352,6 @@ def _loadTrainingData(bno):
 
 def _loadTrainingData_v2(bno):
     global cnxpool, shared_args, check_input
-    # idxlst = _getIndex()
     flag = 'TR'
     print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag,
                                                     bno))
@@ -381,8 +380,8 @@ def _loadTrainingData_v2(bno):
             ]
             r = list(ray.get(tasks))
             data, vals = zip(*r)
-        d = np.array(data, 'f')
-        v = np.expand_dims(np.array(vals, 'f'), axis=1)
+        d = np.array(data, np.float32)
+        v = np.expand_dims(np.array(vals, np.float32), axis=1)
 
         if check_input:
             if np.ma.is_masked(d):
@@ -688,16 +687,13 @@ def getInputs_v2(start_bno=0,
     bnums = [bno for bno in range(start_bno, train_batches + 1)]
 
     def mapfunc(bno):
-        with tf.device('/CPU:0'):
-            ret = tf.numpy_function(func=_loadTrainingData_v2,
-                                    inp=[bno],
-                                    Tout=[tf.float32, tf.float32])
-            feat, corl = ret
-
-            feat.set_shape((None, max_step, feat_size))
-            corl.set_shape((None, 1))
-
-            return feat, corl
+        ret = tf.numpy_function(func=_loadTrainingData_v2,
+                                inp=[bno],
+                                Tout=[tf.float32, tf.float32])
+        feat, corl = ret
+        feat.set_shape((None, max_step, feat_size))
+        corl.set_shape((None, 1))
+        return feat, corl
 
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
         lambda bno: tuple(mapfunc(bno)),
