@@ -137,7 +137,7 @@ class AllocationAdressing:
         Uses tf.cumprod and tf.gather_nd as a workaround to the poor performance of calculating tf.reduce_prod's gradient
         on CPU.
         '''
-        with tf.variable_scope(name or "c_reduce_prod"):
+        with tf.name_scope(name or "c_reduce_prod"):
             cp=tf.math.cumprod(x, axis, reverse=True)
             size=tf.shape(cp)[0]
             idx1=tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
