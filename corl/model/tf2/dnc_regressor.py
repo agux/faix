@@ -100,6 +100,9 @@ class DNC_Model():
 
 
 class DNC_Model_V2(DNC_Model):
+    '''
+        2 Bidirectional DNC layers, dropout and output layer
+    '''
 
     def __init__(self, *args, **kwargs):
         super(DNC_Model_V2, self).__init__(*args, **kwargs)
@@ -153,6 +156,9 @@ class DNC_Model_V2(DNC_Model):
         return self.model
 
 class DNC_Model_V3(DNC_Model):
+    '''
+        Multiple Bidirectional DNC layers, AlphaDropout, Multiple FCN layers
+    '''
 
     def __init__(self, num_dnc_layers=3, num_fcn_layers=3, *args, **kwargs):
         super(DNC_Model_V3, self).__init__(*args, **kwargs)
@@ -195,6 +201,69 @@ class DNC_Model_V3(DNC_Model):
                 units=units,
                 bias_initializer=tf.constant_initializer(0.1),
                 activation='selu'
+            )(layer)
+            units = units // 2
+
+        # Output layer
+        outputs = keras.layers.Dense(
+            units=1,
+            bias_initializer=tf.constant_initializer(0.1),
+        )(layer)
+
+        self.model = keras.Model(inputs=feat, outputs=outputs)
+        self.model._name = self.getName()
+
+        return self.model
+
+class DNC_Model_V4(DNC_Model):
+    '''
+        DNC with LayerNormLSTMCell as controller.
+    '''
+
+    def __init__(self, num_dnc_layers=2, num_fcn_layers=2, *args, **kwargs):
+        super(DNC_Model_V4, self).__init__(*args, **kwargs)
+        self._num_dnc_layers = num_dnc_layers
+        self._num_fcn_layers = num_fcn_layers
+
+    def getModel(self):
+        if self.model is not None:
+            return self.model
+        print('{} constructing model {}'.format(strftime("%H:%M:%S"),
+                                                self.getName()))
+
+        feat = keras.Input(
+            shape=(self._time_step, self._feat_size),
+            name='features',
+            dtype=tf.float32)
+
+        # create sequence of DNC layers
+        layer = feat
+        for i in range(self._num_dnc_layers):
+            rnn = keras.layers.RNN(
+                cell = dnc.DNC(
+                    name='dnc_{}'.format(i),
+                    output_size=self.output_size,
+                    controller_units=self.controller_units,
+                    memory_size=self.memory_size,
+                    word_size=self.word_size,
+                    num_read_heads=self.num_read_heads,
+                    layer_norm_lstm=True
+                ),
+                return_sequences=True if i+1 < self._num_dnc_layers else False,
+                name='rnn_{}'.format(i),
+            )
+            layer = keras.layers.Bidirectional(layer=rnn,name='bidir_{}'.format(i))(layer)
+        
+        layer = keras.layers.AlphaDropout(self._dropout_rate)(layer)
+
+        # create sequence of FCN layers
+        units = self.output_size
+        for i in range(self._num_fcn_layers):
+            layer = keras.layers.Dense(
+                units=units,
+                bias_initializer=tf.constant_initializer(0.1),
+                activation='selu',
+                name='dense_{}'.format(i)
             )(layer)
             units = units // 2
 

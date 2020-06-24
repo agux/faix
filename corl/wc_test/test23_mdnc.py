@@ -21,7 +21,7 @@ NUM_READ_HEADS = 8
 
 MAX_STEP = 35
 TIME_SHIFT = 4
-DROPOUT_RATE = 0.3
+DROPOUT_RATE = 0.5
 LEARNING_RATE = 1e-4
 LR_DECAY_STEPS = 1000
 CLIP_VALUE = 50
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     np.random.seed(SEED)
 
-    regressor = dnc_regressor.DNC_Model_V3(
+    regressor = dnc_regressor.DNC_Model_V4(
         num_dnc_layers = NUM_DNC_LAYERS,
         num_fcn_layers = NUM_FCN_LAYERS,
         output_size=DNC_OUTPUT_SIZE,
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     )
     
     run(
-        id="test22_mdnc",
+        id="test23_mdnc",
         regressor=regressor, 
         max_step=MAX_STEP, 
         time_shift=TIME_SHIFT, 

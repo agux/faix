@@ -15,6 +15,7 @@ Conventions:
 
 from collections import namedtuple, OrderedDict
 import tensorflow as tf
+import tensorflow_addons as tfa
 from tensorflow.python.util import nest
 
 from .memory import Memory, EPSILON
@@ -55,7 +56,7 @@ class DNC(tf.keras.layers.Layer):
     ])
 
     def __init__(self, name='DNC', output_size=None, controller_units=256, memory_size=256,
-                 word_size=64, num_read_heads=4, **kwargs):
+                 word_size=64, num_read_heads=4, layer_norm_lstm=False, **kwargs):
         super().__init__(name=name, **kwargs)
 
         self._output_size = output_size
@@ -66,7 +67,10 @@ class DNC(tf.keras.layers.Layer):
         self._interface_vector_size = self._R * self._W + 3 * self._W + 5 * self._R + 3
         self._clip = 20.0
 
-        self._controller = tf.keras.layers.LSTMCell(units=controller_units, name="controller")
+        if layer_norm_lstm:
+            self._controller = tfa.rnn.LayerNormLSTMCell(units=controller_units, name="controller")
+        else:
+            self._controller = tf.keras.layers.LSTMCell(units=controller_units, name="controller")
         self._controller_to_interface_dense = tf.keras.layers.Dense(
             self._interface_vector_size,
             name='controller_to_interface'
