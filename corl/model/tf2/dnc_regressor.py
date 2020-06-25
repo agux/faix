@@ -319,6 +319,7 @@ class DNC_Model_V5(DNC_Model):
                 return_sequences=True if i+1 < self._num_dnc_layers else False,
                 name='rnn_{}'.format(i),
             )
+            # TODO use separate dnc cell for forward & backward pass?
             layer = keras.layers.Bidirectional(layer=rnn, name='bidir_{}'.format(i))(layer)
         
         # TODO add batch normalization layer before FCN?

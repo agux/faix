@@ -254,7 +254,7 @@ class AllocationAdressing:
         emptiness = 1 - usage
 
         words_num = usage_vector.get_shape().as_list()[1]
-        emptiness_sorted, free_list = tf.nn.top_k(emptiness, k=words_num)
+        emptiness_sorted, free_list = tf.math.top_k(emptiness, k=words_num)
         usage_sorted = 1 - emptiness_sorted
         allocation_sorted = emptiness_sorted * tf.math.cumprod(usage_sorted, axis=1, exclusive=True)
 

@@ -13,6 +13,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 NUM_DNC_LAYERS = 1
 NUM_FCN_LAYERS = 0
+LAYER_NORM_LSTM = False
 CONTROLLER_UNITS = 128
 DNC_OUTPUT_SIZE = 256
 WORD_SIZE = 32
@@ -33,8 +34,9 @@ SEED = 285139
 VAL_SAVE_FREQ = 500
 STEPS_PER_EPOCH = 500
 
-# feat_cols = ["close", "volume", "amount"]
 FEAT_COLS = ["close"]
+INCLUDE_SEQLENS = False
+# feat_cols = ["close", "volume", "amount"]
 
 # pylint: disable-msg=E0601,E1101
 
@@ -45,7 +47,7 @@ if __name__ == '__main__':
     regressor = dnc_regressor.DNC_Model_V5(
         num_dnc_layers = NUM_DNC_LAYERS,
         num_fcn_layers = NUM_FCN_LAYERS,
-        layer_norm_lstm = False,
+        layer_norm_lstm = LAYER_NORM_LSTM,
         output_size=DNC_OUTPUT_SIZE,
         controller_units=CONTROLLER_UNITS, memory_size=MEMORY_SIZE,
         word_size=WORD_SIZE, num_read_heads=NUM_READ_HEADS,
@@ -68,5 +70,5 @@ if __name__ == '__main__':
         feat_cols=FEAT_COLS,
         val_save_freq=VAL_SAVE_FREQ,
         steps_per_epoch=STEPS_PER_EPOCH,
-        include_seqlens=False,
+        include_seqlens=INCLUDE_SEQLENS,
     )

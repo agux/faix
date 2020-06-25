@@ -260,6 +260,8 @@ def _main(args, regressor, id=None, include_seqlens=True):
     _train(args, regressor, input_dict, base_dir, training_dir)
 
 def _setupTensorflow(args):
+    # interim workaround to fix memory leak issue
+    tf.keras.backend.clear_session()
     # if args.check_weights:
     #     tf.debugging.enable_check_numerics()
     physical_devices = tf.config.list_physical_devices('GPU')

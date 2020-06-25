@@ -84,21 +84,21 @@ class DNC(tf.keras.layers.Layer):
         def read_keys(v):
             return tf.reshape(v, (-1, w, r))
         def read_strengths(v):
-            return 1 + tf.nn.softplus((tf.reshape(v, (-1, r))))
+            return 1 + tf.math.softplus((tf.reshape(v, (-1, r))))
         def write_key(v):
             return tf.reshape(v, (-1, w, 1))
         def write_strength(v):
-            return 1 + tf.nn.softplus((tf.reshape(v, (-1, 1))))
+            return 1 + tf.math.softplus((tf.reshape(v, (-1, 1))))
         def erase_vector(v):
-            return tf.nn.sigmoid(tf.reshape(v, (-1, w)))
+            return tf.math.sigmoid(tf.reshape(v, (-1, w)))
         def write_vector(v):
             return tf.reshape(v, (-1, w))
         def free_gates(v):
-            return tf.nn.sigmoid(tf.reshape(v, (-1, r)))
+            return tf.math.sigmoid(tf.reshape(v, (-1, r)))
         def allocation_gate(v):
-            return tf.nn.sigmoid(tf.reshape(v, (-1, 1)))
+            return tf.math.sigmoid(tf.reshape(v, (-1, 1)))
         def write_gate(v):
-            return tf.nn.sigmoid(tf.reshape(v, (-1, 1)))
+            return tf.math.sigmoid(tf.reshape(v, (-1, 1)))
         def read_modes(v):
             return tf.nn.softmax(tf.reshape(v, (-1, 3, r)), axis=1)
         fns = OrderedDict([
