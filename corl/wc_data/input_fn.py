@@ -697,9 +697,11 @@ def getInputs_v2(start_bno=0,
 
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
         lambda bno: tuple(mapfunc(bno)),
-            num_parallel_calls=tf.data.experimental.AUTOTUNE
+            # num_parallel_calls=tf.data.experimental.AUTOTUNE
+            num_parallel_calls=parallel
         ).prefetch(
-            tf.data.experimental.AUTOTUNE
+            # tf.data.experimental.AUTOTUNE
+            _prefetch
         )
 
     # Create dataset for testing

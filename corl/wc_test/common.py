@@ -1,7 +1,7 @@
 # from __future__ import print_function
 
 import os
-import multiprocessing
+import psutil
 import shutil
 import asyncio
 import math
@@ -57,7 +57,7 @@ def parseArgs():
     parser.add_argument('--parallel',
                         type=int,
                         help='database operation parallel level',
-                        default=multiprocessing.cpu_count())
+                        default=psutil.cpu_count(logical=False))
     parser.add_argument('--prefetch',
                         type=int,
                         help='dataset prefetch batches',
@@ -81,7 +81,7 @@ def parseArgs():
     parser.add_argument('--db_pool',
                         type=int,
                         help='database connection pool size',
-                        default=multiprocessing.cpu_count())
+                        default=psutil.cpu_count(logical=False))
     parser.add_argument('--start',
                         type=int,
                         help='start training at specified batch no',

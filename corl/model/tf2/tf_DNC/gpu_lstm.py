@@ -1,7 +1,7 @@
 
 import tensorflow as tf
 import tensorflow.keras.activations as activations
-import tf.math as math
+import tensorflow.math as math
 
 _CUDNN_AVAILABLE_MSG = 'Layer %s will use cuDNN kernel when run on GPU.'
 _CUDNN_NOT_AVAILABLE_MSG = ('Layer %s will not use cuDNN kernel since it '

@@ -178,14 +178,14 @@ class AllocationAdressing:
         """
         with tf.name_scope('allocation_addressing'):
             # back prob of tf.reduce_prod runs in CPU
-            # retention_vector = tf.reduce_prod(
-            #     input_tensor=1 - tf.expand_dims(free_gates, 1) * prev_read_weightings,
-            #     axis=2,
-            # )
-            retention_vector = AllocationAdressing.reduce_prod(
-                1 - tf.expand_dims(free_gates, 1) * prev_read_weightings,
-                2,
+            retention_vector = tf.reduce_prod(
+                input_tensor=1 - tf.expand_dims(free_gates, 1) * prev_read_weightings,
+                axis=2,
             )
+            # retention_vector = AllocationAdressing.reduce_prod(
+            #     1 - tf.expand_dims(free_gates, 1) * prev_read_weightings,
+            #     2,
+            # )
             usage_vector = (
                 (prev_usage_vector + prev_write_weighting
                  - (prev_usage_vector * prev_write_weighting))
