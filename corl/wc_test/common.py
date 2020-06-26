@@ -252,7 +252,7 @@ class DebugCallback(keras.callbacks.Callback):
         #              summarize=-1)
 
 class TracemallocCallback(keras.callbacks.Callback):
-    def __init__(self, nframe=100, start=10, end=110, out_file='tracemalloc.log'):
+    def __init__(self, nframe=100, start=200, end=300, out_file='tracemalloc.log'):
         super(TracemallocCallback, self).__init__()
         tracemalloc.start(nframe)
         print('{} TracemallocCallback is enabled'.format(strftime("%H:%M:%S")))
@@ -266,14 +266,21 @@ class TracemallocCallback(keras.callbacks.Callback):
         i = self.model.optimizer.iterations.numpy()
         if i == self.start:
             self.snapshot1 = tracemalloc.take_snapshot()
-            self.snapshot1.dump('{}_1{}'.format(self.out_file_base, self.out_file_ext))
+            dest = '{}_1{}'.format(self.out_file_base, self.out_file_ext)
+            self.snapshot1.dump(dest)
+            tf.print('tracemalloc snapshot #1 at iteration ', i, ' has been dumped to ', dest)
         if i == self.end:
+            dest = '{}_2{}'.format(self.out_file_base, self.out_file_ext)
             snapshot2 = tracemalloc.take_snapshot()
-            snapshot2.dump('{}_2{}'.format(self.out_file_base, self.out_file_ext))
-            stats_diff = snapshot2.compare_to(snapshot1, 'lineno')
-            with open('{}_d{}'.format(self.out_file_base, self.out_file_ext), 'w') as f:
+            snapshot2.dump(dest)
+            tf.print('tracemalloc snapshot #2 at iteration ', i, ' has been dumped to ', dest)
+            stats_diff = snapshot2.compare_to(self.snapshot1, 'lineno')
+            diff_dest = '{}_d{}'.format(self.out_file_base, self.out_file_ext)
+            with open(diff_dest, 'w') as f:
                 for stat in stats_diff:
                     print(stat, file=f)
+                tf.print('2 snapshot compare has been dumped to ', diff_dest)
+                
         
         
         
