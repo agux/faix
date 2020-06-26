@@ -217,7 +217,7 @@ def _loadTestSet_v2(max_step, ntest, vset=None):
         ]
         r = list(ray.get(tasks))
         data, vals = zip(*r)
-        return np.array(data, 'f'), np.expand_dims(np.array(vals, 'f'), axis=1)
+        return np.array(data, np.float32, copy=False), np.expand_dims(np.array(vals, np.float32, copy=False), axis=1)
     except:
         print(sys.exc_info()[0])
         raise
@@ -353,8 +353,8 @@ def _loadTrainingData(bno):
 def _loadTrainingData_v2(bno):
     global cnxpool, shared_args, check_input
     flag = 'TR'
-    print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag,
-                                                    bno))
+    # print("{} loading training set {} {}...".format(strftime("%H:%M:%S"), flag,
+    #                                                 bno))
     cnx = cnxpool.get_connection()
     try:
         cursor = cnx.cursor(buffered=True)
@@ -380,8 +380,8 @@ def _loadTrainingData_v2(bno):
             ]
             r = list(ray.get(tasks))
             data, vals = zip(*r)
-        d = np.array(data, np.float32)
-        v = np.expand_dims(np.array(vals, np.float32), axis=1)
+        d = np.array(data, np.float32, copy=False)
+        v = np.expand_dims(np.array(vals, np.float32, copy=False), axis=1)
 
         if check_input:
             if np.ma.is_masked(d):

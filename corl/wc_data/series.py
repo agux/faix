@@ -85,7 +85,7 @@ def _getBatch(code, s, e, rcode, shared_args):
                 rcode, rtotal, code, total, max_step, time_shift, qd))
         batch = []
         for t in range(time_shift + 1):
-            steps = np.zeros((max_step, featSize), dtype='f')
+            steps = np.zeros((max_step, featSize), dtype=np.float32)
             offset = max_step + time_shift - total
             s = max(0, t - offset)
             e = total - time_shift + t
@@ -144,7 +144,7 @@ def _getBatch_v2(code, s, e, rcode, shared_args):
                 rcode, rtotal, code, total, max_step, time_shift, qd))
         batch = []
         for t in range(time_shift + 1):
-            steps = np.zeros((max_step, featSize), dtype='f')
+            steps = np.zeros((max_step, featSize), dtype=np.float32)
             offset = max_step + time_shift - total
             s = max(0, t - offset)
             e = total - time_shift + t
