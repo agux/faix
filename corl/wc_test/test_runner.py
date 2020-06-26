@@ -8,7 +8,7 @@ import logging
 import ray
 import psutil
 from pathlib import Path
-from corl.wc_test.common import parseArgs, cleanup, LOG_DIR, log, setupPath, DebugCallback
+from corl.wc_test.common import parseArgs, cleanup, LOG_DIR, log, setupPath, DebugCallback, TracemallocCallback
 from corl.wc_data import input_fn
 from time import strftime
 from corl.model.tf2 import lstm
@@ -128,6 +128,7 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
         # decay,
         tensorboard_cbk,
         DebugCallback() if args.check_weights else None,
+        TracemallocCallback() if args.tracemalloc else None,
         keras.callbacks.CSVLogger('train_perf.log'),
         keras.callbacks.TerminateOnNaN() if args.terminate_on_nan else None,
         # tf.keras.callbacks.ProgbarLogger(count_mode='steps',

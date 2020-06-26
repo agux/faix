@@ -7,6 +7,7 @@ import asyncio
 import math
 import numpy as np
 import tensorflow as tf
+import tracemalloc
 from tensorflow import keras
 from pathlib import Path
 from time import strftime
@@ -119,6 +120,11 @@ def parseArgs():
         dest='gpu_grow_mem',
         action='store_true',
         help='allow gpu to allocate mem dynamically at runtime.')
+    parser.add_argument(
+        '--tracemalloc',
+        dest='tracemalloc',
+        action='store_true',
+        help='enable built-in python tracemalloc in first several runs.')
     parser.add_argument('--trace',
                         dest='trace',
                         action='store_true',
@@ -244,3 +250,30 @@ class DebugCallback(keras.callbacks.Callback):
         #     tf.print(self.model.inputs,
         #              output_stream='file://' + self.out_file,
         #              summarize=-1)
+
+class TracemallocCallback(keras.callbacks.Callback):
+    def __init__(self, nframe=100, start=10, end=110, out_file='tracemalloc.log'):
+        super(TracemallocCallback, self).__init__()
+        tracemalloc.start(nframe)
+        print('{} TracemallocCallback is enabled'.format(strftime("%H:%M:%S")))
+        self.start = start
+        self.end = end
+        self.out_file = out_file
+        path_seg = os.path.splitext(self.out_file)
+        self.out_file_base, self.out_file_ext = path_seg[0], path_seg[1]
+
+    def on_train_batch_end(self, batch, logs=None):
+        i = self.model.optimizer.iterations.numpy()
+        if i == self.start:
+            self.snapshot1 = tracemalloc.take_snapshot()
+            self.snapshot1.dump('{}_1{}'.format(self.out_file_base, self.out_file_ext))
+        if i == self.end:
+            snapshot2 = tracemalloc.take_snapshot()
+            snapshot2.dump('{}_2{}'.format(self.out_file_base, self.out_file_ext))
+            stats_diff = snapshot2.compare_to(snapshot1, 'lineno')
+            with open('{}_d{}'.format(self.out_file_base, self.out_file_ext), 'w') as f:
+                for stat in stats_diff:
+                    print(stat, file=f)
+        
+        
+        
