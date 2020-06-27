@@ -68,11 +68,18 @@ class DNC(tf.keras.layers.Layer):
         self._clip = 20.0
 
         if layer_norm_lstm:
-            self._controller = tfa.rnn.LayerNormLSTMCell(units=controller_units, name="controller")
+            self._controller = tfa.rnn.LayerNormLSTMCell(
+                units = controller_units, 
+                bias_initializer = tf.constant_initializer(0.1), 
+                name="controller")
         else:
-            self._controller = tf.keras.layers.LSTMCell(units=controller_units, name="controller")
+            self._controller = tf.keras.layers.LSTMCell(
+                units = controller_units, 
+                bias_initializer = tf.constant_initializer(0.1), 
+                name="controller")
         self._controller_to_interface_dense = tf.keras.layers.Dense(
             self._interface_vector_size,
+            bias_initializer = tf.constant_initializer(0.1),
             name='controller_to_interface'
         )
         self._memory = Memory(memory_size, word_size, num_read_heads)

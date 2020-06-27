@@ -168,6 +168,8 @@ def parseArgs():
 #                                  or VSET, args.vol_size)
 # return None
 
+def next_power_of_2(x):  
+    return 1 if x == 0 else 2**(x - 1).bit_length()
 
 async def cleanup(dirpath, keep=5, interval=30):
     while True:

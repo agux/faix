@@ -349,3 +349,116 @@ class DNC_Model_V5(DNC_Model):
         self.model._name = self.getName()
 
         return self.model
+
+class DNC_Model_V6(DNC_Model):
+    '''
+        Multiple causal Conv1D layers, Multiple Bidirectional DNC layers, AlphaDropout, Multiple FCN layers
+    '''
+
+    def __init__(self, 
+        num_cnn_layers=1, 
+        num_dnc_layers=2, 
+        num_fcn_layers=2, 
+        cnn_filters=64, #can be a list
+        cnn_kernel_size=3, #can be a list
+        layer_norm_lstm=False,
+        *args, **kwargs):
+        super(DNC_Model_V6, self).__init__(*args, **kwargs)
+        self._num_cnn_layers = num_cnn_layers
+        self._num_dnc_layers = num_dnc_layers
+        self._num_fcn_layers = num_fcn_layers
+        self._cnn_filters=cnn_filters
+        self._cnn_kernel_size=cnn_kernel_size
+        self._layer_norm_lstm = layer_norm_lstm
+
+    def getModel(self):
+        if self.model is not None:
+            return self.model
+        print('{} constructing model {}'.format(strftime("%H:%M:%S"),
+                                                self.getName()))
+
+        inputs = keras.Input(
+            shape=(self._time_step, self._feat_size),
+            # name='features',
+            dtype=tf.float32)
+
+        layer = inputs
+        # add CNN before RNN
+        if self._num_cnn_layers > 0:
+            layer = keras.layers.Reshape([self._feat_size, self._time_step, 1])(layer)
+            filters = self._cnn_filters
+            kernels = self._cnn_kernel_size
+            for i in range(self._num_cnn_layers):
+                layer = keras.layers.TimeDistributed(
+                    keras.layers.Conv1D(
+                        filters = filters[i] if isinstance(filters, list) else filters,
+                        kernel_size= kernels[i] if isinstance(kernels, list) else kernels,
+                        padding='causal', 
+                        dilation_rate=i+1, 
+                        activation='selu', 
+                        bias_initializer=tf.constant_initializer(0.1),
+                    )
+                )(layer)
+            layer = keras.layers.Reshape([self._time_step, self._feat_size * filters[len(filters)-1] if isinstance(filters, list) else filters])(layer)
+            layer = keras.layers.BatchNormalization(
+                beta_initializer=tf.constant_initializer(0.1),
+                moving_mean_initializer=tf.constant_initializer(0.1),
+                fused=True
+            )(layer)
+
+        # create sequence of DNC layers
+        for i in range(self._num_dnc_layers):
+            forward = keras.layers.RNN(
+                cell = dnc.DNC(
+                    name='dnc_fwd_{}'.format(i),
+                    output_size=self.output_size,
+                    controller_units=self.controller_units,
+                    memory_size=self.memory_size,
+                    word_size=self.word_size,
+                    num_read_heads=self.num_read_heads,
+                    layer_norm_lstm=self._layer_norm_lstm
+                ),
+                return_sequences=True if i+1 < self._num_dnc_layers else False,
+                name='rnn_fwd_{}'.format(i),
+            )
+            backward = keras.layers.RNN(
+                cell = dnc.DNC(
+                    name='dnc_bwd_{}'.format(i),
+                    output_size=self.output_size,
+                    controller_units=self.controller_units,
+                    memory_size=self.memory_size,
+                    word_size=self.word_size,
+                    num_read_heads=self.num_read_heads,
+                    layer_norm_lstm=self._layer_norm_lstm
+                ),
+                go_backwards=True,
+                return_sequences=True if i+1 < self._num_dnc_layers else False,
+                name='rnn_bwd_{}'.format(i),
+            )
+            layer = keras.layers.Bidirectional(layer=forward, backward_layer=backward, name='bidir_{}'.format(i))(layer)
+        
+        if self._dropout_rate > 0:
+            layer = keras.layers.AlphaDropout(self._dropout_rate)(layer)
+
+        # create sequence of FCN layers
+        units = self.output_size
+        for i in range(self._num_fcn_layers):
+            layer = keras.layers.Dense(
+                units=units,
+                bias_initializer=tf.constant_initializer(0.1),
+                activation='selu',
+                name='dense_{}'.format(i)
+            )(layer)
+            units = units // 2
+
+        # Output layer
+        outputs = keras.layers.Dense(
+            units=1,
+            bias_initializer=tf.constant_initializer(0.1),
+            name='output',
+        )(layer)
+
+        self.model = keras.Model(inputs=inputs, outputs=outputs)
+        self.model._name = self.getName()
+
+        return self.model
