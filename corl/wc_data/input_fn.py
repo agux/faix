@@ -72,7 +72,13 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         # ssl_ca='',
         # use_pure=True,
         connect_timeout=90000)
-    ray.init(num_cpus=psutil.cpu_count(logical=False), webui_host='127.0.0.1')
+    ray.init(
+        num_cpus=psutil.cpu_count(logical=False), 
+        webui_host='127.0.0.1',
+        memory=2 * 1024 * 1024 * 1024,  # 2G
+        object_store_memory=512 * 1024 * 1024, # 512M
+        driver_object_store_memory=256 * 1024 * 1024    # 256M
+    )
 
 
 # def _getExecutor():
