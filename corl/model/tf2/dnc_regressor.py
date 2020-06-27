@@ -477,7 +477,7 @@ class DNC_Model_V7(DNC_Model):
         cnn_kernel_size=3, #can be a list
         layer_norm_lstm=False,
         *args, **kwargs):
-        super(DNC_Model_V6, self).__init__(*args, **kwargs)
+        super(DNC_Model_V7, self).__init__(*args, **kwargs)
         self._num_cnn_layers = num_cnn_layers
         self._num_dnc_layers = num_dnc_layers
         self._num_fcn_layers = num_fcn_layers
