@@ -388,39 +388,6 @@ def _loadTrainingData_v2(bno):
             data, vals = zip(*r)
         d = np.array(data, np.float32, copy=False)
         v = np.expand_dims(np.array(vals, np.float32, copy=False), axis=1)
-
-        if check_input:
-            if np.ma.is_masked(d):
-                print('batch[{}] masked feature'.format(bno))
-                print(d)
-            if np.ma.is_masked(v):
-                print('batch[{}] masked values'.format(bno))
-                print(v)
-
-            found = False
-            nanLoc = np.argwhere(np.isnan(d))
-            if len(nanLoc) > 0:
-                print('batch[{}] nan for feature: {}'.format(bno, nanLoc))
-                found = True
-            infLoc = np.argwhere(np.isinf(d))
-            if len(infLoc) > 0:
-                print('batch[{}] inf for feature: {}'.format(bno, infLoc))
-                found = True
-            if found:
-                print(d)
-
-            found = False
-            nanVal = np.argwhere(np.isnan(v))
-            if len(nanVal) > 0:
-                print('batch[{}] nan for values: {}'.format(bno, nanVal))
-                found = True
-            infVal = np.argwhere(np.isinf(v))
-            if len(infVal) > 0:
-                print('batch[{}] inf for values: {}'.format(bno, infVal))
-                found = True
-            if found:
-                print(v)
-
         return d, v
     except:
         print(sys.exc_info()[0])

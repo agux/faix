@@ -155,7 +155,7 @@ def _getBatch_v2(code, s, e, rcode, shared_args):
                 for j, col in enumerate(row[1:]):
                     steps[i + offset][j + featSize // 2] = col
             batch.append(steps)
-        return np.concatenate(batch, 1)
+        return np.concatenate(batch, 1).astype(np.float32)
     except:
         print(sys.exc_info()[0])
         raise

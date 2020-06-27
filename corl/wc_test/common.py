@@ -48,6 +48,10 @@ def parseArgs():
                         type=str,
                         help='batches to profile.',
                         default=None)
+    parser.add_argument('--tracemalloc',
+                        type=str,
+                        help='specify the batches for snapshots',
+                        default=None)
     parser.add_argument('--ds',
                         type=str,
                         help='datasource. such as file, db, or BigQuery.',
@@ -120,11 +124,6 @@ def parseArgs():
         dest='gpu_grow_mem',
         action='store_true',
         help='allow gpu to allocate mem dynamically at runtime.')
-    parser.add_argument(
-        '--tracemalloc',
-        dest='tracemalloc',
-        action='store_true',
-        help='enable built-in python tracemalloc in first several runs.')
     parser.add_argument('--trace',
                         dest='trace',
                         action='store_true',
@@ -254,12 +253,13 @@ class DebugCallback(keras.callbacks.Callback):
         #              summarize=-1)
 
 class TracemallocCallback(keras.callbacks.Callback):
-    def __init__(self, nframe=100, start=200, end=300, out_file='tracemalloc.log'):
+    def __init__(self, nframe=500, batches='200,300', out_file='tracemalloc.log'):
         super(TracemallocCallback, self).__init__()
         tracemalloc.start(nframe)
-        print('{} TracemallocCallback is enabled'.format(strftime("%H:%M:%S")))
-        self.start = start
-        self.end = end
+        print('{} TracemallocCallback is enabled at batches {}'.format(strftime("%H:%M:%S"), batches))
+        seg = batches.split(',')
+        self.start = int(seg[0])
+        self.end = int(seg[1])
         self.out_file = out_file
         path_seg = os.path.splitext(self.out_file)
         self.out_file_base, self.out_file_ext = path_seg[0], path_seg[1]
@@ -271,7 +271,7 @@ class TracemallocCallback(keras.callbacks.Callback):
             dest = '{}_1{}'.format(self.out_file_base, self.out_file_ext)
             self.snapshot1.dump(dest)
             tf.print('tracemalloc snapshot #1 at iteration ', i, ' has been dumped to ', dest)
-        if i == self.end:
+        elif i == self.end:
             dest = '{}_2{}'.format(self.out_file_base, self.out_file_ext)
             snapshot2 = tracemalloc.take_snapshot()
             snapshot2.dump(dest)

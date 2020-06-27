@@ -128,7 +128,7 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
         # decay,
         tensorboard_cbk,
         DebugCallback() if args.check_weights else None,
-        TracemallocCallback() if args.tracemalloc else None,
+        TracemallocCallback(batches=args.tracemalloc) if args.tracemalloc is not None else None,
         keras.callbacks.CSVLogger('train_perf.log'),
         keras.callbacks.TerminateOnNaN() if args.terminate_on_nan else None,
         # tf.keras.callbacks.ProgbarLogger(count_mode='steps',
@@ -266,7 +266,7 @@ def _setupTensorflow(args):
     # if args.check_weights:
     #     tf.debugging.enable_check_numerics()
     physical_devices = tf.config.list_physical_devices('GPU')
-    if len(physical_devices) > 0:
+    if len(physical_devices) > 0 and args.gpu_grow_mem:
         try:
             print('{} enabling memory growth for {}'.format(strftime("%H:%M:%S"), physical_devices[0]))
             tf.config.experimental.set_memory_growth(physical_devices[0], True)

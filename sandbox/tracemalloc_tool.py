@@ -29,7 +29,7 @@ def display_top(snapshot, key_type='lineno', limit=10):
 
 tracemalloc.start(nframe)
 
-s = Snapshot.load('/Users/jx/Downloads/tracemalloc/tracemalloc_2.log')
+s = Snapshot.load('/Users/jx/Downloads/tracemalloc_2.log')
 
 top_stats = s.statistics('traceback')
 
@@ -39,4 +39,4 @@ print("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
 for line in stat.traceback.format():
     print(line)
 
-display_top(s, limit=100)
+display_top(s, limit=1000)
