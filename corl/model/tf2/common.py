@@ -36,8 +36,8 @@ class CausalConv1D(keras.layers.Layer):
 
     def build(self, input_shape):
         super(CausalConv1D, self).build(input_shape)
-        self.time_step = int(input_shape[0])
-        self.feat_size = int(input_shape[1])
+        self.time_step = int(input_shape[1])
+        self.feat_size = int(input_shape[2])
         self.cnn_layers = []
         self.bn_layers = []
         self.out_size = []
