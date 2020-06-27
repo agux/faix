@@ -266,15 +266,28 @@ def _setupTensorflow(args):
     # if args.check_weights:
     #     tf.debugging.enable_check_numerics()
     physical_devices = tf.config.list_physical_devices('GPU')
-    if len(physical_devices) > 0 and args.gpu_grow_mem:
-        try:
-            print('{} enabling memory growth for {}'.format(strftime("%H:%M:%S"), physical_devices[0]))
-            tf.config.experimental.set_memory_growth(physical_devices[0], True)
-        except:
-            print(
-                'Invalid device or cannot modify virtual devices once initialized.\n'
-                + sys.exc_info()[0])
-            pass
+    if len(physical_devices) > 0:
+        if args.gpu_grow_mem:
+            try:
+                print('{} enabling memory growth for {}'.format(strftime("%H:%M:%S"), physical_devices[0]))
+                tf.config.experimental.set_memory_growth(physical_devices[0], True)
+            except:
+                print(
+                    'Invalid device or cannot modify virtual devices once initialized.\n'
+                    + sys.exc_info()[0])
+                pass
+        if args.limit_gpu_mem is not None:
+            # Restrict TensorFlow to only allocate the specified memory on the first GPU
+            try:
+                print('{} setting GPU memory limit to {} MB'.format(strftime("%H:%M:%S"),args.limit_gpu_mem*1024))
+                tf.config.experimental.set_virtual_device_configuration(
+                    physical_devices[0],
+                    [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=args.limit_gpu_mem*1024)])
+                logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+                print(strftime("%H:%M:%S"), len(physical_devices), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            except RuntimeError as e:
+                # Virtual devices must be set before GPUs have been initialized
+                print(e)
     
     if args.enable_xla:
         # enalbe XLA
