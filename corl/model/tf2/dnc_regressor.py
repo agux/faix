@@ -404,7 +404,8 @@ class DNC_Model_V6(DNC_Model):
                 moving_mean_initializer=tf.constant_initializer(0.1),
                 fused=True
             )(layer)
-            layer = keras.layers.Reshape([self._time_step, self._feat_size * filters[len(filters)-1] if isinstance(filters, list) else filters])(layer)
+            last_dim = filters[len(filters)-1] if isinstance(filters, list) else filters
+            layer = keras.layers.Reshape([self._time_step, self._feat_size * last_dim])(layer)
             
         # create sequence of DNC layers
         for i in range(self._num_dnc_layers):
