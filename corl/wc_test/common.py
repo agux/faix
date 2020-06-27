@@ -96,7 +96,7 @@ def parseArgs():
                         help='volume size for the dataset storage sub-folder',
                         default=None)
     parser.add_argument('--limit_gpu_mem',
-                        type=int,
+                        type=float,
                         help='pre-allocate gpu memory (in giga-bytes)',
                         default=4)
     parser.add_argument(
