@@ -98,7 +98,7 @@ def parseArgs():
     parser.add_argument('--limit_gpu_mem',
                         type=float,
                         help='pre-allocate gpu memory (in giga-bytes)',
-                        default=4)
+                        default=None)
     parser.add_argument(
         '--terminate_on_nan',
         help='abort training process on NaN loss.',
