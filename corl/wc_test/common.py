@@ -1,5 +1,4 @@
 # from __future__ import print_function
-
 import os
 import psutil
 import shutil
@@ -8,6 +7,8 @@ import math
 import numpy as np
 import tensorflow as tf
 import tracemalloc
+import argparse
+import logging
 from tensorflow import keras
 from pathlib import Path
 from time import strftime
@@ -17,9 +18,6 @@ from time import strftime
 # from wc_data import input_fn
 # from wc_data import input_bq, input_file2
 
-import argparse
-
-import logging
 LOG_DIR = 'logdir'
 LOGGER_FORMAT = '%(asctime)s %(message)s'
 
