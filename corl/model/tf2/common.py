@@ -56,13 +56,13 @@ class CausalConv1D(keras.layers.Layer):
                     )
                 )
             )
-            # self.bn_layers.append(
-            #     keras.layers.BatchNormalization(
-            #         beta_initializer=tf.constant_initializer(0.1),
-            #         moving_mean_initializer=tf.constant_initializer(0.1),
-            #         fused=True
-            #     )
-            # )
+            self.bn_layers.append(
+                keras.layers.BatchNormalization(
+                    beta_initializer=tf.constant_initializer(0.1),
+                    moving_mean_initializer=tf.constant_initializer(0.1),
+                    fused=True
+                )
+            )
             if isinstance(filters, list):
                 self.out_size = filters * self.feat_size
             else:
@@ -74,7 +74,7 @@ class CausalConv1D(keras.layers.Layer):
         for i in range(self.num_cnn_layers):
             outputs.append(
                 keras.layers.Reshape([self.time_step, self.out_size[i]])(
-                    self.cnn_layers[i](reshaped)
+                    self.bn_layers[i](self.cnn_layers[i](reshaped))
                 )
             )
         out = tf.concat([inputs]+outputs, axis=-1)

@@ -503,7 +503,7 @@ class DNC_Model_V7(DNC_Model):
             layer = keras.layers.BatchNormalization(
                 beta_initializer=tf.constant_initializer(0.1),
                 moving_mean_initializer=tf.constant_initializer(0.1),
-                fused=True
+                # fused=True  #fused mode only support 4D tensors
             )(layer)
             if self._dropout_rate > 0:
                 layer = keras.layers.AlphaDropout(self._dropout_rate)(layer)
