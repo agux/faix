@@ -28,11 +28,12 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
         }
 
 class CausalConv1D(keras.layers.Layer):
-    def __init__(self, num_cnn_layers, filters, kernels):
+    def __init__(self, num_cnn_layers, filters, kernels, output_size):
         super(CausalConv1D, self).__init__()
         self.num_cnn_layers = num_cnn_layers
         self.filters = filters
         self.kernels = kernels
+        self.output_size = output_size
 
     def build(self, input_shape):
         super(CausalConv1D, self).build(input_shape)
@@ -68,6 +69,12 @@ class CausalConv1D(keras.layers.Layer):
             else:
                 self.out_size = [filters * self.feat_size for _ in range(self.num_cnn_layers)]
 
+        self.output_layer = keras.layers.Dense(
+            self.output_size, 
+            activation='tanh', 
+            bias_initializer=tf.constant_initializer(0.1),
+        )
+
     def call(self, inputs):
         reshaped = keras.layers.Reshape([self.feat_size, self.time_step, 1])(inputs)
         outputs = []
@@ -78,6 +85,7 @@ class CausalConv1D(keras.layers.Layer):
                 )
             )
         out = tf.concat([inputs]+outputs, axis=-1)
+        out = self.output_layer(out)
         return out
 
     def get_config(self):
@@ -85,6 +93,7 @@ class CausalConv1D(keras.layers.Layer):
         config.update({
             'num_cnn_layers': self.num_cnn_layers,
             'filters': self.filters,
-            'kernels': self.kernels
+            'kernels': self.kernels,
+            'output_size': self.output_size
         })
         return config

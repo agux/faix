@@ -475,14 +475,16 @@ class DNC_Model_V7(DNC_Model):
         num_fcn_layers=2, 
         cnn_filters=64, #can be a list
         cnn_kernel_size=3, #can be a list
+        cnn_output_size=256,
         layer_norm_lstm=False,
         *args, **kwargs):
         super(DNC_Model_V7, self).__init__(*args, **kwargs)
         self._num_cnn_layers = num_cnn_layers
         self._num_dnc_layers = num_dnc_layers
         self._num_fcn_layers = num_fcn_layers
-        self._cnn_filters=cnn_filters
-        self._cnn_kernel_size=cnn_kernel_size
+        self._cnn_filters = cnn_filters
+        self._cnn_kernel_size = cnn_kernel_size
+        self._cnn_output_size = cnn_output_size
         self._layer_norm_lstm = layer_norm_lstm
 
     def getModel(self):
@@ -499,7 +501,12 @@ class DNC_Model_V7(DNC_Model):
         layer = inputs
         # add CNN before RNN
         if self._num_cnn_layers > 0:
-            layer = CausalConv1D(self._num_cnn_layers, self._cnn_filters, self._cnn_kernel_size)(layer)
+            layer = CausalConv1D(
+                self._num_cnn_layers, 
+                self._cnn_filters, 
+                self._cnn_kernel_size,
+                self._cnn_output_size
+            )(layer)
             layer = keras.layers.BatchNormalization(
                 beta_initializer=tf.constant_initializer(0.1),
                 moving_mean_initializer=tf.constant_initializer(0.1),

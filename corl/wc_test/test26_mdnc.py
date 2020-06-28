@@ -31,9 +31,10 @@ NUM_DNC_LAYERS = 3
 NUM_FCN_LAYERS = 0
 CNN_FILTERS = next_power_of_2(FEAT_SIZE * 2)
 CNN_KERNEL_SIZE = TIME_SHIFT
+CNN_OUTPUT_SIZE = 512
 LAYER_NORM_LSTM = True
 CONTROLLER_UNITS = 128
-DNC_OUTPUT_SIZE = [512, 256, 128]
+DNC_OUTPUT_SIZE = [256, 128, 64]
 WORD_SIZE = 32
 MEMORY_SIZE = 32
 NUM_READ_HEADS = 8
@@ -49,13 +50,13 @@ INCLUDE_SEQLENS = False
 if __name__ == '__main__':
 
     np.random.seed(SEED)
-    #TODO experiment with DNC_Model_V7
     regressor = dnc_regressor.DNC_Model_V7(
         num_cnn_layers=NUM_CNN_LAYERS, 
         num_dnc_layers = NUM_DNC_LAYERS,
         num_fcn_layers = NUM_FCN_LAYERS,
         cnn_filters=CNN_FILTERS,
-        cnn_kernel_size=CNN_KERNEL_SIZE, #can be a list
+        cnn_kernel_size=CNN_KERNEL_SIZE,
+        cnn_output_size=CNN_OUTPUT_SIZE,
         layer_norm_lstm = LAYER_NORM_LSTM,
         output_size=DNC_OUTPUT_SIZE,
         controller_units=CONTROLLER_UNITS, 
