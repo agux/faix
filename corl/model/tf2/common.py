@@ -77,7 +77,7 @@ class CausalConv1D(keras.layers.Layer):
                     self.cnn_layers[i](reshaped)
                 )
             )
-        out = tf.stack([inputs]+outputs, axis=-1)
+        out = tf.concat([inputs]+outputs, axis=-1)
         return out
 
     def get_config(self):
