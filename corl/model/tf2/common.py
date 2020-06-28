@@ -69,15 +69,14 @@ class CausalConv1D(keras.layers.Layer):
                 self.out_size = [filters * self.feat_size for _ in range(self.num_cnn_layers)]
 
     def call(self, inputs):
-        inputs = keras.layers.Reshape([self.feat_size, self.time_step, 1])(inputs)
+        reshaped = keras.layers.Reshape([self.feat_size, self.time_step, 1])(inputs)
         outputs = []
         for i in range(self.num_cnn_layers):
             outputs.append(
                 keras.layers.Reshape([self.time_step, self.out_size[i]])(
-                    self.cnn_layers[i](inputs)
+                    self.cnn_layers[i](reshaped)
                 )
             )
-        #FIXME: Expected list for 'values' argument to 'pack' Op, not <tf.Tensor 'causal_conv1d/add:0' shape=(3, 10, 35, 320) dtype=float32>
         out = tf.stack([inputs]+outputs, axis=-1)
         return out
 
