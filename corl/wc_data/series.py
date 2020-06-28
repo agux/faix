@@ -26,7 +26,7 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         connect_timeout=90000)
 
 
-@ray.remote
+# @ray.remote
 def getSeries(code, klid, rcode, val, shared_args):
     # code, klid, rcode, val, max_step, time_shift, qk, qd = p
     max_step = shared_args['max_step']

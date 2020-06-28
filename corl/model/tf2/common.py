@@ -77,7 +77,8 @@ class CausalConv1D(keras.layers.Layer):
                     self.cnn_layers[i](inputs)
                 )
             )
-        out = tf.stack(inputs+outputs, axis=-1)
+        #FIXME: Expected list for 'values' argument to 'pack' Op, not <tf.Tensor 'causal_conv1d/add:0' shape=(3, 10, 35, 320) dtype=float32>
+        out = tf.stack([inputs]+outputs, axis=-1)
         return out
 
     def get_config(self):
