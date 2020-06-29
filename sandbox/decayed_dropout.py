@@ -28,6 +28,7 @@ from corl.model.tf2.common import DecayedDropoutLayer
 inputs = np.ones((5,5))
 total_steps = 50
 print(inputs)
+k_dropout = tf.keras.layers.Dropout(0.5)
 dropout = DecayedDropoutLayer(dropout="dropout",
                     decay_start=10,
                     initial_dropout_rate=0.5,
@@ -37,6 +38,8 @@ dropout = DecayedDropoutLayer(dropout="dropout",
                     alpha=0.01,
                     seed=1234
                 )
+
+print('using keras dropout: \n{}'.format(k_dropout(inputs).numpy()))
 
 for _ in range(total_steps):
     output=dropout(inputs)

@@ -96,6 +96,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
             "t_mul": self._t_mul,
             "m_mul": self._m_mul,
             "alpha": self.alpha,
+            "seed": self.seed
         })
         return config
 
