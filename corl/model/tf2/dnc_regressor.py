@@ -488,9 +488,8 @@ class DNC_Model_V7(DNC_Model):
         self._layer_norm_lstm = layer_norm_lstm
     
     def _inputLayer(self):
-        return inputs = keras.Input(
-            shape=(self._time_step, 
-            self._feat_size),
+        return keras.Input(
+            shape=(self._time_step, self._feat_size),
             dtype=tf.float32
         )
 
