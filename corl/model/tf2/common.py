@@ -86,6 +86,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
         )
         return output
     
+    @tf.function
     def train(self, inputs):
         self.global_step.assign_add(1)
         rate = tf.cond(
@@ -95,7 +96,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
         )
         self.dropout_layer.rate = rate
         output = self.dropout_layer(inputs)
-        tf.print('step: ', self.global_step, ', dropout rate: ', rate)
+        # tf.print('step: ', self.global_step, ', dropout rate: ', rate)
         return output
 
     def get_config(self):
