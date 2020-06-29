@@ -30,27 +30,24 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
         })
         return config
 
-class DecayedDropoutLayer(keras.layers.Layer):
-    def __init__(self, 
-        dropout="dropout",
+class DecayedDropoutWrapper(keras.layers.Layer):
+    def __init__(self,
+        dropout_layer=None,
         decay_start=20000,
-        initial_dropout_rate=0.5,
         first_decay_steps=1000,
         t_mul=2.0,
         m_mul=1.0,
         alpha=0.0,
-        seed=None,
         *args, **kwargs):
         # kwargs['dynamic'] = True
         super(DecayedDropoutLayer, self).__init__(*args, **kwargs)
-        self.dropout=dropout.lower()
-        self.initial_dropout_rate = initial_dropout_rate
+        self.dropout_layer=dropout_layer
+        self.initial_dropout_rate = dropout_layer.rate
         self.first_decay_steps = first_decay_steps
         self._decay_start = decay_start
         self._t_mul = t_mul
         self._m_mul = m_mul
         self.alpha = alpha
-        self.seed = seed
 
     def build(self, input_shape):
         super(DecayedDropoutLayer, self).build(input_shape)
@@ -66,18 +63,6 @@ class DecayedDropoutLayer(keras.layers.Layer):
             alpha=self.alpha,
             name='cosine_dacay_restarts'
         )
-        if self.dropout == 'dropout':
-            self.dropout_layer = keras.layers.Dropout(
-                rate=self.initial_dropout_rate, 
-                seed=self.seed
-            )
-        elif self.dropout == 'alphadropout':
-            self.dropout_layer = keras.layers.AlphaDropout(
-                rate=self.initial_dropout_rate, 
-                seed=self.seed
-            )
-        else:
-            raise Exception('unsupported dropout type: {}'.format(self.dropout))
     
     def compute_output_shape(self, input_shape):
         return input_shape
@@ -107,14 +92,12 @@ class DecayedDropoutLayer(keras.layers.Layer):
     def get_config(self):
         config = super(DecayedDropoutLayer, self).get_config().copy()
         config.update({
-            "dropout": self.dropout,
             "decay_start": self._decay_start,
             "initial_dropout_rate": self.initial_dropout_rate,
             "first_decay_steps": self.first_decay_steps,
             "t_mul": self._t_mul,
             "m_mul": self._m_mul,
             "alpha": self.alpha,
-            "seed": self.seed
         })
         return config
 

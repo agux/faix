@@ -3,7 +3,7 @@ import numpy as np
 
 from tensorflow import keras
 from time import strftime
-from corl.model.tf2.common import DelayedCosineDecayRestarts, CausalConv1D, CausalConv1D_V2, DecayedDropoutLayer
+from corl.model.tf2.common import DelayedCosineDecayRestarts, CausalConv1D, CausalConv1D_V2, DecayedDropoutWrapper
 from .tf_DNC import dnc
 
 class DNC_Model():
@@ -654,15 +654,16 @@ class DNC_Model_V8(DNC_Model_V7):
         
         # Dropout
         if self._num_fcn_layers == 0 and self._dropout_rate > 0:
-            layer = DecayedDropoutLayer(
-                dropout="alphadropout",
+            layer = DecayedDropoutWrapper(
+                dropout_layer=keras.layers.AlphaDropout(
+                    rate=self._dropout_rate, 
+                    seed=self.seed
+                ),
                 decay_start=self._decayed_dropout_start,
-                initial_dropout_rate=self._dropout_rate,
                 first_decay_steps=self._dropout_decay_steps,
                 t_mul=1.05,
                 m_mul=0.98,
                 alpha=0.007,
-                seed=self.seed
             )(layer)
 
         # FCN layers
@@ -677,15 +678,16 @@ class DNC_Model_V8(DNC_Model_V7):
                 name='dense_{}'.format(i)
             )(layer)
             if i == 0 and self._dropout_rate > 0:
-                layer = DecayedDropoutLayer(
-                    dropout="alphadropout",
+                layer = DecayedDropoutWrapper(
+                    dropout_layer=keras.layers.AlphaDropout(
+                        rate=self._dropout_rate, 
+                        seed=self.seed
+                    ),
                     decay_start=self._decayed_dropout_start,
-                    initial_dropout_rate=self._dropout_rate,
                     first_decay_steps=self._dropout_decay_steps,
                     t_mul=1.05,
                     m_mul=0.98,
                     alpha=0.007,
-                    seed=self.seed
                 )(layer)
             units = units // 2
 
