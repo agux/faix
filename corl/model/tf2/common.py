@@ -50,7 +50,12 @@ class AlphaDropout(keras.layers.Layer):
         scale = 1.0507009873554804934193349852946
         alpha_p = -alpha * scale
         kept_idx = tf.math.greater_equal(
-            keras.backend.random_uniform(noise_shape, seed=seed), rate)
+            keras.backend.random_uniform(
+                self._get_noise_shape(inputs), 
+                seed=seed
+            ), 
+            rate
+        )
         kept_idx = tf.cast(kept_idx, inputs.dtype)
         # Get affine transformation params
         a = ((1 - rate) * (1 + rate * alpha_p**2))**-0.5
@@ -59,15 +64,15 @@ class AlphaDropout(keras.layers.Layer):
         x = inputs * kept_idx + alpha_p * (1 - kept_idx)
         # Do affine transformation
         return a * x + b
-    def dropout():
-        noise_shape = self._get_noise_shape(inputs)
-        return keras.backend.in_train_phase(dropped_inputs, inputs, training=training)
     return tf_utils.smart_cond(
         tf.math.logical_and(
             tf.math.greater(self.rate, 0.),
             tf.math.less(self.rate, 1.)
         ),
-        dropout,
+        lambda: keras.backend.in_train_phase(
+            dropped_inputs, 
+            inputs, 
+            training=training),
         lambda: tf.identity(inputs)
     )
 
