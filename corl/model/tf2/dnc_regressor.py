@@ -609,7 +609,7 @@ class DNC_Model_V8(DNC_Model_V7):
                 activation='selu',
                 bias_initializer=tf.constant_initializer(0.1),
                 kernel_initializer='lecun_normal'
-            )
+            )(layer)
             layer = keras.layers.BatchNormalization(
                 beta_initializer=tf.constant_initializer(0.1),
                 moving_mean_initializer=tf.constant_initializer(0.1),
@@ -646,7 +646,11 @@ class DNC_Model_V8(DNC_Model_V7):
                 return_sequences=True if i+1 < self._num_dnc_layers else False,
                 name='rnn_bwd_{}'.format(i),
             )
-            layer = keras.layers.Bidirectional(layer=forward, backward_layer=backward, name='bidir_{}'.format(i))(layer)
+            layer = keras.layers.Bidirectional(
+                layer=forward, 
+                backward_layer=backward, 
+                name='bidir_{}'.format(i)
+            )(layer)
         
         # Dropout
         if self._num_fcn_layers == 0 and self._dropout_rate > 0:
