@@ -79,22 +79,27 @@ class DecayedDropoutLayer(keras.layers.Layer):
     
     def train(self, layer, inputs):
         self.global_step.assign_add(1)
-        rate = tf.cond(
+        rate = keras.utils.smart_cond(
             tf.less(self.global_step, self._decay_start),
             lambda: self.initial_dropout_rate,
             lambda: self.cosine_decay_restarts(self.global_step-self._decay_start+1)
         )
+        layer = self.dropout_layer
         layer.rate = rate
         output = layer(inputs)
         # tf.print('step: ', self.global_step, ', dropout rate: ', rate)
         return output
 
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+
     def call(self, inputs, training=None):
         if training is None:
             training = keras.backend.learning_phase()
-        output = tf.cond(
+        output = keras.utils.smart_cond(
             training,
-            lambda: self.train(self.dropout_layer, inputs),
+            lambda: self.train(inputs),
             lambda: tf.identity(inputs)
         )
         return output
