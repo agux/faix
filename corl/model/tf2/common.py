@@ -39,6 +39,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
         alpha=0.0,
         seed=None,
         *args, **kwargs):
+        **kwargs['dynamic'] = True
         super(DecayedDropoutLayer, self).__init__(*args, **kwargs)
         self.dropout=dropout.lower()
         self.initial_dropout_rate = initial_dropout_rate
