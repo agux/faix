@@ -39,7 +39,7 @@ class DecayedDropoutWrapper(keras.layers.Layer):
         m_mul=1.0,
         alpha=0.0,
         *args, **kwargs):
-        kwargs['dynamic'] = True
+        # kwargs['dynamic'] = True
         super(DecayedDropoutWrapper, self).__init__(*args, **kwargs)
         self.dropout_layer=dropout_layer
         self.initial_dropout_rate = dropout_layer.rate
@@ -68,9 +68,8 @@ class DecayedDropoutWrapper(keras.layers.Layer):
         return input_shape
 
     def call(self, inputs, training=None):
-        if training is None:
-            training = keras.backend.learning_phase()
-
+        # if training is None:
+        #     training = keras.backend.learning_phase()
         def dropout():
             self.global_step.assign_add(1)
             rate = tf_utils.smart_cond(

@@ -654,18 +654,20 @@ class DNC_Model_V8(DNC_Model_V7):
             )(layer)
         
         # Dropout
+        dropout = DecayedDropoutWrapper(
+            dropout_layer=keras.layers.AlphaDropout(
+                rate=self._dropout_rate, 
+                seed=self.seed
+            ),
+            decay_start=self._decayed_dropout_start,
+            first_decay_steps=self._dropout_decay_steps,
+            t_mul=1.05,
+            m_mul=0.98,
+            alpha=0.007,
+        )
+
         if self._num_fcn_layers == 0 and self._dropout_rate > 0:
-            layer = DecayedDropoutWrapper(
-                dropout_layer=keras.layers.AlphaDropout(
-                    rate=self._dropout_rate, 
-                    seed=self.seed
-                ),
-                decay_start=self._decayed_dropout_start,
-                first_decay_steps=self._dropout_decay_steps,
-                t_mul=1.05,
-                m_mul=0.98,
-                alpha=0.007,
-            )(layer)
+            layer = dropout(layer)
 
         # FCN layers
         size = self.output_size
@@ -679,17 +681,7 @@ class DNC_Model_V8(DNC_Model_V7):
                 name='dense_{}'.format(i)
             )(layer)
             if i == 0 and self._dropout_rate > 0:
-                layer = DecayedDropoutWrapper(
-                    dropout_layer=keras.layers.AlphaDropout(
-                        rate=self._dropout_rate, 
-                        seed=self.seed
-                    ),
-                    decay_start=self._decayed_dropout_start,
-                    first_decay_steps=self._dropout_decay_steps,
-                    t_mul=1.05,
-                    m_mul=0.98,
-                    alpha=0.007,
-                )(layer)
+                layer = dropout(layer)
             units = units // 2
 
         # Output layer
