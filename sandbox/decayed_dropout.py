@@ -39,8 +39,8 @@ dropout = DecayedDropoutLayer(dropout="dropout",
                     seed=1234
                 )
 
-print('using keras dropout: \n{}'.format(k_dropout(inputs).numpy()))
+print('using keras dropout: \n{}'.format(k_dropout(inputs, training=True).numpy()))
 
 for _ in range(total_steps):
-    output=dropout(inputs)
+    output=dropout(inputs, training=True)
     print(output.numpy())
