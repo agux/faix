@@ -1,6 +1,5 @@
 
 import tensorflow as tf
-
 from tensorflow import keras
 from time import strftime
 
@@ -23,13 +22,85 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
         return lr
 
     def get_config(self):
-        return {
+        config = super(DelayedCosineDecayRestarts, self).get_config().copy()
+        config.update({
             "decay_start": self._decay_start
-        }
+        })
+        return config
+
+class DecayedDropoutLayer(keras.layers.Layer):
+    def __init__(self, 
+        dropout="dropout",
+        decay_start=20000,
+        initial_dropout_rate=0.5,
+        first_decay_steps=1000,
+        t_mul=2.0,
+        m_mul=1.0,
+        alpha=0.0,
+        seed=None,
+        *args, **kwargs):
+        super(DecayedDropoutLayer, self).__init__(*args, **kwargs)
+        self.dropout=dropout.lower()
+        self.initial_dropout_rate = initial_dropout_rate
+        self.first_decay_steps = first_decay_steps
+        self._decay_start = decay_start
+        self._t_mul = t_mul
+        self._m_mul = m_mul
+        self.alpha = alpha
+        self.seed = seed
+
+    def build(self, input_shape):
+        super(DecayedDropoutLayer, self).build(input_shape)
+        self.global_step = self.add_weight(initializer="zeros",
+                                        dtype=tf.int32,
+                                        trainable=False,
+                                        name="global_step")
+        self.cosine_decay_restarts = keras.experimental.CosineDecayRestarts(
+            initial_learning_rate = self.initial_dropout_rate,
+            first_decay_steps=self.first_decay_steps,
+            t_mul=self._t_mul,
+            m_mul=self._m_mul,
+            alpha=self.alpha,
+            name='cosine_dacay_restarts'
+        )
+        self.rate = tf.cond(
+            tf.less(self.global_step, self._decay_start),
+            lambda: self.initial_dropout_rate,
+            lambda: self.cosine_decay_restarts(self.global_step-self._decay_start+1)
+        )
+        if self.dropout == 'dropout':
+            self.dropout_layer = keras.layers.Dropout(
+                rate=self.rate, 
+                seed=self.seed
+            )
+        elif self.dropout == 'alphadropout':
+            self.dropout_layer = keras.layers.AlphaDropout(
+                rate=self.rate, 
+                seed=self.seed
+            )
+
+    def call(self, inputs):
+        self.global_step.assign_add(1)
+        output = self.dropout_layer(inputs)
+        tf.print('step: ', self.global_step, ', dropout rate: ', self.rate)
+        return output
+
+    def get_config(self):
+        config = super(DecayedDropoutLayer, self).get_config().copy()
+        config.update({
+            "dropout": self.dropout,
+            "decay_start": self._decay_start,
+            "initial_dropout_rate": self.initial_dropout_rate,
+            "first_decay_steps": self.first_decay_steps,
+            "t_mul": self._t_mul,
+            "m_mul": self._m_mul,
+            "alpha": self.alpha,
+        })
+        return config
 
 class CausalConv1D(keras.layers.Layer):
-    def __init__(self, num_cnn_layers, filters, kernels, output_size):
-        super(CausalConv1D, self).__init__()
+    def __init__(self, num_cnn_layers, filters, kernels, output_size, *args, **kwargs):
+        super(CausalConv1D, self).__init__(*args, **kwargs)
         self.num_cnn_layers = num_cnn_layers
         self.filters = filters
         self.kernels = kernels
@@ -95,5 +166,26 @@ class CausalConv1D(keras.layers.Layer):
             'filters': self.filters,
             'kernels': self.kernels,
             'output_size': self.output_size
+        })
+        return config
+
+
+class CausalConv1D_V2(CausalConv1D):
+    def __init__(self, activation=None, *args, **kwargs):
+        super(CausalConv1D_V2, self).__init__(*args, **kwargs)
+        self.activation = activation
+
+    def build(self, input_shape):
+        super(CausalConv1D_V2, self).build(input_shape)
+        self.output_layer = keras.layers.Dense(
+            self.output_size,
+            activation=self.activation, 
+            bias_initializer=tf.constant_initializer(0.1),
+        )
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'activation': self.activation
         })
         return config
