@@ -73,7 +73,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
                 rate=self.initial_dropout_rate, 
                 seed=self.seed
             )
-        else
+        else:
             raise Exception('unsupported dropout type: {}'.format(self.dropout))
 
     def call(self, inputs, training=None):
