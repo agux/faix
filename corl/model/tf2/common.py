@@ -107,7 +107,7 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
 
 class DecayedDropoutLayer(keras.layers.Layer):
     def __init__(self,
-        dropout_type='dropout'
+        dropout_type='dropout',
         decay_start=20000,
         initial_dropout_rate=0.5,
         first_decay_steps=1000,
