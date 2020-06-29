@@ -79,28 +79,27 @@ class DecayedDropoutLayer(keras.layers.Layer):
         else:
             raise Exception('unsupported dropout type: {}'.format(self.dropout))
     
-    def train(self, inputs):
-        self.global_step.assign_add(1)
-        rate = tf_utils.smart_cond(
-            tf.less(self.global_step, self._decay_start),
-            lambda: self.initial_dropout_rate,
-            lambda: self.cosine_decay_restarts(self.global_step-self._decay_start+1)
-        )
-        layer = self.dropout_layer
-        layer.rate = rate
-        output = layer(inputs)
-        # tf.print('step: ', self.global_step, ', dropout rate: ', rate)
-        return output
-
     def compute_output_shape(self, input_shape):
         return input_shape
 
     def call(self, inputs, training=None):
         if training is None:
             training = keras.backend.learning_phase()
+
+        def dropout():
+            self.global_step.assign_add(1)
+            rate = tf_utils.smart_cond(
+                tf.less(self.global_step, self._decay_start),
+                lambda: self.initial_dropout_rate,
+                lambda: self.cosine_decay_restarts(self.global_step-self._decay_start+1)
+            )
+            self.dropout_layer.rate = rate
+            # tf.print('step: ', self.global_step, ', dropout rate: ', rate)
+            return self.dropout_layer(inputs)
+
         output = tf_utils.smart_cond(
             training,
-            lambda: self.train(inputs),
+            dropout,
             lambda: tf.identity(inputs)
         )
         return output
