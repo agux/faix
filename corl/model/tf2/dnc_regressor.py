@@ -3,7 +3,7 @@ import numpy as np
 
 from tensorflow import keras
 from time import strftime
-from corl.model.tf2.common import DelayedCosineDecayRestarts, CausalConv1D, CausalConv1D_V2, DecayedDropoutWrapper
+from corl.model.tf2.common import DelayedCosineDecayRestarts, CausalConv1D, CausalConv1D_V2, DecayedDropoutLayer
 from .tf_DNC import dnc
 
 class DNC_Model():
@@ -654,7 +654,7 @@ class DNC_Model_V8(DNC_Model_V7):
             )(layer)
         
         # Dropout
-        dropout = DecayedDropoutWrapper(
+        dropout = DecayedDropoutLayer(
             dropout_type='AlphaDropout',
             initial_dropout_rate=self._dropout_rate, 
             decay_start=self._decayed_dropout_start,
