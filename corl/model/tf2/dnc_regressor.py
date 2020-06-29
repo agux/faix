@@ -576,7 +576,12 @@ class DNC_Model_V7(DNC_Model):
 
 class DNC_Model_V8(DNC_Model_V7):
     '''
-        Multiple causal Conv1D layers on same input, DecayedDropout, Multiple Bidirectional DNC layers, Multiple FCN layers
+
+        Multiple causal Conv1D layers on same input, BatchNorm, Multiple Bidirectional DNC layers, (DecayedDropout#1), Multiple FCN layers (DecayedDropout#2)
+        
+        * DecayedDropout#1 exists only if number of FCN layer is 0
+        * DecayedDropout#2 exists only if number of FCN layer is > 0
+
     '''
 
     def __init__(self, seed, *args, **kwargs):
@@ -598,26 +603,21 @@ class DNC_Model_V8(DNC_Model_V7):
                 self._num_cnn_layers, 
                 self._cnn_filters, 
                 self._cnn_kernel_size,
-                self._cnn_output_size,
-                activation='selu'
+                'selu'
             )(layer)
-            # layer = keras.layers.BatchNormalization(
-            #     beta_initializer=tf.constant_initializer(0.1),
-            #     moving_mean_initializer=tf.constant_initializer(0.1),
-            #     # fused=True  #fused mode only support 4D tensors
-            # )(layer)
-            if self._dropout_rate > 0:
-                layer = DecayedDropoutLayer(dropout="dropout",
-                    decay_start=self._decayed_dropout_start,
-                    initial_dropout_rate=self._dropout_rate,
-                    first_decay_steps=self._dropout_decay_steps,
-                    t_mul=2.0,
-                    m_mul=1.0,
-                    alpha=0.0,
-                    seed=self.seed
-                )(layer)
+            layer = keras.layers.Dense(
+                self._cnn_output_size,
+                activation='selu',
+                bias_initializer=tf.constant_initializer(0.1),
+                kernel_initializer='lecun_normal'
+            )
+            layer = keras.layers.BatchNormalization(
+                beta_initializer=tf.constant_initializer(0.1),
+                moving_mean_initializer=tf.constant_initializer(0.1),
+                # fused=True  #fused mode only support 4D tensors
+            )(layer)
 
-        # create sequence of DNC layers
+        # DNC layers
         for i in range(self._num_dnc_layers):
             output_size = self.output_size[i] if isinstance(self.output_size, list) else self.output_size
             forward = keras.layers.RNN(
@@ -649,8 +649,22 @@ class DNC_Model_V8(DNC_Model_V7):
             )
             layer = keras.layers.Bidirectional(layer=forward, backward_layer=backward, name='bidir_{}'.format(i))(layer)
         
-        # create sequence of FCN layers
-        units = self.output_size
+        # Dropout
+        if self._num_fcn_layers == 0 and self._dropout_rate > 0:
+            layer = DecayedDropoutLayer(
+                dropout="alphadropout",
+                decay_start=self._decayed_dropout_start,
+                initial_dropout_rate=self._dropout_rate,
+                first_decay_steps=self._dropout_decay_steps,
+                t_mul=1.05,
+                m_mul=0.98,
+                alpha=0.007,
+                seed=self.seed
+            )(layer)
+
+        # FCN layers
+        size = self.output_size
+        units = (size[len(size)-1] if isinstance(size, list) else size) * 2
         for i in range(self._num_fcn_layers):
             layer = keras.layers.Dense(
                 units=units,
@@ -659,6 +673,17 @@ class DNC_Model_V8(DNC_Model_V7):
                 activation='selu',
                 name='dense_{}'.format(i)
             )(layer)
+            if i == 0 and self._dropout_rate > 0:
+                layer = DecayedDropoutLayer(
+                    dropout="alphadropout",
+                    decay_start=self._decayed_dropout_start,
+                    initial_dropout_rate=self._dropout_rate,
+                    first_decay_steps=self._dropout_decay_steps,
+                    t_mul=1.05,
+                    m_mul=0.98,
+                    alpha=0.007,
+                    seed=self.seed
+                )(layer)
             units = units // 2
 
         # Output layer
