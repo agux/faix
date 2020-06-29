@@ -602,7 +602,8 @@ class DNC_Model_V8(DNC_Model_V7):
                 self._num_cnn_layers, 
                 self._cnn_filters, 
                 self._cnn_kernel_size,
-                'selu'
+                'selu',
+                name='CausalCNN'
             )(layer)
             layer = keras.layers.Dense(
                 self._cnn_output_size,
