@@ -92,7 +92,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
             return output
         output = tf.cond(
             training,
-            lambda: train(inputs),
+            lambda: train(self, inputs),
             lambda: tf.identity(inputs)
         )
         return output
