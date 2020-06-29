@@ -63,26 +63,28 @@ class DecayedDropoutLayer(keras.layers.Layer):
             alpha=self.alpha,
             name='cosine_dacay_restarts'
         )
-        self.rate = tf.cond(
-            tf.less(self.global_step, self._decay_start),
-            lambda: self.initial_dropout_rate,
-            lambda: self.cosine_decay_restarts(self.global_step-self._decay_start+1)
-        )
         if self.dropout == 'dropout':
             self.dropout_layer = keras.layers.Dropout(
-                rate=self.rate, 
+                rate=self.initial_dropout_rate, 
                 seed=self.seed
             )
         elif self.dropout == 'alphadropout':
             self.dropout_layer = keras.layers.AlphaDropout(
-                rate=self.rate, 
+                rate=self.initial_dropout_rate, 
                 seed=self.seed
             )
 
     def call(self, inputs):
         self.global_step.assign_add(1)
+        rate = tf.cond(
+            tf.less(self.global_step, self._decay_start),
+            lambda: self.initial_dropout_rate,
+            lambda: self.cosine_decay_restarts(self.global_step-self._decay_start+1)
+        )
+        self.dropout_layer.rate = rate
         output = self.dropout_layer(inputs)
-        tf.print('step: ', self.global_step, ', dropout rate: ', self.rate)
+        tf.print('step: ', self.global_step, ', dropout rate: ', rate)
+        tf.print('output: ', output)
         return output
 
     def get_config(self):
