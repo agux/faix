@@ -79,7 +79,7 @@ class DecayedDropoutWrapper(keras.layers.Layer):
             )
             self.dropout_layer.rate = rate
             # tf.print('step: ', self.global_step, ', dropout rate: ', rate)
-            return self.dropout_layer(inputs)
+            return self.dropout_layer(inputs, training)
 
         output = tf_utils.smart_cond(
             training,
