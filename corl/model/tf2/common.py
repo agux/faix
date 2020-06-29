@@ -5,6 +5,81 @@ from time import strftime
 
 from tensorflow.python.keras.utils import tf_utils
 
+class AlphaDropout(keras.layers.Layer):
+  """Applies Alpha Dropout to the input.
+
+  Alpha Dropout is a `Dropout` that keeps mean and variance of inputs
+  to their original values, in order to ensure the self-normalizing property
+  even after this dropout.
+  Alpha Dropout fits well to Scaled Exponential Linear Units
+  by randomly setting activations to the negative saturation value.
+
+  Arguments:
+    rate: float, drop probability (as with `Dropout`).
+      The multiplicative noise will have
+      standard deviation `sqrt(rate / (1 - rate))`.
+    seed: A Python integer to use as random seed.
+
+  Call arguments:
+    inputs: Input tensor (of any rank).
+    training: Python boolean indicating whether the layer should behave in
+      training mode (adding dropout) or in inference mode (doing nothing).
+
+  Input shape:
+    Arbitrary. Use the keyword argument `input_shape`
+    (tuple of integers, does not include the samples axis)
+    when using this layer as the first layer in a model.
+
+  Output shape:
+    Same shape as input.
+  """
+
+  def __init__(self, rate, noise_shape=None, seed=None, **kwargs):
+    super(AlphaDropout, self).__init__(**kwargs)
+    self.rate = rate
+    self.noise_shape = noise_shape
+    self.seed = seed
+    self.supports_masking = True
+
+  def _get_noise_shape(self, inputs):
+    return self.noise_shape if self.noise_shape else tf.shape(inputs)
+
+  def call(self, inputs, training=None):
+    def dropped_inputs(inputs=inputs, rate=self.rate, seed=self.seed):  # pylint: disable=missing-docstring
+        alpha = 1.6732632423543772848170429916717
+        scale = 1.0507009873554804934193349852946
+        alpha_p = -alpha * scale
+        kept_idx = tf.math.greater_equal(
+            keras.backend.random_uniform(noise_shape, seed=seed), rate)
+        kept_idx = tf.cast(kept_idx, inputs.dtype)
+        # Get affine transformation params
+        a = ((1 - rate) * (1 + rate * alpha_p**2))**-0.5
+        b = -a * alpha_p * rate
+        # Apply mask
+        x = inputs * kept_idx + alpha_p * (1 - kept_idx)
+        # Do affine transformation
+        return a * x + b
+    def dropout():
+        noise_shape = self._get_noise_shape(inputs)
+        return keras.backend.in_train_phase(dropped_inputs, inputs, training=training)
+    return tf_utils.smart_cond(
+        tf.math.logical_and(
+            tf.math.greater(self.rate, 0.),
+            tf.math.less(self.rate, 1.)
+        ),
+        dropout,
+        lambda: tf.identity(inputs)
+    )
+
+  def get_config(self):
+    config = {'rate': self.rate}
+    base_config = super(AlphaDropout, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
+
+  @tf_utils.shape_type_conversion
+  def compute_output_shape(self, input_shape):
+    return input_shape
+
 class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
 
     def __init__(self, decay_start, *args, **kwargs):
@@ -13,7 +88,7 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
 
     def __call__(self, step):
         return tf.cond(
-            tf.less(step, self._decay_start), 
+            tf.math.less(step, self._decay_start), 
             lambda: self.initial_learning_rate,
             lambda: self.decay(step)
         )
@@ -30,27 +105,30 @@ class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
         })
         return config
 
-class DecayedDropoutWrapper(keras.layers.Layer):
+class DecayedDropoutLayer(keras.layers.Layer):
     def __init__(self,
-        dropout_layer=None,
+        dropout_type='dropout'
         decay_start=20000,
+        initial_dropout_rate=0.5,
         first_decay_steps=1000,
         t_mul=2.0,
         m_mul=1.0,
         alpha=0.0,
+        seed=None,
         *args, **kwargs):
         # kwargs['dynamic'] = True
-        super(DecayedDropoutWrapper, self).__init__(*args, **kwargs)
-        self.dropout_layer=dropout_layer
-        self.initial_dropout_rate = dropout_layer.rate
+        super(DecayedDropoutLayer, self).__init__(*args, **kwargs)
+        self.dropout_type=dropout_type.lower()
+        self.initial_dropout_rate = initial_dropout_rate
         self.first_decay_steps = first_decay_steps
         self._decay_start = decay_start
         self._t_mul = t_mul
         self._m_mul = m_mul
         self.alpha = alpha
+        self.seed = seed
 
     def build(self, input_shape):
-        super(DecayedDropoutWrapper, self).build(input_shape)
+        super(DecayedDropoutLayer, self).build(input_shape)
         self.global_step = self.add_weight(initializer="zeros",
                                         dtype=tf.int32,
                                         trainable=False,
@@ -63,22 +141,34 @@ class DecayedDropoutWrapper(keras.layers.Layer):
             alpha=self.alpha,
             name='cosine_dacay_restarts'
         )
+        if self.dropout_type == 'dropout':
+            self.dropout_layer = keras.layers.Dropout(
+                rate=self.initial_dropout_rate, 
+                seed=self.seed
+            )
+        elif self.dropout_type == 'alphadropout':
+            self.dropout_layer = AlphaDropout(
+                rate=self.initial_dropout_rate, 
+                seed=self.seed
+            )
+        else:
+            raise Exception('unsupported dropout type: {}'.format(self.dropout)) 
     
     def compute_output_shape(self, input_shape):
         return input_shape
 
     def call(self, inputs, training=None):
-        # if training is None:
-        #     training = keras.backend.learning_phase()
+        if training is None:
+            training = keras.backend.learning_phase()
+
         def dropout():
             self.global_step.assign_add(1)
             rate = tf_utils.smart_cond(
-                tf.less(self.global_step, self._decay_start),
+                tf.math.less(self.global_step, self._decay_start),
                 lambda: self.initial_dropout_rate,
                 lambda: self.cosine_decay_restarts(self.global_step-self._decay_start+1)
             )
             self.dropout_layer.rate = rate
-            # tf.print('step: ', self.global_step, ', dropout rate: ', rate)
             return self.dropout_layer(inputs, training)
 
         output = tf_utils.smart_cond(
@@ -89,14 +179,16 @@ class DecayedDropoutWrapper(keras.layers.Layer):
         return output
     
     def get_config(self):
-        config = super(DecayedDropoutWrapper, self).get_config().copy()
+        config = super(DecayedDropoutLayer, self).get_config().copy()
         config.update({
+            "dropout_type": self.dropout_type,
             "decay_start": self._decay_start,
             "initial_dropout_rate": self.initial_dropout_rate,
             "first_decay_steps": self.first_decay_steps,
             "t_mul": self._t_mul,
             "m_mul": self._m_mul,
             "alpha": self.alpha,
+            "seed": self.seed
         })
         return config
 

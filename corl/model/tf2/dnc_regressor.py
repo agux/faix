@@ -655,15 +655,14 @@ class DNC_Model_V8(DNC_Model_V7):
         
         # Dropout
         dropout = DecayedDropoutWrapper(
-            dropout_layer=keras.layers.AlphaDropout(
-                rate=self._dropout_rate, 
-                seed=self.seed
-            ),
+            dropout_type='AlphaDropout',
+            initial_dropout_rate=self._dropout_rate, 
             decay_start=self._decayed_dropout_start,
             first_decay_steps=self._dropout_decay_steps,
             t_mul=1.05,
             m_mul=0.98,
             alpha=0.007,
+            seed=self.seed,
         )
 
         if self._num_fcn_layers == 0 and self._dropout_rate > 0:
