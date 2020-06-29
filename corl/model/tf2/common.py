@@ -40,7 +40,7 @@ class DecayedDropoutWrapper(keras.layers.Layer):
         alpha=0.0,
         *args, **kwargs):
         # kwargs['dynamic'] = True
-        super(DecayedDropoutLayer, self).__init__(*args, **kwargs)
+        super(DecayedDropoutWrapper, self).__init__(*args, **kwargs)
         self.dropout_layer=dropout_layer
         self.initial_dropout_rate = dropout_layer.rate
         self.first_decay_steps = first_decay_steps
@@ -50,7 +50,7 @@ class DecayedDropoutWrapper(keras.layers.Layer):
         self.alpha = alpha
 
     def build(self, input_shape):
-        super(DecayedDropoutLayer, self).build(input_shape)
+        super(DecayedDropoutWrapper, self).build(input_shape)
         self.global_step = self.add_weight(initializer="zeros",
                                         dtype=tf.int32,
                                         trainable=False,
@@ -90,7 +90,7 @@ class DecayedDropoutWrapper(keras.layers.Layer):
         return output
     
     def get_config(self):
-        config = super(DecayedDropoutLayer, self).get_config().copy()
+        config = super(DecayedDropoutWrapper, self).get_config().copy()
         config.update({
             "decay_start": self._decay_start,
             "initial_dropout_rate": self.initial_dropout_rate,
