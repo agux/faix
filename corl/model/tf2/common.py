@@ -3,6 +3,8 @@ import tensorflow as tf
 from tensorflow import keras
 from time import strftime
 
+from tensorflow.python.keras.utils.tf_utils import smart_cond
+
 class DelayedCosineDecayRestarts(keras.experimental.CosineDecayRestarts):
 
     def __init__(self, decay_start, *args, **kwargs):
@@ -79,7 +81,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
     
     def train(self, layer, inputs):
         self.global_step.assign_add(1)
-        rate = keras.utils.tf_utils.smart_cond(
+        rate = smart_cond(
             tf.less(self.global_step, self._decay_start),
             lambda: self.initial_dropout_rate,
             lambda: self.cosine_decay_restarts(self.global_step-self._decay_start+1)
@@ -97,7 +99,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
     def call(self, inputs, training=None):
         if training is None:
             training = keras.backend.learning_phase()
-        output = keras.utils.tf_utils.smart_cond(
+        output = smart_cond(
             training,
             lambda: self.train(inputs),
             lambda: tf.identity(inputs)
