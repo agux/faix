@@ -1,11 +1,13 @@
-import pandas as pd
-import numpy as np
+import argparse
+from time import strftime
 from mysql.connector.pooling import MySQLConnectionPool
+
+print_header = lambda msg: print(f"{msg}\n{'-'*len(msg)}")
 
 cnxpool = None
 
-def _parseArgs():
-    parser = argparse.ArgumentParser()
+def parseArgs():
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('--db_host',
                         type=str,
                         help='database host address',
@@ -20,8 +22,10 @@ def _parseArgs():
                         default=None)
     return parser.parse_args()
 
-def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
+def init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
+    if cnxpool is not None:
+        return cnxpool
     print("{} initializing mysql connection pool...".format(
         strftime("%H:%M:%S")))
     cnxpool = MySQLConnectionPool(
@@ -35,18 +39,4 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         # ssl_ca='',
         # use_pure=True,
         connect_timeout=90000)
-
-def _impute():
-    global cnxpool
-    c = cnxpool.get_connection()
-    query = 'select code, date, amount, xrate, close, high, high_close, open, open_close, low, low_close, volume from index_d_n_lr'
-    df = pd.read_sql(query, c)
-
-if __name__ == '__main__':
-    args = _parseArgs()
-    _init(4, 
-        db_host=args.db_host,
-        db_port=args.db_port, 
-        db_pwd=args.db_pwd
-    )
-    _impute()
+    return cnxpool
