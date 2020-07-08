@@ -47,21 +47,20 @@ INCLUDE_SEQLENS = False
 
 # pylint: disable-msg=E0601,E1101
 
-if __name__ == '__main__':
 
-    np.random.seed(SEED)
+def create_regressor():
     regressor = dnc_regressor.DNC_Model_V8(
-        num_cnn_layers=NUM_CNN_LAYERS, 
-        num_dnc_layers = NUM_DNC_LAYERS,
-        num_fcn_layers = NUM_FCN_LAYERS,
+        num_cnn_layers=NUM_CNN_LAYERS,
+        num_dnc_layers=NUM_DNC_LAYERS,
+        num_fcn_layers=NUM_FCN_LAYERS,
         cnn_filters=CNN_FILTERS,
         cnn_kernel_size=CNN_KERNEL_SIZE,
         cnn_output_size=CNN_OUTPUT_SIZE,
-        layer_norm_lstm = LAYER_NORM_LSTM,
+        layer_norm_lstm=LAYER_NORM_LSTM,
         output_size=DNC_OUTPUT_SIZE,
-        controller_units=CONTROLLER_UNITS, 
+        controller_units=CONTROLLER_UNITS,
         memory_size=MEMORY_SIZE,
-        word_size=WORD_SIZE, 
+        word_size=WORD_SIZE,
         num_read_heads=NUM_READ_HEADS,
         time_step=MAX_STEP,
         feat_size=FEAT_SIZE,
@@ -74,12 +73,19 @@ if __name__ == '__main__':
         clipvalue=CLIP_VALUE,
         seed=SEED,
     )
-    
+    return regressor
+
+
+if __name__ == '__main__':
+
+    np.random.seed(SEED)
+    regressor = create_regressor()
+
     run(
         id="test27_mdnc",
-        regressor=regressor, 
-        max_step=MAX_STEP, 
-        time_shift=TIME_SHIFT, 
+        regressor=regressor,
+        max_step=MAX_STEP,
+        time_shift=TIME_SHIFT,
         feat_cols=FEAT_COLS,
         val_save_freq=VAL_SAVE_FREQ,
         steps_per_epoch=STEPS_PER_EPOCH,

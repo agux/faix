@@ -42,7 +42,10 @@ def getSeries_v2(code, klid, rcode, val, shared_args):
     time_shift = shared_args['time_shift']
     s = max(0, klid - max_step + 1 - time_shift)
     batch = _getBatch_v2(code, s, klid, rcode, shared_args)
-    return batch, val
+    if val is not None:
+        return batch, val
+    else:
+        return batch
 
 
 def _getBatch(code, s, e, rcode, shared_args):
@@ -122,8 +125,9 @@ def _getBatch_v2(code, s, e, rcode, shared_args):
     qd = shared_args['qd_idx'] if rcode in shared_args[
         'index_list'] else shared_args['qd']
     cnx = cnxpool.get_connection()
-    fcursor = cnx.cursor(buffered=True)
+    fcursor = None
     try:
+        fcursor = cnx.cursor(buffered=True)
         fcursor.execute(qk, (code, s, e, max_step + time_shift))
         col_names = fcursor.column_names
         featSize = (len(col_names) - 1) * 2
@@ -160,5 +164,6 @@ def _getBatch_v2(code, s, e, rcode, shared_args):
         print(sys.exc_info()[0])
         raise
     finally:
-        fcursor.close()
+        if fcursor is not None:
+            fcursor.close()
         cnx.close()

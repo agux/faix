@@ -57,6 +57,7 @@ _executor = None
 
 cnxpool = None
 
+
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
     print("{} [PID={}]: initializing mysql connection pool...".format(
@@ -73,10 +74,10 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         # use_pure=True,
         connect_timeout=90000)
     ray.init(
-        num_cpus=psutil.cpu_count(logical=False), 
+        num_cpus=psutil.cpu_count(logical=True),
         webui_host='127.0.0.1',
         memory=2 * 1024 * 1024 * 1024,  # 2G
-        object_store_memory=512 * 1024 * 1024, # 512M
+        object_store_memory=512 * 1024 * 1024,  # 512M
         driver_object_store_memory=256 * 1024 * 1024    # 256M
     )
 
@@ -110,7 +111,7 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, qk, qd):
         dates = [r[0] for r in rows]
         dateStr = "'{}'".format("','".join(dates))
         ym = {d.replace('-', '')[:-2]
-              for d in dates}  #extract year-month to a set
+              for d in dates}  # extract year-month to a set
         ymStr = ",".join(ym)
         qd = qd.format(ymStr, dateStr)
         fcursor.execute(qd, (rcode, max_step + time_shift))
@@ -199,6 +200,7 @@ def _loadTestSet(max_step, ntest, vset=None):
     finally:
         cnx.close()
 
+
 def _loadTestSet_v2(max_step, ntest, vset=None):
     global cnxpool, shared_args
     cnx = cnxpool.get_connection()
@@ -255,6 +257,8 @@ def _getIndex():
         cnx.close()
 
 # @tf.function
+
+
 def _loadTrainingData(bno):
     global cnxpool, shared_args, check_input
     # idxlst = _getIndex()
@@ -395,6 +399,7 @@ def _loadTrainingData_v2(bno):
     finally:
         cnx.close()
 
+
 def _getStats():
     '''
     Get statistics from fs_stats table.
@@ -518,7 +523,7 @@ def getInputs(start_bno=0,
         'test_batches': total batch of test set
         'train_batch_size': size of a single train set batch
         'test_batch_size': size of a single test set batch
-        
+
         Where each dataset is a dictionary of {features,seqlens}.
     """
     # Create dataset for training
@@ -562,12 +567,12 @@ def getInputs(start_bno=0,
             ret = tf.numpy_function(func=_loadTrainingData,
                                     inp=[bno],
                                     Tout=[tf.float32, tf.int32, tf.float32])
-                    # f = py_function(func=_loadTrainingData,
-                    #                 inp=[bno],
-                    #                 Tout=[{
-                    #                     'features': tf.float32,
-                    #                     'seqlens': tf.int32
-                    #                 }, tf.float32])
+            # f = py_function(func=_loadTrainingData,
+            #                 inp=[bno],
+            #                 Tout=[{
+            #                     'features': tf.float32,
+            #                     'seqlens': tf.int32
+            #                 }, tf.float32])
             feat, seqlens, corl = ret
 
             feat.set_shape((None, max_step, feat_size))
@@ -578,12 +583,12 @@ def getInputs(start_bno=0,
 
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
         lambda bno: tuple(mapfunc(bno)),
-            # _prefetch
-            num_parallel_calls=tf.data.experimental.AUTOTUNE
-        ).prefetch(
-            # _prefetch
-            tf.data.experimental.AUTOTUNE
-        )
+        # _prefetch
+        num_parallel_calls=tf.data.experimental.AUTOTUNE
+    ).prefetch(
+        # _prefetch
+        tf.data.experimental.AUTOTUNE
+    )
 
     # Create dataset for testing
     test_batches, test_batch_size = _getDataSetMeta("TS")
@@ -600,18 +605,63 @@ def getInputs(start_bno=0,
         'test_batch_size': test_batch_size
     }
 
+
+def getWorkloadForPrediction(corl_prior, host, port, pwd):
+    '''
+        Get total workload from the database.
+
+        Returns:
+        List of tuples of (code, date, klid)
+    '''
+    q = (
+        "SELECT  "
+        "	t.code code, t.date date, t.klid klid "
+        "FROM "
+        "	(SELECT  "
+        "		code, date, klid "
+        "	FROM "
+        "		kline_d_b_lr "
+        "	WHERE "
+        "		klid >= %s "
+        "	ORDER BY code , klid) t "
+        "WHERE "
+        "	(code, klid) NOT IN (SELECT  "
+        "			code, klid "
+        "		FROM "
+        "			stockrel "
+        "	) "
+    )
+    _init(1, host, port, pwd)
+    cnx = cnxpool.get_connection()
+    try:
+        print('{} querying total workload...'.format(strftime("%H:%M:%S")))
+        cursor = cnx.cursor()
+        cursor.execute(q, (corl_prior, ))
+        rows = cursor.fetchall()
+        total = cursor.rowcount
+        cursor.close()
+        print('{} total workload remaining: {}'.format(
+            strftime("%H:%M:%S"), total))
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        cnx.close()
+    return [(c, d, k) for c, d, k in rows]
+
+
 def getInputs_v2(start_bno=0,
-              shift=0,
-              cols=None,
-              step=30,
-              cores=psutil.cpu_count(logical=False),
-              pfetch=2,
-              pool=None,
-              host=None,
-              port=None,
-              pwd=None,
-              vset=None,
-              check=False):
+                 shift=0,
+                 cols=None,
+                 step=30,
+                 cores=psutil.cpu_count(logical=False),
+                 pfetch=2,
+                 pool=None,
+                 host=None,
+                 port=None,
+                 pwd=None,
+                 vset=None,
+                 check=False):
     """Input function for the wcc training dataset.
 
     Returns:
@@ -670,18 +720,18 @@ def getInputs_v2(start_bno=0,
 
     ds_train = tf.data.Dataset.from_tensor_slices(bnums).map(
         lambda bno: tuple(mapfunc(bno)),
-            # num_parallel_calls=tf.data.experimental.AUTOTUNE
-            num_parallel_calls=parallel
-        ).prefetch(
-            # tf.data.experimental.AUTOTUNE
-            _prefetch
-        )
+        # num_parallel_calls=tf.data.experimental.AUTOTUNE
+        num_parallel_calls=parallel
+    ).prefetch(
+        # tf.data.experimental.AUTOTUNE
+        _prefetch
+    )
 
     # Create dataset for testing
     test_batches, test_batch_size = _getDataSetMeta("TS")
     ds_test = tf.data.Dataset.from_tensor_slices(
         _loadTestSet_v2(step, test_batches + 1,
-                     vset)).batch(test_batch_size).cache().repeat()
+                        vset)).batch(test_batch_size).cache().repeat()
 
     return {
         'train': ds_train,
