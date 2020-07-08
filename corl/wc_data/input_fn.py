@@ -625,10 +625,10 @@ def getWorkloadForPrediction(corl_prior, host, port, pwd):
         "		klid >= %s "
         "	ORDER BY code , klid) t "
         "WHERE "
-        "	(code, klid) NOT IN (SELECT  "
-        "			code, klid "
+        "	(code, date) NOT IN (SELECT  "
+        "			code, date "
         "		FROM "
-        "			stockrel "
+        "			wcc_predict "
         "	) "
     )
     _init(1, host, port, pwd)

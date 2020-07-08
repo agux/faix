@@ -12,6 +12,26 @@ from mysql.connector.pooling import MySQLConnectionPool
 from corl.wc_data.series import getSeries_v2
 
 cnxpool = None
+BUCKET_SIZE = 64
+bucket = []
+MAX_K = 5
+WCC_INSERT = """
+    INSERT INTO `secu`.`wcc_predict`
+        (`code`,`date`,`klid`,
+        `t1_code`,`t2_code`,`t3_code`,`t4_code`,`t5_code`,
+        `t1_corl`,`t2_corl`,`t3_corl`,`t4_corl`,`t5_corl`,
+        `b1_code`,`b2_code`,`b3_code`,`b4_code`,`b5_code`,
+        `b1_corl`,`b2_corl`,`b3_corl`,`b4_corl`,`b5_corl`,
+        `rcode_size`,`udate`,`utime`)
+    VALUES
+        (%s,%s,%s,
+        %s,%s,%s,%s,%s,
+        %s,%s,%s,%s,%s,
+        %s,%s,%s,%s,%s,
+        %s,%s,%s,%s,%s,
+        %s,%s,%s)
+"""
+
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
@@ -130,12 +150,62 @@ def _process(code, klid, date, min_rcode, shared_args):
         return []
     tasks = [getSeries_v2.remote(
         code, klid, rcode, None, shared_args) for rcode in rcodes]
-    return np.array(ray.get(tasks), np.float32)
+    return np.array(ray.get(tasks), np.float32), np.array(rcodes, object)
 
 
+def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, predictions=None):
+    if code is not None:
+        # get top and bottom k
+        top_k = top_k if top_k <= MAX_K else MAX_K
+        p = predictions
+        top_idx = np.argpartition(p, -top_k)[-top_k:]
+        top_idx = top_idx[np.argsort(p[top_idx])]
+        top_k_corl = p[top_idx][::-1]
+        top_k_code = rcodes[top_idx][::-1]
+        bottom_idx = np.argpartition(p, top_k)[: top_k]
+        bottom_idx = bottom_idx[np.argsort(p[bottom_idx])]
+        bottom_k_corl = p[bottom_idx]
+        bottom_k_code = rcodes[bottom_idx]
+        if top_k < MAX_K:
+            pad = MAX_K-top_k
+            top_k_corl = np.pad(top_k_corl, ((0, 0), (0, pad)),
+                                mode='constant', constant_values=None)
+            top_k_code = np.pad(top_k_code, ((0, 0), (0, pad)),
+                                mode='constant', constant_values=None)
+            bottom_k_corl = np.pad(bottom_k_corl, ((0, 0), (0, pad)),
+                                   mode='constant', constant_values=None)
+            bottom_k_code = np.pad(bottom_k_code, ((0, 0), (0, pad)),
+                                   mode='constant', constant_values=None)
+        bucket.append((
+            code, date, klid,
+            *top_k_code,
+            *top_k_corl,
+            *bottom_k_code,
+            *bottom_k_corl,
+            len(rcodes),
+            strftime("%Y-%m-%d"),
+            strftime("%H:%M:%S")
+        ))
+        if len(bucket) < BUCKET_SIZE:
+            return
+    if len(bucket) == 0:
+        return
+    cnx = cnxpool.get_connection()
+    cursor = None
+    try:
+        cursor = cnx.cursor()
+        cursor.executemany(WCC_INSERT, bucket)
+        cnx.commit()
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        if cnx.is_connected():
+            cursor.close()
+            cnx.close()
 
 @ray.remote
-def predict_wcc(work, min_rcode, model, shared_args):
+def predict_wcc(work, min_rcode, model, top_k, shared_args):
     global cnxpool
     if cnxpool is None:
         db_host = shared_args['db_host']
@@ -143,7 +213,13 @@ def predict_wcc(work, min_rcode, model, shared_args):
         db_pwd = shared_args['db_pwd']
         _init(1, db_host, db_port, db_pwd)
     for code, klid, date in work:
-        batch = _process(code, klid, date, min_rcode, shared_args)
-        #TODO use model to predict
-        prediction = model.predict(batch)
-        
+        batch, rcodes = _process(code, klid, date, min_rcode, shared_args)
+        if len(batch) < min_rcode or len(rcodes) < min_rcode:
+            print('{} {}@({},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
+                strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
+            continue
+        # use model to predict
+        p = model.predict(batch)
+        _save_prediction(code, klid, date, rcodes, top_k, p)
+    # flush bucket
+    _save_prediction()

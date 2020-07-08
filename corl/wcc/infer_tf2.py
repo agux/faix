@@ -16,6 +16,7 @@ CORL_PRIOR = 100
 TIME_SHIFT = 4
 MAX_STEP = 35
 MIN_RCODE = 30
+TOP_K = 5
 REGRESSOR = create_regressor()
 
 
@@ -73,13 +74,12 @@ def _load_model(model_path):
 def run(args):
     print("{} started inference, pid:{}".format(
         strftime("%H:%M:%S"), os.getpid()))
-    # TODO re-write inference process
     # load total workload from db
     workload = getWorkloadForPrediction(
         CORL_PRIOR, args.db_host, args.db_port, args.db_pwd)
     # delegate to ray remote workers with split-even workloads
     work_seg = np.array_split(workload, args.parallel)
-    # in each worker, load input data from db, run model prediction, and save predictions back to stockrel table with bucketing
+    # in each worker, load input data from db, run model prediction, and save predictions back to wcc_predict table with bucketing
     qk, qd, qd_idx = _getFtQuery()
     shared_args = ray.put({
         'db_host': args.db_host,
@@ -94,7 +94,7 @@ def run(args):
     })
     model = _load_model(args.model)
     tasks = [predict_wcc.remote(
-        work, MIN_RCODE, model, shared_args) for work in work_seg]
+        work, MIN_RCODE, model, TOP_K, shared_args) for work in work_seg]
     ray.get(tasks)
 
 
