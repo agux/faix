@@ -700,6 +700,7 @@ def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
             '',
         ))
         total = cursor.fetchone()
+        total = total[0]
         print('{} total workload remaining: {}'.format(
             strftime("%H:%M:%S"), total))
         seg_size = round(total/segments)
