@@ -185,9 +185,9 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
         bucket.append((
             code, date, klid,
             *top_k_code,
-            *top_k_corl,
+            *(top_k_corl.tolist()),
             *bottom_k_code,
-            *bottom_k_corl,
+            *(bottom_k_corl.tolist()),
             len(rcodes),
             strftime("%Y-%m-%d"),
             strftime("%H:%M:%S")
