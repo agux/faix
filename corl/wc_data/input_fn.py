@@ -686,7 +686,7 @@ def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
         "			code, date "
         "		FROM "
         "			wcc_predict "
-        "	) {}"
+        "	) {} "
     )
     _init(1, host, port, pwd)
     cnx = cnxpool.get_connection()
@@ -697,7 +697,7 @@ def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
             'count(*)',
             'code, date'
             'klid >= {}'.format(corl_prior),
-            ''
+            '',
         ))
         total = cursor.fetchone()
         print('{} total workload remaining: {}'.format(
@@ -709,7 +709,7 @@ def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
                 't.code code, t.klid klid',
                 'code, date, klid'
                 'klid >= {}'.format(corl_prior),
-                'limit 1 offset {}'.format(i*seg_size)
+                'limit 1 offset {}'.format(i*seg_size),
             ))
             c, k = cursor.fetchone()
             ret.append((c, k))
