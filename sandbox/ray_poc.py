@@ -23,6 +23,8 @@ def f(x, s):
 
 shared = ray.put({'a': 99, 'b': 100})
 
+print("objectid: {} type of objectid: {}".format(shared, type(shared)))
+
 futures = [f.remote(i, shared) for i in range(4)]
 
 r = list(ray.get(futures))

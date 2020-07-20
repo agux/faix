@@ -92,9 +92,10 @@ def run(args):
         'qd_idx': qd_idx,
         'index_list': _getIndex(),
     })
+    shared_args_oid = ray.put(shared_args)
     model = _load_model(args.model)
     tasks = [predict_wcc.remote(
-        work, MIN_RCODE, model, TOP_K, shared_args) for work in work_seg]
+        work, MIN_RCODE, model, TOP_K, shared_args, shared_args_oid) for work in work_seg]
     ray.get(tasks)
 
 
