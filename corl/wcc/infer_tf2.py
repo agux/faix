@@ -74,7 +74,7 @@ def run(args):
         'index_list': _getIndex(),
     })
     shared_args_oid = ray.put([shared_args])
-    print('shape of work_seg: {}'.format(work_seg.shape))
+    print('shape of work_seg: {}'.format(np.shape(work_seg)))
     wsid = [ray.put(w) for w in work_seg]
     # FIXME occupy too much memory
     tasks = [predict_wcc.remote(
