@@ -150,7 +150,7 @@ def _process(code, klid, date, min_rcode, shared_args, shared_args_oid):
         return []
     # retrive objectID for shared_sargs and pass to getSeries_v2
     tasks = [getSeries_v2.remote(
-        code, klid, rcode, None, shared_args_oid) for rcode in rcodes]
+        code, klid, rcode, None, shared_args_oid[0]) for rcode in rcodes]
     return np.array(ray.get(tasks), np.float32), np.array(rcodes, object)
 
 
@@ -205,6 +205,7 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
             cursor.close()
             cnx.close()
 
+
 @ray.remote
 def predict_wcc(work, min_rcode, model, top_k, shared_args, shared_args_oid):
     global cnxpool
@@ -214,7 +215,8 @@ def predict_wcc(work, min_rcode, model, top_k, shared_args, shared_args_oid):
         db_pwd = shared_args['db_pwd']
         _init(1, db_host, db_port, db_pwd)
     for code, klid, date in work:
-        batch, rcodes = _process(code, klid, date, min_rcode, shared_args, shared_args_oid)
+        batch, rcodes = _process(
+            code, klid, date, min_rcode, shared_args, shared_args_oid)
         if len(batch) < min_rcode or len(rcodes) < min_rcode:
             print('{} {}@({},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
                 strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))

@@ -439,11 +439,12 @@ def _getStats():
         cnx.close()
 
 
-def _getFtQuery():
-    global qk, qd, qd_idx
+def _getFtQuery(cols=None):
+    global qk, qd, qd_idx, feat_cols
     if qk is not None and qd is not None and qd_idx is not None:
         return qk, qd, qd_idx
-
+    if cols is not None:
+        feat_cols = cols
     stats = _getStats()
     p_kline = ""
     p_index = ""
