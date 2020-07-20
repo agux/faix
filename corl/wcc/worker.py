@@ -11,6 +11,7 @@ from pathlib import Path
 from mysql.connector.pooling import MySQLConnectionPool
 from corl.wc_data.series import getSeries_v2
 from corl.wc_test.test27_mdnc import create_regressor
+from corl.wc_data.input_fn import getWorkloadForPrediction
 
 REGRESSOR = create_regressor()
 cnxpool = None
@@ -209,6 +210,7 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
             cursor.close()
             cnx.close()
 
+
 def _load_model(model_path):
     if not os.path.exists(model_path):
         raise Exception(
@@ -228,16 +230,22 @@ def _load_model(model_path):
         REGRESSOR.compile()
     return model
 
+
 @ray.remote
-def predict_wcc(work, min_rcode, model_path, top_k, shared_args, shared_args_oid):
+def predict_wcc(anchor, corl_prior, min_rcode, model_path, top_k, shared_args, shared_args_oid):
     global cnxpool
     model = None
+    db_host = shared_args['db_host']
+    db_port = shared_args['db_port']
+    db_pwd = shared_args['db_pwd']
+    anchors = shared_args['anchors']
     if cnxpool is None:
-        db_host = shared_args['db_host']
-        db_port = shared_args['db_port']
-        db_pwd = shared_args['db_pwd']
         _init(1, db_host, db_port, db_pwd)
         model = _load_model(model_path)
+    start_anchor = None if anchor == 0 else anchors[anchor-1]
+    stop_anchor = None if anchor == len(anchors) else anchors[anchor]
+    work = getWorkloadForPrediction(start_anchor, stop_anchor,
+                             corl_prior, db_host, db_port, db_pwd)
     for code, klid, date in work:
         batch, rcodes = _process(
             code, klid, date, min_rcode, shared_args, shared_args_oid)

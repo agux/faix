@@ -605,14 +605,11 @@ def getInputs(start_bno=0,
     }
 
 
-def getWorkloadForPrediction(corl_prior, host, port, pwd):
-    '''
-        Get total workload from the database.
-
-        Returns:
-        List of tuples of (code, date, klid)
-    '''
-    q = (
+def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, host, port, pwd):
+    global cnxpool
+    if cnxpool is None:
+        _init(1, host, port, pwd)
+    tpl = (
         "SELECT  "
         "	t.code code, t.date date, t.klid klid "
         "FROM "
@@ -621,32 +618,108 @@ def getWorkloadForPrediction(corl_prior, host, port, pwd):
         "	FROM "
         "		kline_d_b_lr "
         "	WHERE "
-        "		klid >= %s "
+        "		{} "
         "	ORDER BY code , klid) t "
         "WHERE "
         "	(code, date) NOT IN (SELECT  "
         "			code, date "
         "		FROM "
         "			wcc_predict "
-        "	) "
+        "	)"
     )
-    _init(1, host, port, pwd)
+    cond = ' klid >= {} '.format(corl_prior)
+    if start_anchor is not None:
+        c1, k1 = start_anchor
+        cond += '''
+            and (
+                code > '{}'
+                or (code = '{}' and klid >= {})
+            )
+        '''.format(c1, c1, k1)
+    if stop_anchor is not None:
+        c2, k2 = stop_anchor
+        cond += '''
+            and (
+                code < '{}'
+                or (code = '{}' and klid < {})
+            )
+        '''.format(c2, c2, k2),
     cnx = cnxpool.get_connection()
     try:
-        print('{} querying total workload...'.format(strftime("%H:%M:%S")))
+        print('{} querying workload for segment [{}, {}]'.format(
+            strftime("%H:%M:%S"), start_anchor, stop_anchor))
         cursor = cnx.cursor()
-        cursor.execute(q, (corl_prior, ))
+        cursor.execute(tpl.format(cond))
         rows = cursor.fetchall()
         total = cursor.rowcount
-        cursor.close()
-        print('{} total workload remaining: {}'.format(
+        print('{} workload for segment: {}'.format(
             strftime("%H:%M:%S"), total))
+        cursor.close()
     except:
         print(sys.exc_info()[0])
         raise
     finally:
         cnx.close()
     return [(c, d, k) for c, d, k in rows]
+
+
+def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
+    '''
+        Get anchor points (code, klid) for each segment of workload.
+
+        Returns:
+        List of tuples of (code, klid) for the anchors.
+    '''
+    tpl = (
+        "SELECT  "
+        "	{} "
+        "FROM "
+        "	(SELECT  "
+        "		{} "
+        "	FROM "
+        "		kline_d_b_lr "
+        "	WHERE "
+        "		{} "
+        "	ORDER BY code , klid) t "
+        "WHERE "
+        "	(code, date) NOT IN (SELECT  "
+        "			code, date "
+        "		FROM "
+        "			wcc_predict "
+        "	) {}"
+    )
+    _init(1, host, port, pwd)
+    cnx = cnxpool.get_connection()
+    try:
+        print('{} querying total workload...'.format(strftime("%H:%M:%S")))
+        cursor = cnx.cursor()
+        cursor.execute(tpl.format(
+            'count(*)',
+            'code, date'
+            'klid >= {}'.format(corl_prior),
+            ''
+        ))
+        total = cursor.fetchone()
+        print('{} total workload remaining: {}'.format(
+            strftime("%H:%M:%S"), total))
+        seg_size = round(total/segments)
+        ret = []
+        for i in range(1, segments):
+            cursor.execute(tpl.format(
+                't.code code, t.klid klid',
+                'code, date, klid'
+                'klid >= {}'.format(corl_prior),
+                'limit 1 offset {}'.format(i*seg_size)
+            ))
+            c, k = cursor.fetchone()
+            ret.append((c, k))
+        cursor.close()
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        cnx.close()
+    return ret
 
 
 def getInputs_v2(start_bno=0,

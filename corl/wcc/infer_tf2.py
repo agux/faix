@@ -8,7 +8,7 @@ import numpy as np
 
 from time import strftime
 from pathlib import Path
-from corl.wc_data.input_fn import getWorkloadForPrediction, _getFtQuery, _getIndex
+from corl.wc_data.input_fn import getWorkSegmentsForPrediction, _getFtQuery, _getIndex
 from corl.wc_test.test27_mdnc import create_regressor
 from corl.wcc.worker import predict_wcc
 
@@ -45,6 +45,8 @@ def parseArgs():
                         default=math.sqrt(psutil.cpu_count(logical=True)))
     parser.add_argument('-f', '--prefetch', type=int,
                         help='dataset prefetch batches', default=2)
+    parser.add_argument('-i', '--init_workload', dest='init_workload', default=False,
+                        action='store_true', help='initialize holistic workload for the inference')
     parser.add_argument('-g', '--gpu_grow_mem', dest='gpu_grow_mem', default=False,
                         action='store_true', help='allow gpu to allocate mem dynamically at runtime.')
     parser.add_argument('--profile', dest='profile', action='store_true', default=False,
@@ -55,13 +57,9 @@ def parseArgs():
 def run(args):
     print("{} started inference, pid:{}".format(
         strftime("%H:%M:%S"), os.getpid()))
-    # load total workload from db
-    workload = getWorkloadForPrediction(
-        CORL_PRIOR, args.db_host, args.db_port, args.db_pwd)
-    print('workload:\n{}'.format(workload))
-    # delegate to ray remote workers with split-even workloads
-    work_seg = np.array_split(workload, args.parallel)
-    print('workseg:\n{}'.format(work_seg))
+    # load workload segmentation anchors from db
+    anchors = getWorkSegmentsForPrediction(
+        CORL_PRIOR, args.db_host, args.db_port, args.db_pwd, args.parallel)
     # in each worker, load input data from db, run model prediction, and save predictions back to wcc_predict table with bucketing
     qk, qd, qd_idx = _getFtQuery(COLS)
     shared_args = ray.put({
@@ -74,13 +72,11 @@ def run(args):
         'qd': qd,
         'qd_idx': qd_idx,
         'index_list': _getIndex(),
+        'anchors': anchors,
     })
     shared_args_oid = ray.put([shared_args])
-    print('shape of work_seg: {}'.format(np.shape(work_seg)))
-    wsid = [ray.put(w) for w in work_seg]
-    # FIXME occupy too much memory
     tasks = [predict_wcc.remote(
-        i, MIN_RCODE, args.model, TOP_K, shared_args, shared_args_oid) for i in wsid]
+        i, CORL_PRIOR, MIN_RCODE, args.model, TOP_K, shared_args, shared_args_oid) for i in args.parallel]
     ray.get(tasks)
 
 
