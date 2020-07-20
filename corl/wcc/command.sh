@@ -1,6 +1,6 @@
 #!/bin/sh
 
-python wcc_infer.py --prefetch=5 -m [model destination] -r gs://carusytes_bucket/wcc_infer -p gs://carusytes_bucket/wcc_infer_results
+python infer_tf2.py -m [PATH TO THE SAVED MODEL] --gpu_grow_mem --prefetch=2 --parallel=2 --db_host=[DB_HOST] --db_port=[DB_PORT] --db_pwd=[DB_PWD]
 if [ $? -eq 0 ]; then
     sleep 15
     echo "job complete, shutting down vm." | mail -s "Job Complete" 3110798@qq.com
