@@ -57,6 +57,21 @@ _executor = None
 
 cnxpool = None
 
+def _init_db(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
+    global cnxpool
+    print("{} [PID={}]: initializing mysql connection pool...".format(
+        strftime("%H:%M:%S"), os.getpid()))
+    cnxpool = MySQLConnectionPool(
+        pool_name="dbpool",
+        pool_size=db_pool_size or 5,
+        host=db_host or '127.0.0.1',
+        port=db_port or 3306,
+        user='mysql',
+        database='secu',
+        password=db_pwd or '123456',
+        # ssl_ca='',
+        # use_pure=True,
+        connect_timeout=90000)
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
@@ -608,7 +623,7 @@ def getInputs(start_bno=0,
 def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, host, port, pwd):
     global cnxpool
     if cnxpool is None:
-        _init(1, host, port, pwd)
+        _init_db(1, host, port, pwd)
     tpl = (
         "SELECT  "
         "	t.code code, t.date date, t.klid klid "
@@ -688,7 +703,7 @@ def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
         "			wcc_predict "
         "	) {} "
     )
-    _init(1, host, port, pwd)
+    _init_db(1, host, port, pwd)
     cnx = cnxpool.get_connection()
     try:
         print('{} querying total workload...'.format(strftime("%H:%M:%S")))
