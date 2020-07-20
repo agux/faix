@@ -52,7 +52,6 @@ def parseArgs():
     return parser.parse_args()
 
 
-
 def run(args):
     print("{} started inference, pid:{}".format(
         strftime("%H:%M:%S"), os.getpid()))
@@ -75,8 +74,11 @@ def run(args):
         'index_list': _getIndex(),
     })
     shared_args_oid = ray.put([shared_args])
+    print('shape of work_seg: {}'.format(work_seg.shape))
+    wsid = [ray.put(w) for w in work_seg]
+    # FIXME occupy too much memory
     tasks = [predict_wcc.remote(
-        work, MIN_RCODE, args.model, TOP_K, shared_args, shared_args_oid) for work in work_seg]
+        i, MIN_RCODE, args.model, TOP_K, shared_args, shared_args_oid) for i in wsid]
     ray.get(tasks)
 
 

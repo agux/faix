@@ -157,6 +157,7 @@ def _process(code, klid, date, min_rcode, shared_args, shared_args_oid):
 
 
 def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, predictions=None):
+    global bucket
     if code is not None:
         # get top and bottom k
         top_k = top_k if top_k <= MAX_K else MAX_K
@@ -203,6 +204,7 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
         print(sys.exc_info()[0])
         raise
     finally:
+        bucket = []
         if cnx.is_connected():
             cursor.close()
             cnx.close()

@@ -76,9 +76,9 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     ray.init(
         num_cpus=psutil.cpu_count(logical=True),
         webui_host='127.0.0.1',
-        memory=2 * 1024 * 1024 * 1024,  # 2G
-        object_store_memory=2 * 1024 * 1024 * 1024,  # 2G
-        driver_object_store_memory=512 * 1024 * 1024    # 512M
+        memory=4 * 1024 * 1024 * 1024,  # 4G
+        object_store_memory=4 * 1024 * 1024 * 1024,  # 4G
+        driver_object_store_memory=256 * 1024 * 1024    # 256M
     )
 
 
