@@ -125,12 +125,6 @@ def _get_rcodes(code, klid, steps, shift):
             )
             return None
         rows = cursor.fetchall()
-        dates = [r[0] for r in rows]
-        # get rcodes from kline table
-        rcodes_k = _get_rcodes_for(code, 'kline_d_b_lr', dates)
-        # get rcodes from index table
-        rcodes_i = _get_rcodes_for(code, 'index_d_n_lr', dates)
-        return rcodes_k + rcodes_i
     except:
         print(sys.exc_info()[0])
         raise
@@ -138,6 +132,13 @@ def _get_rcodes(code, klid, steps, shift):
         if cursor is not None:
             cursor.close()
         cnx.close()
+
+    dates = [r[0] for r in rows]
+    # get rcodes from kline table
+    rcodes_k = _get_rcodes_for(code, 'kline_d_b_lr', dates)
+    # get rcodes from index table
+    rcodes_i = _get_rcodes_for(code, 'index_d_n_lr', dates)
+    return rcodes_k + rcodes_i
 
 
 def _process(code, klid, date, min_rcode, shared_args, shared_args_oid):
@@ -245,7 +246,7 @@ def predict_wcc(anchor, corl_prior, min_rcode, model_path, top_k, shared_args, s
     start_anchor = None if anchor == 0 else anchors[anchor-1]
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
     work = getWorkloadForPrediction(start_anchor, stop_anchor,
-                             corl_prior, db_host, db_port, db_pwd)
+                                    corl_prior, db_host, db_port, db_pwd)
     for code, date, klid in work:
         batch, rcodes = _process(
             code, klid, date, min_rcode, shared_args, shared_args_oid)
