@@ -20,7 +20,6 @@ TOP_K = 5
 COLS = ["close"]
 REGRESSOR = create_regressor()
 
-
 def parseArgs():
     parser = argparse.ArgumentParser()
     req = parser.add_argument_group('required named arguments')
@@ -53,6 +52,14 @@ def parseArgs():
                         help='profile CG execution.')
     return parser.parse_args()
 
+def init():
+    ray.init(
+        num_cpus=psutil.cpu_count(logical=True),
+        webui_host='127.0.0.1',
+        memory=4 * 1024 * 1024 * 1024,  # 4G
+        object_store_memory=4 * 1024 * 1024 * 1024,  # 4G
+        driver_object_store_memory=256 * 1024 * 1024    # 256M
+    )
 
 def run(args):
     print("{} started inference, pid:{}".format(
@@ -82,4 +89,5 @@ def run(args):
 
 if __name__ == '__main__':
     args = parseArgs()
+    init()
     run(args)
