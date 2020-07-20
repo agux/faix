@@ -24,13 +24,39 @@ from tensorflow.python import pywrap_tfe as pywrap_tfe
 
 # pywrap_tfe.TFE_Py_FastPathExecute()
 
-x = np.array([3, 7, 1, 9, 2, 6.3, 10.2, 99, 0.2])
-k = 5
+# x = np.array([3, 7, 1, 9, 2, 6.3, 10.2, 99, 0.2])
+# k = 5
 
-top_idx = np.argpartition(x, -k)[-k:]
-top_k = x[top_idx[np.argsort(x[top_idx])][::-1]]
+# top_idx = np.argpartition(x, -k)[-k:]
+# top_k = x[top_idx[np.argsort(x[top_idx])][::-1]]
 
-bottom_idx = np.argpartition(x, k)[:k]
-bottom_k = x[bottom_idx[np.argsort(x[bottom_idx])]]
-print(top_k)
-print(bottom_k)
+# bottom_idx = np.argpartition(x, k)[:k]
+# bottom_k = x[bottom_idx[np.argsort(x[bottom_idx])]]
+# print(top_k)
+# print(bottom_k)
+
+tpl = '''
+    SELECT  
+    	{outer_sel_cols} 
+    FROM 
+    	(SELECT  
+    		{inner_sel_cols} 
+    	FROM 
+    		kline_d_b_lr 
+    	WHERE 
+    		{cond} 
+    	ORDER BY code , klid) t 
+    WHERE 
+    	(code, date) NOT IN (SELECT  
+    			code, date 
+    		FROM 
+    			wcc_predict 
+    	) {end} 
+'''
+
+print(tpl.format(
+    outer_sel_cols='count(*)',
+    inner_sel_cols='code, date',
+    cond='klid >= {}'.format(100),
+    end=''
+))

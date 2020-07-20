@@ -695,7 +695,7 @@ def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
         cursor = cnx.cursor()
         cursor.execute(tpl.format(
             'count(*)',
-            'code, date'
+            'code, date',
             'klid >= {}'.format(corl_prior),
             '',
         ))
@@ -707,7 +707,7 @@ def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
         for i in range(1, segments):
             cursor.execute(tpl.format(
                 't.code code, t.klid klid',
-                'code, date, klid'
+                'code, date, klid',
                 'klid >= {}'.format(corl_prior),
                 'limit 1 offset {}'.format(i*seg_size),
             ))
