@@ -246,7 +246,7 @@ def predict_wcc(anchor, corl_prior, min_rcode, model_path, top_k, shared_args, s
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
     work = getWorkloadForPrediction(start_anchor, stop_anchor,
                              corl_prior, db_host, db_port, db_pwd)
-    for code, klid, date in work:
+    for code, date, klid in work:
         batch, rcodes = _process(
             code, klid, date, min_rcode, shared_args, shared_args_oid)
         if len(batch) < min_rcode or len(rcodes) < min_rcode:

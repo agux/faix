@@ -623,6 +623,9 @@ def getInputs(start_bno=0,
 
 
 def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, host, port, pwd):
+    '''
+    Returns list of tuples (code, date, klid)
+    '''
     global cnxpool
     if cnxpool is None:
         _init_db(1, host, port, pwd)
