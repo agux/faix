@@ -151,7 +151,7 @@ def _process(code, klid, date, min_rcode, shared_args, shared_args_oid):
             strftime("%H:%M:%S"),
             code, klid, date, len(rcodes),
         ))
-        return []
+        return [], []
     # retrive objectID for shared_sargs and pass to getSeries_v2
     tasks = [getSeries_v2.remote(
         code, klid, rcode, None, shared_args_oid[0]) for rcode in rcodes]
