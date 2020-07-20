@@ -10,7 +10,7 @@ from time import strftime
 from pathlib import Path
 from corl.wc_data.input_fn import getWorkloadForPrediction, _getFtQuery, _getIndex
 from corl.wc_test.test27_mdnc import create_regressor
-from .worker import predict_wcc
+from corl.wcc.worker import predict_wcc
 
 CORL_PRIOR = 100
 TIME_SHIFT = 4
