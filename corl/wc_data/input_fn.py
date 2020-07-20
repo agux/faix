@@ -57,6 +57,7 @@ _executor = None
 
 cnxpool = None
 
+
 def _init_db(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
     print("{} [PID={}]: initializing mysql connection pool...".format(
@@ -72,6 +73,7 @@ def _init_db(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         # ssl_ca='',
         # use_pure=True,
         connect_timeout=90000)
+
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
@@ -658,7 +660,7 @@ def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, host, port, 
                 code < '{}'
                 or (code = '{}' and klid < {})
             )
-        '''.format(c2, c2, k2),
+        '''.format(c2, c2, k2)
     cnx = cnxpool.get_connection()
     try:
         print('{} querying workload for segment [{}, {}]'.format(
@@ -728,6 +730,7 @@ def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
                 'limit 1 offset {}'.format(i*seg_size),
             ))
             c, k = cursor.fetchone()
+            print('{} found anchor: {}, {}'.format(strftime("%H:%M:%S"), c, k))
             ret.append((c, k))
         cursor.close()
     except:

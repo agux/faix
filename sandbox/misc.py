@@ -35,6 +35,18 @@ from tensorflow.python import pywrap_tfe as pywrap_tfe
 # print(top_k)
 # print(bottom_k)
 
+stop_anchor = ('000001', 123)
+cond = ' klid >= {} '.format(100)
+c2, k2 = stop_anchor
+cond += '''
+    and (
+        code < '{}'
+        or (code = '{}' and klid < {})
+    )
+'''.format(c2, c2, k2)
+
+print(cond)
+
 tpl = '''
     SELECT  
     	{outer_sel_cols} 
