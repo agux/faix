@@ -58,8 +58,10 @@ def run(args):
     # load total workload from db
     workload = getWorkloadForPrediction(
         CORL_PRIOR, args.db_host, args.db_port, args.db_pwd)
+    print('workload:\n'.format(workload))
     # delegate to ray remote workers with split-even workloads
     work_seg = np.array_split(workload, args.parallel)
+    print('workseg:\n'.format(work_seg))
     # in each worker, load input data from db, run model prediction, and save predictions back to wcc_predict table with bucketing
     qk, qd, qd_idx = _getFtQuery(COLS)
     shared_args = ray.put({
