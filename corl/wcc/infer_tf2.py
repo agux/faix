@@ -76,7 +76,7 @@ def run(args):
     })
     shared_args_oid = ray.put([shared_args])
     tasks = [predict_wcc.remote(
-        i, CORL_PRIOR, MIN_RCODE, args.model, TOP_K, shared_args, shared_args_oid) for i in args.parallel]
+        i, CORL_PRIOR, MIN_RCODE, args.model, TOP_K, shared_args, shared_args_oid) for i in range(args.parallel)]
     ray.get(tasks)
 
 
