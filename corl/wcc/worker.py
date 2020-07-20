@@ -256,6 +256,7 @@ def predict_wcc(anchor, corl_prior, min_rcode, model_path, top_k, shared_args, s
             continue
         # use model to predict
         p = model.predict(batch)
+        print("the prediction:\n{}".format(p))
         _save_prediction(code, klid, date, rcodes, top_k, p)
     # flush bucket
     _save_prediction()
