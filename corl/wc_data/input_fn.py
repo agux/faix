@@ -256,8 +256,6 @@ def _getIndex():
     finally:
         cnx.close()
 
-# @tf.function
-
 
 def _loadTrainingData(bno):
     global cnxpool, shared_args, check_input

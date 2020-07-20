@@ -52,25 +52,6 @@ def parseArgs():
     return parser.parse_args()
 
 
-def _load_model(model_path):
-    if not os.path.exists(model_path):
-        raise Exception(
-            "{} is not a valid path for the model".format(model_path))
-
-    ckpts = sorted(Path(model_path).iterdir(), key=os.path.getmtime)
-    model = None
-    if len(ckpts) > 0:
-        print("{} model folder exists. #checkpoints: {}".format(
-            strftime("%H:%M:%S"), len(ckpts)))
-        ck_path = tf.train.latest_checkpoint(model_path)
-        print("{} latest model checkpoint path: {}".format(
-            strftime("%H:%M:%S"), ck_path))
-        # Extract from checkpoint filename
-        model = REGRESSOR.getModel()
-        model.load_weights(str(ck_path))
-        REGRESSOR.compile()
-    return model
-
 
 def run(args):
     print("{} started inference, pid:{}".format(
@@ -94,9 +75,8 @@ def run(args):
         'index_list': _getIndex(),
     })
     shared_args_oid = ray.put([shared_args])
-    model = _load_model(args.model)
     tasks = [predict_wcc.remote(
-        work, MIN_RCODE, model, TOP_K, shared_args, shared_args_oid) for work in work_seg]
+        work, MIN_RCODE, args.model, TOP_K, shared_args, shared_args_oid) for work in work_seg]
     ray.get(tasks)
 
 
