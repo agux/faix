@@ -239,7 +239,7 @@ def _load_model(model_path):
     return model
 
 
-@ray.remote
+
 def predict_wcc(anchor, corl_prior, min_rcode, batch_size, model_path, top_k, shared_args, shared_args_oid):
     global cnxpool
     model = None

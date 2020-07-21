@@ -21,6 +21,7 @@ TOP_K = 5
 COLS = ["close"]
 REGRESSOR = create_regressor()
 
+
 def parseArgs():
     parser = argparse.ArgumentParser()
     req = parser.add_argument_group('required named arguments')
@@ -53,6 +54,7 @@ def parseArgs():
                         help='profile CG execution.')
     return parser.parse_args()
 
+
 def init():
     ray.init(
         num_cpus=psutil.cpu_count(logical=True),
@@ -62,15 +64,16 @@ def init():
         driver_object_store_memory=256 * 1024 * 1024    # 256M
     )
 
+
 def run(args):
     print("{} started inference, pid:{}".format(
         strftime("%H:%M:%S"), os.getpid()))
     # load workload segmentation anchors from db
     anchors = getWorkSegmentsForPrediction(
-        CORL_PRIOR, args.db_host, args.db_port, args.db_pwd, args.parallel)
+        CORL_PRIOR, args.db_host, args.db_port, args.db_pwd, 1)
     # in each worker, load input data from db, run model prediction, and save predictions back to wcc_predict table with bucketing
     qk, qd, qd_idx = _getFtQuery(COLS)
-    shared_args = ray.put({
+    shared_args = {
         'db_host': args.db_host,
         'db_port': args.db_port,
         'db_pwd': args.db_pwd,
@@ -81,11 +84,10 @@ def run(args):
         'qd_idx': qd_idx,
         'index_list': _getIndex(),
         'anchors': anchors,
-    })
-    shared_args_oid = ray.put([shared_args])
-    tasks = [predict_wcc.remote(
-        i, CORL_PRIOR, MIN_RCODE, BATCH_SIZE, args.model, TOP_K, shared_args, shared_args_oid) for i in range(args.parallel)]
-    ray.get(tasks)
+    }
+    shared_args_oid = ray.put(shared_args)
+    predict_wcc(0, CORL_PRIOR, MIN_RCODE, BATCH_SIZE, args.model,
+                TOP_K, shared_args, shared_args_oid)
 
 
 if __name__ == '__main__':
