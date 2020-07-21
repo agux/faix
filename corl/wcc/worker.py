@@ -263,12 +263,13 @@ def predict_wcc(anchor, corl_prior, min_rcode, max_batch_size, model_path, top_k
                 strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
             continue
         # use model to predict
-        batch_size = min(len(batch), max_batch_size)
+        # batch_size = min(len(batch), max_batch_size)
+        batch_size = max_batch_size
         p = model.predict(batch, batch_size=batch_size)
         p = np.squeeze(p)
         if c < 100:
             print('{} size of prediction result: {}'.format(
-                strftime("%H:%M:%S"), len(p)))
+                strftime("%H:%M:%S"), len(p)), file=sys.stderr)
             c += 1
         _save_prediction(code, klid, date, rcodes, top_k, p)
     # flush bucket
