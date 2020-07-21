@@ -154,7 +154,7 @@ def _process(code, klid, date, min_rcode, shared_args, shared_args_oid):
         return [], []
     # retrive objectID for shared_sargs and pass to getSeries_v2
     tasks = [getSeries_v2.remote(
-        code, klid, rcode, None, shared_args_oid[0]) for rcode in rcodes]
+        code, klid, rcode, None, shared_args_oid) for rcode in rcodes]
     return np.array(ray.get(tasks), np.float32), np.array(rcodes, object)
 
 
@@ -237,7 +237,6 @@ def _load_model(model_path):
         model.load_weights(str(ck_path))
         REGRESSOR.compile()
     return model
-
 
 
 def predict_wcc(anchor, corl_prior, min_rcode, batch_size, model_path, top_k, shared_args, shared_args_oid):
