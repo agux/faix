@@ -214,8 +214,9 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
 
 class SavePredictionCallback(tf.keras.callbacks.Callback):
 
-    def on_predict_batch_end(batch, logs=None):
-        tf.print('batch=', batch, ', logs=', logs)
+    def on_predict_batch_end(self, batch, logs=None):
+        tf.print('batch=', batch, ', logs=', logs,
+                 ', history=', self.model.history)
 
 
 def _load_model(model_path):
