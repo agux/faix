@@ -212,6 +212,12 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
             cnx.close()
 
 
+class SavePredictionCallback(tf.keras.callbacks.Callback):
+
+    def on_predict_batch_end(batch, logs=None):
+        tf.print('batch=', batch, ', logs=', logs)
+
+
 def _load_model(model_path):
     if not os.path.exists(model_path):
         raise Exception(
@@ -247,6 +253,7 @@ def predict_wcc(anchor, corl_prior, min_rcode, model_path, top_k, shared_args, s
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
     work = getWorkloadForPrediction(start_anchor, stop_anchor,
                                     corl_prior, db_host, db_port, db_pwd)
+    spc = SavePredictionCallback()
     for code, date, klid in work:
         batch, rcodes = _process(
             code, klid, date, min_rcode, shared_args, shared_args_oid)
@@ -255,7 +262,7 @@ def predict_wcc(anchor, corl_prior, min_rcode, model_path, top_k, shared_args, s
                 strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
             continue
         # use model to predict
-        p = model.predict(batch)
+        p = model.predict(batch, callbacks=[spc])
         p = np.squeeze(p)
         _save_prediction(code, klid, date, rcodes, top_k, p)
     # flush bucket
