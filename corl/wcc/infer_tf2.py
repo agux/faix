@@ -14,7 +14,7 @@ from corl.wc_test.test27_mdnc import create_regressor
 from corl.wcc.worker import predict_wcc
 
 CORL_PRIOR = 100
-BATCH_SIZE = 300
+MAX_BATCH_SIZE = 600
 TIME_SHIFT = 4
 MAX_STEP = 35
 MIN_RCODE = 30
@@ -45,6 +45,10 @@ def parseArgs():
                         type=int,
                         help='number of parallel workers to run prediction',
                         default=math.sqrt(psutil.cpu_count(logical=True)))
+    parser.add_argument('-b', '--max_batch_size',
+                        type=int,
+                        help='maximum number of batches in each prediction.',
+                        default=MAX_BATCH_SIZE)
     parser.add_argument('-f', '--prefetch', type=int,
                         help='dataset prefetch batches', default=2)
     parser.add_argument('-i', '--init_workload', dest='init_workload', default=False,
@@ -135,7 +139,7 @@ def run(args):
         'anchors': anchors,
     }
     shared_args_oid = ray.put(shared_args)
-    predict_wcc(0, CORL_PRIOR, MIN_RCODE, BATCH_SIZE, args.model,
+    predict_wcc(0, CORL_PRIOR, MIN_RCODE, args.max_batch_size, args.model,
                 TOP_K, shared_args, shared_args_oid)
 
 
