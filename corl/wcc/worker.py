@@ -240,7 +240,7 @@ def _load_model(model_path):
 
 
 @ray.remote
-def predict_wcc(anchor, corl_prior, min_rcode, model_path, top_k, shared_args, shared_args_oid):
+def predict_wcc(anchor, corl_prior, min_rcode, batch_size, model_path, top_k, shared_args, shared_args_oid):
     global cnxpool
     model = None
     db_host = shared_args['db_host']
@@ -254,7 +254,7 @@ def predict_wcc(anchor, corl_prior, min_rcode, model_path, top_k, shared_args, s
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
     work = getWorkloadForPrediction(start_anchor, stop_anchor,
                                     corl_prior, db_host, db_port, db_pwd)
-    spc = SavePredictionCallback()
+    # spc = SavePredictionCallback()
     for code, date, klid in work:
         batch, rcodes = _process(
             code, klid, date, min_rcode, shared_args, shared_args_oid)
@@ -263,7 +263,7 @@ def predict_wcc(anchor, corl_prior, min_rcode, model_path, top_k, shared_args, s
                 strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
             continue
         # use model to predict
-        p = model.predict(batch, callbacks=[spc])
+        p = model.predict(batch, batch_size=batch_size)
         p = np.squeeze(p)
         _save_prediction(code, klid, date, rcodes, top_k, p)
     # flush bucket

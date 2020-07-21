@@ -13,6 +13,7 @@ from corl.wc_test.test27_mdnc import create_regressor
 from corl.wcc.worker import predict_wcc
 
 CORL_PRIOR = 100
+BATCH_SIZE = 300
 TIME_SHIFT = 4
 MAX_STEP = 35
 MIN_RCODE = 30
@@ -83,7 +84,7 @@ def run(args):
     })
     shared_args_oid = ray.put([shared_args])
     tasks = [predict_wcc.remote(
-        i, CORL_PRIOR, MIN_RCODE, args.model, TOP_K, shared_args, shared_args_oid) for i in range(args.parallel)]
+        i, CORL_PRIOR, MIN_RCODE, BATCH_SIZE, args.model, TOP_K, shared_args, shared_args_oid) for i in range(args.parallel)]
     ray.get(tasks)
 
 
