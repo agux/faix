@@ -3,6 +3,7 @@ import os
 import psutil
 import math
 import ray
+import sys
 import tensorflow as tf
 import numpy as np
 
@@ -50,12 +51,59 @@ def parseArgs():
                         action='store_true', help='initialize holistic workload for the inference')
     parser.add_argument('-g', '--gpu_grow_mem', dest='gpu_grow_mem', default=False,
                         action='store_true', help='allow gpu to allocate mem dynamically at runtime.')
+    parser.add_argument('--limit_gpu_mem',
+                        type=float,
+                        help='pre-allocate gpu memory (in giga-bytes)',
+                        default=None)
+    parser.add_argument(
+        '--enable_xla',
+        help='enable XLA feature',
+        dest='enable_xla',
+        action='store_true',
+    )
     parser.add_argument('--profile', dest='profile', action='store_true', default=False,
                         help='profile CG execution.')
     return parser.parse_args()
 
 
-def init():
+def _setupTensorflow(args):
+    # interim workaround to fix memory leak issue
+    tf.keras.backend.clear_session()
+    physical_devices = tf.config.list_physical_devices('GPU')
+    if len(physical_devices) > 0:
+        if args.gpu_grow_mem:
+            try:
+                print('{} enabling memory growth for {}'.format(
+                    strftime("%H:%M:%S"), physical_devices[0]))
+                tf.config.experimental.set_memory_growth(
+                    physical_devices[0], True)
+            except:
+                print(
+                    'Invalid device or cannot modify virtual devices once initialized.\n'
+                    + sys.exc_info()[0])
+                pass
+        if args.limit_gpu_mem is not None:
+            # Restrict TensorFlow to only allocate the specified memory on the first GPU
+            try:
+                print('{} setting GPU memory limit to {} MB'.format(
+                    strftime("%H:%M:%S"), args.limit_gpu_mem*1024))
+                tf.config.experimental.set_virtual_device_configuration(
+                    physical_devices[0],
+                    [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=args.limit_gpu_mem*1024)])
+                logical_gpus = tf.config.experimental.list_logical_devices(
+                    'GPU')
+                print(strftime("%H:%M:%S"), len(physical_devices),
+                      "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            except RuntimeError as e:
+                # Virtual devices must be set before GPUs have been initialized
+                print(e)
+
+    if args.enable_xla:
+        # enalbe XLA
+        tf.config.optimizer.set_jit(True)
+
+
+def init(args):
     ray.init(
         num_cpus=psutil.cpu_count(logical=True),
         webui_host='127.0.0.1',
@@ -63,6 +111,7 @@ def init():
         object_store_memory=4 * 1024 * 1024 * 1024,  # 4G
         driver_object_store_memory=256 * 1024 * 1024    # 256M
     )
+    _setupTensorflow(args)
 
 
 def run(args):
@@ -92,5 +141,5 @@ def run(args):
 
 if __name__ == '__main__':
     args = parseArgs()
-    init()
+    init(args)
     run(args)
