@@ -45,6 +45,10 @@ def parseArgs():
                         type=int,
                         help='number of parallel workers to run prediction',
                         default=math.sqrt(psutil.cpu_count(logical=True)))
+    parser.add_argument('-n', '--num_cpus',
+                        type=int,
+                        help='number of parallel workers for data loading',
+                        default=None)
     parser.add_argument('-b', '--max_batch_size',
                         type=int,
                         help='maximum number of batches in each prediction.',
@@ -109,7 +113,7 @@ def _setupTensorflow(args):
 
 def init(args):
     ray.init(
-        num_cpus=psutil.cpu_count(logical=False),
+        num_cpus=args.num_cpus or psutil.cpu_count(logical=False),
         webui_host='127.0.0.1',
         memory=4 * 1024 * 1024 * 1024,  # 4G
         object_store_memory=4 * 1024 * 1024 * 1024,  # 4G

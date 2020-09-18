@@ -12,3 +12,6 @@ d = d.map(
     lambda x: tf.py_function(func=upper_case_fn, inp=[x], Tout=tf.string))
 
 print(list(d.as_numpy_iterator()))
+
+a = [1,2,3,4]
+
