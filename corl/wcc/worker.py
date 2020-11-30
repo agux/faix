@@ -275,7 +275,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
     done = False
     while not done:
         if data_queue.empty():
-            sleep(0.3)
+            sleep(0.5)
             continue
         try:
             next_work = data_queue.get()
@@ -302,7 +302,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
                  'result': p,
                  'rcodes': next_work['rcodes']})
         except Exception:
-            sleep(0.3)
+            sleep(0.5)
             pass
     return done
 
@@ -319,6 +319,7 @@ def _save_infer_result(top_k, shared_args, infer_queue):
     def _inner_work():
         # poll work request from 'infer_queue' for saving inference result and handle persistence
         if infer_queue.empty():
+            sleep(5)
             return False
         try:
             next_result = infer_queue.get()
@@ -340,12 +341,12 @@ def _save_infer_result(top_k, shared_args, infer_queue):
                 _save_prediction(code, klid, date, rcodes, top_k, result)
         except Exception:
             pass
+        sleep(2)
         return False
 
     done = False
     while not done:
         done = _inner_work()
-        sleep(1)
 
     return done
 
