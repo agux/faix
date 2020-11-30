@@ -116,9 +116,9 @@ def init(args):
         num_cpus=args.num_cpus or psutil.cpu_count(logical=False),
         # webui_host='127.0.0.1',
         dashboard_host='0.0.0.0',
-        _memory=4 * 1024 * 1024 * 1024,  # 4G
         object_store_memory=4 * 1024 * 1024 * 1024,  # 4G
-        driver_object_store_memory=256 * 1024 * 1024    # 256M
+        _memory=4 * 1024 * 1024 * 1024,  # 4G
+        _driver_object_store_memory=256 * 1024 * 1024,    # 256M
     )
     _setupTensorflow(args)
 
