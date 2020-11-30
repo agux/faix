@@ -307,7 +307,8 @@ def _load_data(min_rcode, top_k, shared_args, shared_args_oid, work_queue, data_
 
 @ray.remote
 def _predict(model_path, max_batch_size, data_queue, infer_queue):
-    os.environ('CUDA_VISIBLE_DEVICES') = '0'
+    # os.environ('CUDA_VISIBLE_DEVICES') = '0'
+    
     # poll work from 'data_queue', run inference, and push result to infer_queue
     model = _load_model(model_path)
     c = 0
