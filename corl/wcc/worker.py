@@ -159,7 +159,7 @@ def _process(code, klid, date, min_rcode, shared_args, shared_args_oid):
 
 
 def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, predictions=None):
-    global bucket
+    global bucket, cnxpool
     if code is not None:
         # get top and bottom k
         top_k = top_k if top_k <= MAX_K else MAX_K
@@ -240,7 +240,7 @@ def _load_model(model_path):
 
 
 @ray.remote
-def _load_data(min_rcode, top_k, shared_args, shared_args_oid, work_queue, data_queue, infer_queue):
+def _load_data(work, min_rcode, shared_args, shared_args_oid, data_queue):
     global cnxpool
     db_host = shared_args['db_host']
     db_port = shared_args['db_port']
@@ -249,63 +249,24 @@ def _load_data(min_rcode, top_k, shared_args, shared_args_oid, work_queue, data_
         _init(1, db_host, db_port, db_pwd)
 
     # poll work request from 'work_queue' for data loading, and push to 'data_queue'
-    def load_data():
-        try:
-            next_work = work_queue.get_nowait()
-            if isinstance(next_work, str) and next_work == 'done':
-                if work_queue.empty():
-                    return True
-                else:
-                    print('{} warning, work_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
-                        strftime("%H:%M:%S"), work_queue.size()))
-                    work_queue.put_nowait('done')
-            else:
-                code, date, klid = next_work
-                batch, rcodes = _process(
-                    code, klid, date, min_rcode, shared_args, shared_args_oid)
-                if len(batch) < min_rcode or len(rcodes) < min_rcode:
-                    print('{} {}@({},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
-                        strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
-                    return
-                data_queue.put({'code': code, 'date': date,
-                                'klid': klid, 'batch': batch, 'rcodes': rcodes})
-        except Exception:
-            pass
-        return False
+    def load_data(next_work):
+        code, date, klid = next_work
+        batch, rcodes = _process(
+            code, klid, date, min_rcode, shared_args, shared_args_oid)
+        if len(batch) < min_rcode or len(rcodes) < min_rcode:
+            print('{} {}@({},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
+                strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
+            return
+        data_queue.put({'code': code, 'date': date,
+                        'klid': klid, 'batch': batch, 'rcodes': rcodes})
 
-    # poll work request from 'infer_queue' for saving inference result and handle persistence
-    def save_infer_result():
-        try:
-            next_result = infer_queue.get_nowait()
-            if isinstance(next_result, str) and next_result == 'done':
-                if infer_queue.empty():
-                    # flush bucket
-                    _save_prediction()
-                    return True
-                else:
-                    print('{} warning, infer_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
-                        strftime("%H:%M:%S"), infer_queue.size()))
-                    infer_queue.put_nowait('done')
-            else:
-                result = next_result['result']
-                rcodes = next_result['rcodes']
-                code = next_result['code']
-                date = next_result['date']
-                klid = next_result['klid']
-                _save_prediction(code, klid, date, rcodes, top_k, result)
-        except Exception:
-            pass
-        return False
-
-    done = False
-    while not done:
-        done = load_data() and save_infer_result()
+    for next_item in work:
+        load_data(next_item)
         # sleep(0.1)
 
-    return done
+    return True
 
 
-@ray.remote(num_gpus=1)
 def _predict(model_path, max_batch_size, data_queue, infer_queue):
     # os.environ('CUDA_VISIBLE_DEVICES') = '0'
     # poll work from 'data_queue', run inference, and push result to infer_queue
@@ -314,7 +275,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
     done = False
     while not done:
         try:
-            next_work = data_queue.get_nowait()
+            next_work = data_queue.get()
             if isinstance(next_work, str) and next_work == 'done':
                 if data_queue.empty():
                     infer_queue.put('done')
@@ -339,9 +300,51 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
     return done
 
 
+@ray.remote
+def _save_infer_result(top_k, shared_args, infer_queue):
+    global cnxpool
+    db_host = shared_args['db_host']
+    db_port = shared_args['db_port']
+    db_pwd = shared_args['db_pwd']
+    if cnxpool is None:
+        _init(1, db_host, db_port, db_pwd)
+
+    def _inner_work():
+        # poll work request from 'infer_queue' for saving inference result and handle persistence
+        if infer_queue.empty():
+            return False
+        try:
+            next_result = infer_queue.get()
+            if isinstance(next_result, str) and next_result == 'done':
+                if infer_queue.empty():
+                    # flush bucket
+                    _save_prediction()
+                    return True
+                else:
+                    print('{} warning, infer_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
+                        strftime("%H:%M:%S"), infer_queue.size()))
+                    infer_queue.put_nowait('done')
+            else:
+                result = next_result['result']
+                rcodes = next_result['rcodes']
+                code = next_result['code']
+                date = next_result['date']
+                klid = next_result['klid']
+                _save_prediction(code, klid, date, rcodes, top_k, result)
+        except Exception:
+            pass
+        return False
+
+    done = False
+    while not done:
+        done = _inner_work()
+        sleep(1)
+
+    return done
+
+
 def predict_wcc(anchor, corl_prior, min_rcode, max_batch_size, model_path, top_k, shared_args, shared_args_oid):
     global cnxpool
-    work_queue = Queue(maxsize=16)
     data_queue = Queue(maxsize=16)
     infer_queue = Queue(maxsize=16)
     db_host = shared_args['db_host']
@@ -352,13 +355,14 @@ def predict_wcc(anchor, corl_prior, min_rcode, max_batch_size, model_path, top_k
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
     work = getWorkloadForPrediction(start_anchor, stop_anchor,
                                     corl_prior, db_host, db_port, db_pwd)
-    
-    p = _predict.remote(model_path, max_batch_size, data_queue, infer_queue)
-    d = _load_data.remote(min_rcode, top_k, shared_args,
-                          shared_args_oid, work_queue, data_queue, infer_queue)
-    for item in work:
-        work_queue.put(item)
 
-    if p and d:
+    d = _load_data.remote(work, min_rcode, shared_args,
+                          shared_args_oid, data_queue)
+    s = _save_infer_result(top_k, shared_args, infer_queue)
+
+    # prediction using GPU will be running in master process. There're many unknown issues running in ray worker
+    p = _predict(model_path, max_batch_size, data_queue, infer_queue)
+
+    if d and s and p:
         print('{} inference completed. total workload: {}'.format(
             strftime("%H:%M:%S"), len(work)))

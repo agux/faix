@@ -117,7 +117,7 @@ def init(args):
         # webui_host='127.0.0.1',
         dashboard_host='0.0.0.0',
         object_store_memory=4 * 1024 * 1024 * 1024,  # 4G
-        _memory=4 * 1024 * 1024 * 1024,  # 4G
+        _memory=8 * 1024 * 1024 * 1024,  # 8G
         _driver_object_store_memory=256 * 1024 * 1024,    # 256M
     )
     _setupTensorflow(args)
