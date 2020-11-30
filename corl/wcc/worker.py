@@ -274,6 +274,9 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
     c = 0
     done = False
     while not done:
+        if data_queue.empty():
+            sleep(0.3)
+            continue
         try:
             next_work = data_queue.get()
             if isinstance(next_work, str) and next_work == 'done':
@@ -299,7 +302,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
                  'result': p,
                  'rcodes': next_work['rcodes']})
         except Exception:
-            sleep(0.2)
+            sleep(0.3)
             pass
     return done
 
