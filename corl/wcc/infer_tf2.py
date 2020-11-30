@@ -114,7 +114,8 @@ def _setupTensorflow(args):
 def init(args):
     ray.init(
         num_cpus=args.num_cpus or psutil.cpu_count(logical=False),
-        webui_host='127.0.0.1',
+        # webui_host='127.0.0.1',
+        dashboard_host='0.0.0.0',
         memory=4 * 1024 * 1024 * 1024,  # 4G
         object_store_memory=4 * 1024 * 1024 * 1024,  # 4G
         driver_object_store_memory=256 * 1024 * 1024    # 256M
