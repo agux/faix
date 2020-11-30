@@ -1,12 +1,12 @@
 import ray
 import sys
-import psutil
 import os
 
 import numpy as np
 import tensorflow as tf
 
-from time import strftime
+from ray.util.queue import Queue
+from time import strftime, sleep
 from pathlib import Path
 from mysql.connector.pooling import MySQLConnectionPool
 from corl.wc_data.series import getSeries_v2
@@ -34,6 +34,10 @@ WCC_INSERT = """
         %s,%s,%s,%s,%s,
         %s,%s,%s)
 """
+
+work_queue = Queue(maxsize=16)
+data_queue = Queue(maxsize=16)
+infer_queue = Queue(maxsize=16)
 
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
@@ -239,38 +243,122 @@ def _load_model(model_path):
     return model
 
 
-def predict_wcc(anchor, corl_prior, min_rcode, max_batch_size, model_path, top_k, shared_args, shared_args_oid):
+@ray.remote
+def _load_data(min_rcode, top_k, shared_args, shared_args_oid, work_queue, data_queue, infer_queue):
     global cnxpool
-    model = None
+    db_host = shared_args['db_host']
+    db_port = shared_args['db_port']
+    db_pwd = shared_args['db_pwd']
+    if cnxpool is None:
+        _init(1, db_host, db_port, db_pwd)
+
+    # poll work request from 'work_queue' for data loading, and push to 'data_queue'
+    def load_data():
+        try:
+            next_work = work_queue.get_nowait()
+            if isinstance(next_work, str) and next_work == 'done':
+                if work_queue.empty():
+                    return True
+                else:
+                    print('{} warning, work_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
+                        strftime("%H:%M:%S"), work_queue.size()))
+                    work_queue.put_nowait('done')
+            else:
+                code, date, klid = next_work
+                batch, rcodes = _process(
+                    code, klid, date, min_rcode, shared_args, shared_args_oid)
+                if len(batch) < min_rcode or len(rcodes) < min_rcode:
+                    print('{} {}@({},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
+                        strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
+                    return
+                data_queue.put({'code': code, 'date': date,
+                                'klid': klid, 'batch': batch, 'rcodes': rcodes})
+        except:
+            pass
+        return False
+
+    # poll work request from 'infer_queue' for saving inference result and handle persistence
+    def save_infer_result():
+        try:
+            next_result = infer_queue.get_nowait()
+            if isinstance(next_result, str) and next_result == 'done':
+                if infer_queue.empty():
+                    # flush bucket
+                    _save_prediction()
+                    return True
+                else:
+                    print('{} warning, infer_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
+                        strftime("%H:%M:%S"), infer_queue.size()))
+                    infer_queue.put_nowait('done')
+            else:
+                result = next_result['result']
+                rcodes = next_result['rcodes']
+                code = next_result['code']
+                date = next_result['date']
+                klid = next_result['klid']
+                _save_prediction(code, klid, date, rcodes, top_k, result)
+        except:
+            pass
+        return False
+
+    done = False
+    while not done:
+        done = load_data() and save_infer_result()
+        # sleep(0.1)
+
+    return done
+
+
+@ray.remote
+def _predict(model_path, max_batch_size, data_queue, infer_queue):
+    # poll work from 'data_queue', run inference, and push result to infer_queue
+    model = _load_model(model_path)
+    c = 0
+    done = False
+    while not done:
+        try:
+            next_work = data_queue.get_nowait()
+            if isinstance(next_work, str) and next_work == 'done':
+                if data_queue.empty():
+                    infer_queue.put('done')
+                    done = True
+                else:
+                    print('{} warning, data_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
+                        strftime("%H:%M:%S"), data_queue.size()))
+                    data_queue.put_nowait('done')
+                    continue
+            batch = next_work['batch']
+            p = model.predict(batch, batch_size=max_batch_size)
+            p = np.squeeze(p)
+            if c < 1000:
+                print('{} size of prediction result: {}'.format(
+                    strftime("%H:%M:%S"), len(p)), file=sys.stderr)
+                c += 1
+            infer_queue.put(
+                {'result': p, 'rcodes': next_work['rcodes']})
+        except:
+            sleep(0.2)
+            pass
+    return done
+
+
+def predict_wcc(anchor, corl_prior, min_rcode, max_batch_size, model_path, top_k, shared_args, shared_args_oid):
+    global cnxpool, work_queue, data_queue, infer_queue
     db_host = shared_args['db_host']
     db_port = shared_args['db_port']
     db_pwd = shared_args['db_pwd']
     anchors = shared_args['anchors']
-    if cnxpool is None:
-        _init(1, db_host, db_port, db_pwd)
-        model = _load_model(model_path)
     start_anchor = None if anchor == 0 else anchors[anchor-1]
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
     work = getWorkloadForPrediction(start_anchor, stop_anchor,
                                     corl_prior, db_host, db_port, db_pwd)
-    # spc = SavePredictionCallback()
-    c = 0
-    for code, date, klid in work:
-        batch, rcodes = _process(
-            code, klid, date, min_rcode, shared_args, shared_args_oid)
-        if len(batch) < min_rcode or len(rcodes) < min_rcode:
-            print('{} {}@({},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
-                strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
-            continue
-        # use model to predict
-        # batch_size = min(len(batch), max_batch_size)
-        batch_size = max_batch_size
-        p = model.predict(batch, batch_size=batch_size)
-        p = np.squeeze(p)
-        if c < 1000:
-            print('{} size of prediction result: {}'.format(
-                strftime("%H:%M:%S"), len(p)), file=sys.stderr)
-            c += 1
-        _save_prediction(code, klid, date, rcodes, top_k, p)
-    # flush bucket
-    _save_prediction()
+    
+    p = _predict.remote(model_path, max_batch_size, data_queue, infer_queue)
+    d = _load_data.remote(min_rcode, top_k, shared_args,
+                          shared_args_oid, work_queue, data_queue, infer_queue)
+    for item in work:
+        work_queue.put(item)
+
+    if p and d:
+        print('{} inference completed. total workload: {}'.format(
+            strftime("%H:%M:%S"), len(work)))
