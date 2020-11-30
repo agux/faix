@@ -293,7 +293,11 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
                     strftime("%H:%M:%S"), len(p)), file=sys.stderr)
                 c += 1
             infer_queue.put(
-                {'result': p, 'rcodes': next_work['rcodes']})
+                {'code': next_work['code'],
+                 'date': next_work['date'],
+                 'klid': next_work['klid'],
+                 'result': p,
+                 'rcodes': next_work['rcodes']})
         except Exception:
             sleep(0.2)
             pass
@@ -358,7 +362,7 @@ def predict_wcc(anchor, corl_prior, min_rcode, max_batch_size, model_path, top_k
 
     d = _load_data.remote(work, min_rcode, shared_args,
                           shared_args_oid, data_queue)
-    s = _save_infer_result(top_k, shared_args, infer_queue)
+    s = _save_infer_result.remote(top_k, shared_args, infer_queue)
 
     # prediction using GPU will be running in master process. There're many unknown issues running in ray worker
     p = _predict(model_path, max_batch_size, data_queue, infer_queue)
