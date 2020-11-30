@@ -35,10 +35,6 @@ WCC_INSERT = """
         %s,%s,%s)
 """
 
-work_queue = Queue(maxsize=16)
-data_queue = Queue(maxsize=16)
-infer_queue = Queue(maxsize=16)
-
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
@@ -343,7 +339,10 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
 
 
 def predict_wcc(anchor, corl_prior, min_rcode, max_batch_size, model_path, top_k, shared_args, shared_args_oid):
-    global cnxpool, work_queue, data_queue, infer_queue
+    global cnxpool
+    work_queue = Queue(maxsize=16)
+    data_queue = Queue(maxsize=16)
+    infer_queue = Queue(maxsize=16)
     db_host = shared_args['db_host']
     db_port = shared_args['db_port']
     db_pwd = shared_args['db_pwd']
