@@ -269,7 +269,7 @@ def _load_data(min_rcode, top_k, shared_args, shared_args_oid, work_queue, data_
                     return
                 data_queue.put({'code': code, 'date': date,
                                 'klid': klid, 'batch': batch, 'rcodes': rcodes})
-        except:
+        except Exception:
             pass
         return False
 
@@ -293,7 +293,7 @@ def _load_data(min_rcode, top_k, shared_args, shared_args_oid, work_queue, data_
                 date = next_result['date']
                 klid = next_result['klid']
                 _save_prediction(code, klid, date, rcodes, top_k, result)
-        except:
+        except Exception:
             pass
         return False
 
@@ -307,6 +307,7 @@ def _load_data(min_rcode, top_k, shared_args, shared_args_oid, work_queue, data_
 
 @ray.remote
 def _predict(model_path, max_batch_size, data_queue, infer_queue):
+    os.environ('CUDA_VISIBLE_DEVICES') = '0'
     # poll work from 'data_queue', run inference, and push result to infer_queue
     model = _load_model(model_path)
     c = 0
@@ -332,7 +333,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
                 c += 1
             infer_queue.put(
                 {'result': p, 'rcodes': next_work['rcodes']})
-        except:
+        except Exception:
             sleep(0.2)
             pass
     return done
