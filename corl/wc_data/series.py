@@ -11,11 +11,12 @@ cnxpool = None
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
-    print("{} initializing mysql connection pool...".format(
-        strftime("%H:%M:%S")))
+    size = db_pool_size or 5
+    print("{} initializing mysql connection pool of size {}...".format(
+        strftime("%H:%M:%S"), size))
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
-        pool_size=db_pool_size or 5,
+        pool_size=size,
         host=db_host or '127.0.0.1',
         port=db_port or 3306,
         user='mysql',
@@ -24,6 +25,7 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         # ssl_ca='',
         # use_pure=True,
         connect_timeout=90000)
+    return cnxpool
 
 
 # @ray.remote
@@ -34,6 +36,23 @@ def getSeries(code, klid, rcode, val, shared_args):
     s = max(0, klid - max_step + 1 - time_shift)
     batch, total = _getBatch(code, s, klid, rcode, shared_args)
     return batch, val, total
+
+
+@ray.remote
+class DataLoader(object):
+    def __init__(self, host, port, pwd):
+        self.conn_pool = _init(1, host, port, pwd)
+
+    def get_series(self, code, klid, rcode, val, shared_args):
+        max_step = shared_args['max_step']
+        time_shift = shared_args['time_shift']
+        s = max(0, klid - max_step + 1 - time_shift)
+        batch = _getBatch_v2(code, s, klid, rcode, shared_args, self.conn_pool)
+        if val is not None:
+            return batch, val
+        else:
+            return batch
+
 
 @ray.remote
 def getSeries_v2(code, klid, rcode, val, shared_args):
@@ -77,7 +96,7 @@ def _getBatch(code, s, e, rcode, shared_args):
         dates = [r[0] for r in rows]
         dateStr = "'{}'".format("','".join(dates))
         ym = {d.replace('-', '')[:-2]
-              for d in dates}  #extract year-month to a set
+              for d in dates}  # extract year-month to a set
         ymStr = ",".join(ym)
         qd = qd.format(ymStr, dateStr)
         fcursor.execute(qd, (rcode, max_step + time_shift))
@@ -107,17 +126,21 @@ def _getBatch(code, s, e, rcode, shared_args):
         fcursor.close()
         cnx.close()
 
-def _getBatch_v2(code, s, e, rcode, shared_args):
+
+def _getBatch_v2(code, s, e, rcode, shared_args, pool=None):
     '''
     Returns:
     [max_step, feature*time_shift]
     '''
     global cnxpool
     if cnxpool is None:
-        db_host = shared_args['db_host']
-        db_port = shared_args['db_port']
-        db_pwd = shared_args['db_pwd']
-        _init(1, db_host, db_port, db_pwd)
+        if not pool is None:
+            cnxpool = pool
+        else:
+            db_host = shared_args['db_host']
+            db_port = shared_args['db_port']
+            db_pwd = shared_args['db_pwd']
+            _init(1, db_host, db_port, db_pwd)
 
     max_step = shared_args['max_step']
     time_shift = shared_args['time_shift']
@@ -137,7 +160,7 @@ def _getBatch_v2(code, s, e, rcode, shared_args):
         dates = [r[0] for r in rows]
         dateStr = "'{}'".format("','".join(dates))
         ym = {d.replace('-', '')[:-2]
-              for d in dates}  #extract year-month to a set
+              for d in dates}  # extract year-month to a set
         ymStr = ",".join(ym)
         qd = qd.format(ymStr, dateStr)
         fcursor.execute(qd, (rcode, max_step + time_shift))

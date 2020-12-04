@@ -1,3 +1,4 @@
+import time
 import tensorflow as tf
 import numpy as np
 
@@ -72,3 +73,10 @@ print(tpl.format(
     cond='klid >= {}'.format(100),
     end=''
 ))
+
+
+start = time.time()
+print("hello")
+time.sleep(1)
+end = time.time()
+print(end - start)

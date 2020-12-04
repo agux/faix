@@ -1,6 +1,7 @@
 import ray
 import sys
 import os
+import time
 
 import numpy as np
 import tensorflow as tf
@@ -9,7 +10,7 @@ from ray.util.queue import Queue
 from time import strftime, sleep
 from pathlib import Path
 from mysql.connector.pooling import MySQLConnectionPool
-from corl.wc_data.series import getSeries_v2
+from corl.wc_data.series import DataLoader, getSeries_v2
 from corl.wc_test.test27_mdnc import create_regressor
 from corl.wc_data.input_fn import getWorkloadForPrediction
 
@@ -37,12 +38,14 @@ WCC_INSERT = """
 
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
+    # FIXME too many db initialization message in the log and 'aborted clients' in mysql dashboard
     global cnxpool
-    print("{} initializing mysql connection pool...".format(
-        strftime("%H:%M:%S")))
+    size = db_pool_size or 5
+    print("{} initializing mysql connection pool of size {}".format(
+        strftime("%H:%M:%S"), size))
     cnxpool = MySQLConnectionPool(
         pool_name="dbpool",
-        pool_size=db_pool_size or 5,
+        pool_size=size,
         host=db_host or '127.0.0.1',
         port=db_port or 3306,
         user='mysql',
@@ -141,7 +144,7 @@ def _get_rcodes(code, klid, steps, shift):
     return rcodes_k + rcodes_i
 
 
-def _process(code, klid, date, min_rcode, shared_args, shared_args_oid):
+def _process(pool, code, klid, date, min_rcode, shared_args, shared_args_oid):
     # find eligible rcodes
     rcodes = _get_rcodes(
         code, klid, shared_args['max_step'], shared_args['time_shift'])
@@ -152,9 +155,13 @@ def _process(code, klid, date, min_rcode, shared_args, shared_args_oid):
             code, klid, date, len(rcodes),
         ))
         return [], []
-    # retrive objectID for shared_sargs and pass to getSeries_v2
-    tasks = [getSeries_v2.remote(
-        code, klid, rcode, None, shared_args_oid) for rcode in rcodes]
+    # retrieve objectID for shared_sargs and pass to getSeries_v2
+    # tasks = [getSeries_v2.remote(
+    #     code, klid, rcode, None, shared_args_oid) for rcode in rcodes]
+    tasks = pool.map(lambda a, rcode: a.get_series.remote(
+        code, klid, rcode, None, shared_args_oid),
+        rcodes
+    )
     return np.array(ray.get(tasks), np.float32), np.array(rcodes, object)
 
 
@@ -240,19 +247,28 @@ def _load_model(model_path):
 
 
 @ray.remote
-def _load_data(work, min_rcode, shared_args, shared_args_oid, data_queue):
-    global cnxpool
-    db_host = shared_args['db_host']
-    db_port = shared_args['db_port']
-    db_pwd = shared_args['db_pwd']
-    if cnxpool is None:
-        _init(1, db_host, db_port, db_pwd)
+def _load_data(work, num_actors, min_rcode, shared_args, shared_args_oid, data_queue):
+    # global cnxpool
+    # db_host = shared_args['db_host']
+    # db_port = shared_args['db_port']
+    # db_pwd = shared_args['db_pwd']
+    # if cnxpool is None:
+    #     _init(1, db_host, db_port, db_pwd)
+
+    actor_pool = ray.util.ActorPool(
+        [DataLoader.remote() for _ in range(num_actors)]
+    )
 
     # poll work request from 'work_queue' for data loading, and push to 'data_queue'
     def load_data(next_work):
         code, date, klid = next_work
-        batch, rcodes = _process(
-            code, klid, date, min_rcode, shared_args, shared_args_oid)
+        batch, rcodes = _process(actor_pool,
+                                 code,
+                                 klid,
+                                 date,
+                                 min_rcode,
+                                 shared_args,
+                                 shared_args_oid)
         if len(batch) < min_rcode or len(rcodes) < min_rcode:
             print('{} {}@({},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
                 strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
@@ -260,8 +276,23 @@ def _load_data(work, min_rcode, shared_args, shared_args_oid, data_queue):
         data_queue.put({'code': code, 'date': date,
                         'klid': klid, 'batch': batch, 'rcodes': rcodes})
 
+    c = 0
+    elapsed = 0
     for next_item in work:
-        load_data(next_item)
+        if c >= 1000 and c < 2000:
+            s = time.time()
+            load_data(next_item)
+            e = time.time()
+            et = e-s
+            elapsed += et
+            print('{} load_data: {}'.format(
+                strftime("%H:%M:%S"), et), file=sys.stderr)
+        else:
+            if c == 2000:
+                print('{} load_data average: {}'.format(
+                    strftime("%H:%M:%S"), elapsed/1000), file=sys.stderr)
+            load_data(next_item)
+        c += 1
         # sleep(0.1)
 
     return True
@@ -271,12 +302,8 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
     # os.environ('CUDA_VISIBLE_DEVICES') = '0'
     # poll work from 'data_queue', run inference, and push result to infer_queue
     model = _load_model(model_path)
-    c = 0
-    done = False
-    while not done:
-        if data_queue.empty():
-            sleep(0.5)
-            continue
+
+    def predict():
         try:
             next_work = data_queue.get()
             if isinstance(next_work, str) and next_work == 'done':
@@ -287,23 +314,43 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
                     print('{} warning, data_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
                         strftime("%H:%M:%S"), data_queue.size()))
                     data_queue.put_nowait('done')
-                    continue
+                    return
             batch = next_work['batch']
             p = model.predict(batch, batch_size=max_batch_size)
             p = np.squeeze(p)
-            if c < 1000:
-                print('{} size of prediction result: {}'.format(
-                    strftime("%H:%M:%S"), len(p)), file=sys.stderr)
-                c += 1
             infer_queue.put(
                 {'code': next_work['code'],
                  'date': next_work['date'],
                  'klid': next_work['klid'],
                  'result': p,
-                 'rcodes': next_work['rcodes']})
+                 'rcodes': next_work['rcodes']}
+            )
         except Exception:
             sleep(0.5)
             pass
+
+    c = 0
+    elapsed = 0
+    done = False
+    while not done:
+        if data_queue.empty():
+            sleep(0.5)
+            continue
+
+        if c >= 1000 and c < 2000:
+            s = time.time()
+            predict()
+            e = time.time()
+            et = e-s
+            elapsed += et
+            print('{} predict: {}'.format(
+                strftime("%H:%M:%S"), et), file=sys.stderr)
+        else:
+            if c == 2000:
+                print('{} predict average: {}'.format(
+                    strftime("%H:%M:%S"), elapsed/1000), file=sys.stderr)
+            predict()
+        c += 1
     return done
 
 
@@ -348,11 +395,12 @@ def _save_infer_result(top_k, shared_args, infer_queue):
     while not done:
         done = _inner_work()
 
+    cnxpool._remove_connections()
+
     return done
 
 
-def predict_wcc(anchor, corl_prior, min_rcode, max_batch_size, model_path, top_k, shared_args, shared_args_oid):
-    global cnxpool
+def predict_wcc(anchor, num_actors, corl_prior, min_rcode, max_batch_size, model_path, top_k, shared_args, shared_args_oid):
     data_queue = Queue(maxsize=16)
     infer_queue = Queue(maxsize=16)
     db_host = shared_args['db_host']
@@ -364,7 +412,7 @@ def predict_wcc(anchor, corl_prior, min_rcode, max_batch_size, model_path, top_k
     work = getWorkloadForPrediction(start_anchor, stop_anchor,
                                     corl_prior, db_host, db_port, db_pwd)
 
-    d = _load_data.remote(work, min_rcode, shared_args,
+    d = _load_data.remote(work, num_actors, min_rcode, shared_args,
                           shared_args_oid, data_queue)
     s = _save_infer_result.remote(top_k, shared_args, infer_queue)
 
