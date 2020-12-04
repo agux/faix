@@ -403,8 +403,8 @@ def _save_infer_result(top_k, shared_args, infer_queue):
 
 
 def predict_wcc(anchor, num_actors, corl_prior, min_rcode, max_batch_size, model_path, top_k, shared_args, shared_args_oid):
-    data_queue = Queue(maxsize=16)
-    infer_queue = Queue(maxsize=16)
+    data_queue = Queue(maxsize=128)
+    infer_queue = Queue(maxsize=128)
     db_host = shared_args['db_host']
     db_port = shared_args['db_port']
     db_pwd = shared_args['db_pwd']
