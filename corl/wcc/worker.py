@@ -162,7 +162,7 @@ def _process(pool, code, klid, date, min_rcode, shared_args, shared_args_oid):
         code, klid, rcode, None, shared_args_oid),
         rcodes
     )
-    return np.array(tasks, np.float32), np.array(rcodes, object)
+    return np.array([tasks], np.float32), np.array(rcodes, object)
 
 
 def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, predictions=None):
