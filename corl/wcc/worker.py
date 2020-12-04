@@ -256,7 +256,7 @@ def _load_data(work, num_actors, min_rcode, shared_args, shared_args_oid, data_q
     #     _init(1, db_host, db_port, db_pwd)
 
     actor_pool = ray.util.ActorPool(
-        [DataLoader.remote(host='127.0.0.1') for _ in range(num_actors)]
+        [ray.get_actor("DataLoader_" & i) for i in range(num_actors)]
     )
 
     # poll work request from 'work_queue' for data loading, and push to 'data_queue'
@@ -411,6 +411,9 @@ def predict_wcc(anchor, num_actors, corl_prior, min_rcode, max_batch_size, model
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
     work = getWorkloadForPrediction(start_anchor, stop_anchor,
                                     corl_prior, db_host, db_port, db_pwd)
+
+    for i in range(num_actors):
+        DataLoader.options(name="DataLoader_" + i).remote()
 
     d = _load_data.remote(work, num_actors, min_rcode, shared_args,
                           shared_args_oid, data_queue)
