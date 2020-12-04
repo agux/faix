@@ -113,10 +113,10 @@ def _setupTensorflow(args):
 
 def init(args):
     ray.init(
-        num_cpus=2, # 1.load_data; 2.save_prediction
+        # num_cpus=2,  # 1.load_data; 2.save_prediction
         # webui_host='127.0.0.1',
         dashboard_host='0.0.0.0',
-        log_to_driver = True,
+        log_to_driver=True,
         object_store_memory=4 * 1024 * 1024 * 1024,  # 4G
         _memory=8 * 1024 * 1024 * 1024,  # 8G
         _driver_object_store_memory=256 * 1024 * 1024,    # 256M
@@ -146,6 +146,8 @@ def run(args):
     }
     shared_args_oid = ray.put(shared_args)
     num_actors = args.num_cpus or psutil.cpu_count(logical=False)
+    print("{} num_actors = {}".format(
+        strftime("%H:%M:%S"), num_actors))
     predict_wcc(0, num_actors, CORL_PRIOR, MIN_RCODE, args.max_batch_size, args.model,
                 TOP_K, shared_args, shared_args_oid)
 
