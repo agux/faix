@@ -256,7 +256,7 @@ def _load_data(work, num_actors, min_rcode, shared_args, shared_args_oid, data_q
     #     _init(1, db_host, db_port, db_pwd)
 
     actor_pool = ray.util.ActorPool(
-        [ray.get_actor("DataLoader_" & i) for i in range(num_actors)]
+        [ray.get_actor("DataLoader_" + i) for i in range(num_actors)]
     )
 
     # poll work request from 'work_queue' for data loading, and push to 'data_queue'
