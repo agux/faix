@@ -248,12 +248,12 @@ def _load_model(model_path):
 
 @ray.remote
 def _load_data(work, num_actors, min_rcode, shared_args, shared_args_oid, data_queue):
-    # global cnxpool
+    global cnxpool
     host = shared_args['db_host']
     port = shared_args['db_port']
     pwd = shared_args['db_pwd']
-    # if cnxpool is None:
-    #     _init(1, db_host, db_port, db_pwd)
+    if cnxpool is None:
+        _init(1, host, port, pwd)
 
     actor_pool = ray.util.ActorPool(
         # [ray.get_actor("DataLoader_" + str(i)) for i in range(num_actors)]
