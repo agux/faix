@@ -131,7 +131,7 @@ def run(args):
     anchors = getWorkSegmentsForPrediction(
         CORL_PRIOR, args.db_host, args.db_port, args.db_pwd, 1)
     # in each worker, load input data from db, run model prediction, and save predictions back to wcc_predict table with bucketing
-    qk, qd, qd_idx = _getFtQuery(COLS)
+    qk, qd, qd_idx, qk2 = _getFtQuery(COLS)
     shared_args = {
         'db_host': args.db_host,
         'db_port': args.db_port,
@@ -139,6 +139,7 @@ def run(args):
         'max_step': MAX_STEP,
         'time_shift': TIME_SHIFT,
         'qk': qk,
+        'qk2': qk2,
         'qd': qd,
         'qd_idx': qd_idx,
         'index_list': _getIndex(),

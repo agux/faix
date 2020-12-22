@@ -144,22 +144,22 @@ def _get_rcodes(code, klid, steps, shift):
     return rcodes_k + rcodes_i
 
 
-def _process(pool, code, klid, date, min_rcode, shared_args, shared_args_oid):
+def _process(pool, code, klid, date_start, date_end, min_rcode, shared_args, shared_args_oid):
     # find eligible rcodes
     rcodes = _get_rcodes(
         code, klid, shared_args['max_step'], shared_args['time_shift'])
     # check rcodes
     if len(rcodes) < min_rcode:
-        print('{} {}@({},{}) has {} eligible reference codes, skipping'.format(
+        print('{} {}@({},{},{}) has {} eligible reference codes, skipping'.format(
             strftime("%H:%M:%S"),
-            code, klid, date, len(rcodes),
+            code, klid, date_start, date_end, len(rcodes),
         ))
         return [], []
     # retrieve objectID for shared_sargs and pass to getSeries_v2
     # tasks = [getSeries_v2.remote(
     #     code, klid, rcode, None, shared_args_oid) for rcode in rcodes]
     tasks = pool.map(lambda a, rcode: a.get_series.remote(
-        code, klid, rcode, None, shared_args_oid),
+        code, klid, date_start, date_end, rcode, None, shared_args_oid),
         rcodes
     )
     return np.array(list(tasks), np.float32), np.array(rcodes, object)
@@ -263,19 +263,20 @@ def _load_data(work, num_actors, min_rcode, shared_args, shared_args_oid, data_q
 
     # poll work request from 'work_queue' for data loading, and push to 'data_queue'
     def load_data(next_work):
-        code, date, klid = next_work
+        code, date_start, date_end, klid = next_work
         batch, rcodes = _process(actor_pool,
                                  code,
                                  klid,
-                                 date,
+                                 date_start,
+                                 date_end,
                                  min_rcode,
                                  shared_args,
                                  shared_args_oid)
         if len(batch) < min_rcode or len(rcodes) < min_rcode:
-            print('{} {}@({},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
-                strftime("%H:%M:%S"), code, klid, date, len(batch), len(rcodes)))
+            print('{} {}@({},{},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
+                strftime("%H:%M:%S"), code, klid, date_start, date_end, len(batch), len(rcodes)))
             return
-        data_queue.put({'code': code, 'date': date,
+        data_queue.put({'code': code, 'date': date_end,
                         'klid': klid, 'batch': batch, 'rcodes': rcodes})
 
     c = 0
@@ -409,17 +410,35 @@ def predict_wcc(anchor, num_actors, corl_prior, min_rcode, max_batch_size, model
     db_port = shared_args['db_port']
     db_pwd = shared_args['db_pwd']
     anchors = shared_args['anchors']
+    max_step = shared_args['max_step']
+    time_shift = shared_args['time_shift']
     start_anchor = None if anchor == 0 else anchors[anchor-1]
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
-    work = getWorkloadForPrediction(start_anchor, stop_anchor,
-                                    corl_prior, db_host, db_port, db_pwd)
+    work = getWorkloadForPrediction(start_anchor,
+                                    stop_anchor,
+                                    corl_prior,
+                                    max_step,
+                                    time_shift,
+                                    db_host,
+                                    db_port,
+                                    db_pwd)
 
-    d = _load_data.remote(work, num_actors, min_rcode, shared_args,
-                          shared_args_oid, data_queue)
-    s = _save_infer_result.remote(top_k, shared_args, infer_queue)
+    d = _load_data.remote(work,
+                          num_actors,
+                          min_rcode,
+                          shared_args,
+                          shared_args_oid,
+                          data_queue)
+
+    s = _save_infer_result.remote(top_k,
+                                  shared_args,
+                                  infer_queue)
 
     # prediction using GPU will be running in master process. There're many unknown issues running in ray worker
-    p = _predict(model_path, max_batch_size, data_queue, infer_queue)
+    p = _predict(model_path,
+                 max_batch_size,
+                 data_queue,
+                 infer_queue)
 
     if d and s and p:
         print('{} inference completed. total workload: {}'.format(

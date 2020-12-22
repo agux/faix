@@ -474,11 +474,13 @@ def _getFtQuery(cols=None):
     p_index = p_index[:-1]  # strip last comma
     qk = ftQueryTpl.format(p_kline, 'kline_d_b_lr',
                            " AND d.klid BETWEEN %s AND %s ")
+    qk2 = ftQueryTpl.format(p_kline, 'kline_d_b_lr',
+                           " AND d.ym in ({}) AND d.klid BETWEEN %s AND %s ")
     qd = ftQueryTpl.format(p_kline, 'kline_d_b_lr',
                            " AND d.ym in ({}) AND d.date in ({})")
     qd_idx = ftQueryTpl.format(p_index, 'index_d_n_lr',
                                " AND d.ym in ({}) AND d.date in ({})")
-    return qk, qd, qd_idx
+    return qk, qd, qd_idx, qk2
 
 
 def _getDataSetMeta(flag):
@@ -560,7 +562,7 @@ def getInputs(start_bno=0,
     print("{} Using parallel: {}, prefetch: {} db_host: {} port: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port))
     _init(db_pool_size, db_host, db_port, db_pwd)
-    qk, qd, qd_idx = _getFtQuery()
+    qk, qd, qd_idx, _ = _getFtQuery()
     shared_args = ray.put({
         'max_step': max_step,
         'time_shift': time_shift,
@@ -622,7 +624,7 @@ def getInputs(start_bno=0,
     }
 
 
-def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, host, port, pwd):
+def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, max_step, time_shift, host, port, pwd):
     '''
     Returns list of tuples (code, date, klid)
     '''
@@ -630,22 +632,31 @@ def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, host, port, 
     if cnxpool is None:
         _init_db(1, host, port, pwd)
     tpl = (
+        "WITH t AS ( "
+        "    SELECT   "
+        "       t.code code, t.date date, t.klid klid  "
+        "    FROM  "
+        "       (SELECT   "
+        "           code, date, klid  "
+        "       FROM  "
+        "           kline_d_b_lr  "
+        "       WHERE  "
+        "           {cond} "
+        "       ORDER BY code, klid) t  "
+        "    WHERE  "
+        "       (code, date) NOT IN (SELECT   "
+        "               code, date  "
+        "           FROM  "
+        "               wcc_predict  "
+        "       ) "
+        ") "
         "SELECT  "
-        "	t.code code, t.date date, t.klid klid "
-        "FROM "
-        "	(SELECT  "
-        "		code, date, klid "
-        "	FROM "
-        "		kline_d_b_lr "
-        "	WHERE "
-        "		{} "
-        "	ORDER BY code , klid) t "
+        "    t.code, t.date start_date, t2.date end_date, t2.klid  "
+        "FROM  "
+        "    t, t t2 "
         "WHERE "
-        "	(code, date) NOT IN (SELECT  "
-        "			code, date "
-        "		FROM "
-        "			wcc_predict "
-        "	)"
+        "    t.code = t2.code "
+        "    AND t.klid = t2.klid - {offset} "
     )
     cond = ' klid >= {} '.format(corl_prior)
     if start_anchor is not None:
@@ -669,7 +680,7 @@ def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, host, port, 
         print('{} querying workload for segment [{}, {}]'.format(
             strftime("%H:%M:%S"), start_anchor, stop_anchor))
         cursor = cnx.cursor()
-        cursor.execute(tpl.format(cond))
+        cursor.execute(tpl.format(cond=cond, offset=max_step+time_shift-1))
         rows = cursor.fetchall()
         total = cursor.rowcount
         print('{} workload for segment: {}'.format(
@@ -680,7 +691,7 @@ def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, host, port, 
         raise
     finally:
         cnx.close()
-    return [(c, d, k) for c, d, k in rows]
+    return [(c, d1, d2, k) for c, d1, d2, k in rows]
 
 
 def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
@@ -785,11 +796,12 @@ def getInputs_v2(start_bno=0,
     print("{} Using parallel: {}, prefetch: {} db_host: {} port: {}".format(
         strftime("%H:%M:%S"), parallel, _prefetch, db_host, db_port))
     _init(db_pool_size, db_host, db_port, db_pwd)
-    qk, qd, qd_idx = _getFtQuery()
+    qk, qd, qd_idx, qk2 = _getFtQuery()
     shared_args = ray.put({
         'max_step': max_step,
         'time_shift': time_shift,
         'qk': qk,
+        'qk2': qk2,
         'qd': qd,
         'qd_idx': qd_idx,
         'index_list': _getIndex(),
