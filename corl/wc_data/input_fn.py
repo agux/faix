@@ -632,21 +632,14 @@ def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, max_step, ti
     if cnxpool is None:
         _init_db(1, host, port, pwd)
     tpl = (
-        "WITH t AS ( "
-        "    SELECT   "
-        "       t.code code, t.date date, t.klid klid  "
-        "    FROM  "
-        "        kline_d_b_lr  "
-        "    WHERE "
-        "        {cond} "
-        ") "
         "SELECT  "
-        "    t.code, t.date start_date, t2.date end_date, t2.klid  "
+        "    t.code, t_pre.date start_date, t.date end_date, t.klid  "
         "FROM  "
-        "    t, t t2 "
+        "    kline_d_b_lr t_pre, kline_d_b_lr t "
         "WHERE "
-        "    t.code = t2.code "
-        "    AND t.klid = t2.klid - {offset} "
+        "    {cond} "
+        "    AND t_pre.code = t.code "
+        "    AND t_pre.klid = t.klid - {offset} "
         "    AND (t.code, t.date) NOT IN ( "
         "        SELECT "
         "            code, date  "
@@ -654,23 +647,23 @@ def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, max_step, ti
         "            wcc_predict  "
         "    )"
         "ORDER BY "
-        "    code, klid"
+        "    t.code, t.klid"
     )
-    cond = ' klid >= {} '.format(corl_prior)
+    cond = ' t.klid >= {} '.format(corl_prior)
     if start_anchor is not None:
         c1, k1 = start_anchor
         cond += '''
             and (
-                code > '{}'
-                or (code = '{}' and klid >= {})
+                t.code > '{}'
+                or (t.code = '{}' and t.klid >= {})
             )
         '''.format(c1, c1, k1)
     if stop_anchor is not None:
         c2, k2 = stop_anchor
         cond += '''
             and (
-                code < '{}'
-                or (code = '{}' and klid < {})
+                t.code < '{}'
+                or (t.code = '{}' and t.klid < {})
             )
         '''.format(c2, c2, k2)
     cnx = cnxpool.get_connection()
