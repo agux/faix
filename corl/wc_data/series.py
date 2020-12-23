@@ -87,7 +87,7 @@ class DataLoader(object):
                 strftime("%H:%M:%S"), part))
             fcursor = cnx.cursor(buffered=True)
             fcursor.execute(self.sqlt_wr_part.format(cond=cond),
-                            (part, self.corl_prior, self.offset,))
+                            (part, self.corl_prior, self.offset))
             rows = fcursor.fetchall()
             total = fcursor.rowcount
             print('{} workload for partition {}: {}'.format(
