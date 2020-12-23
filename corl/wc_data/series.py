@@ -61,7 +61,7 @@ class DataLoader(object):
             "    (SELECT  "
             "        code, date, klid "
             "    FROM "
-            "        kline_d_b_lr PARTITION (%s) "
+            "        kline_d_b_lr PARTITION ({part}) "
             "    WHERE "
             "        klid >= %s "
             "            AND (code , date) NOT IN (SELECT "
@@ -87,8 +87,8 @@ class DataLoader(object):
             print('{} querying workload for partition {}'.format(
                 strftime("%H:%M:%S"), part))
             fcursor = cnx.cursor(buffered=True)
-            fcursor.execute(self.sqlt_wr_part.format(cond=cond),
-                            (part, self.corl_prior, self.offset))
+            fcursor.execute(self.sqlt_wr_part.format(part=part, cond=cond),
+                            (self.corl_prior, self.offset))
             rows = fcursor.fetchall()
             total = fcursor.rowcount
             print('{} workload for partition {}: {}'.format(
