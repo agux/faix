@@ -681,7 +681,10 @@ def getWorkloadForPrediction(actor_pool, start_anchor, stop_anchor, corl_prior, 
 
     # sort by code and klid in ascending order
     workloads = sorted(list(tasks), key=lambda tup: (tup[0], tup[3]))
-    
+
+    print('{} total workloads: {}'.format(
+        strftime("%H:%M:%S"), len(workloads)))
+
     return workloads
 
 
