@@ -679,9 +679,10 @@ def getWorkloadForPrediction(actor_pool, start_anchor, stop_anchor, corl_prior, 
         rows
     )
 
-    # flatten the list
-    workloads = [val for sublist in list(tasks) for val in sublist]
-    workloads = [t for t in workloads if t]  # remove empty elements
+    # remove empty sublists
+    workloads = [t for t in list(tasks) if t]
+    # flatten the list and remove empty tuples
+    workloads = [val for sublist in workloads for val in sublist if val]
     # sort by code and klid in ascending order
     workloads.sort(key=lambda tup: (tup[0], tup[3]))
 
