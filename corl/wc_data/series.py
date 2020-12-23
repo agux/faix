@@ -40,34 +40,89 @@ def getSeries(code, klid, rcode, val, shared_args):
 
 @ray.remote
 class DataLoader(object):
-    def __init__(self, host, port, pwd):
+    def __init__(self, shared_args):
+        host = shared_args['db_host']
+        port = shared_args['db_port']
+        pwd = shared_args['db_pwd']
         self.conn_pool = _init(1, host, port, pwd)
+        self.max_step = shared_args['max_step']
+        self.time_shift = shared_args['time_shift']
+        self.corl_prior = shared_args['corl_prior']
+        self.offset = self.max_step+self.time_shift-1
+        self.qk = shared_args['qk2']
+        self.qd_idx = shared_args['qd_idx']
+        self.index_list = shared_args['index_list']
+        self.qd = shared_args['qd']
+        self.sqlt_wr_part = (
+            "SELECT "
+            "    t.code, t_pre.date start_date, t.date end_date, t.klid "
+            "FROM "
+            "    kline_d_b_lr t_pre, "
+            "    (SELECT  "
+            "        code, date, klid "
+            "    FROM "
+            "        kline_d_b_lr PARTITION (%s) "
+            "    WHERE "
+            "        klid >= %s "
+            "            AND (code , date) NOT IN (SELECT "
+            "                code, date "
+            "            FROM "
+            "                wcc_predict) "
+            "            {cond} "
+            "    ) t "
+            "WHERE "
+            "    t_pre.code = t.code "
+            "        AND t_pre.klid = t.klid - %s "
+        )
 
-    def get_series(self, code, klid, date_start, date_end, rcode, val, shared_args):
-        max_step = shared_args['max_step']
-        time_shift = shared_args['time_shift']
-        s = max(0, klid - max_step + 1 - time_shift)
+    def get_wcc_infer_work_request(self, part, cond):
+        '''
+        Returns code, start_date, end_date, klid for the given table partition.
+        '''
+        cnxpool = self.conn_pool
+        cnx = cnxpool.get_connection()
+        fcursor = None
+        try:
+            print('{} querying workload for partition {}'.format(
+                strftime("%H:%M:%S"), part))
+            fcursor = cnx.cursor(buffered=True)
+            fcursor.execute(self.sqlt_wr_part.format(cond=cond),
+                            (part, self.corl_prior, self.offset,))
+            rows = fcursor.fetchall()
+            total = fcursor.rowcount
+            print('{} workload for partition {}: {}'.format(
+                strftime("%H:%M:%S"), part, total))
+        except:
+            print(sys.exc_info()[0])
+            raise
+        finally:
+            if fcursor is not None:
+                fcursor.close()
+            cnx.close()
+        return [(c, d1, d2, k) for c, d1, d2, k in rows]
 
-        batch = self.get_batch(code, s, klid, date_start,
-                               date_end, rcode, shared_args)
+    def get_series(self, code, klid, date_start, date_end, rcode, val):
+        s = max(0, klid - self.max_step + 1 - self.time_shift)
+
+        batch = self._get_batch(code, s, klid, date_start,
+                                date_end, rcode)
 
         if val is not None:
             return batch, val
         else:
             return batch
 
-    def get_batch(self, code, s, e, date_start, date_end, rcode, shared_args):
+    def _get_batch(self, code, s, e, date_start, date_end, rcode):
         cnxpool = self.conn_pool
-        max_step = shared_args['max_step']
-        time_shift = shared_args['time_shift']
-        qk = shared_args['qk2']
-        qd = shared_args['qd_idx'] if rcode in shared_args[
-            'index_list'] else shared_args['qd']
+        max_step = self.max_step
+        time_shift = self.time_shift
+        qk = self.qk
+        qd = self.qd_idx if rcode in self.index_list else self.qd
         cnx = cnxpool.get_connection()
         fcursor = None
         try:
             fcursor = cnx.cursor(buffered=True)
-            ymStr = self.get_ymstr(date_start, date_end)
+            ymStr = self._get_ymstr(date_start, date_end)
             qk = qk.format(ymStr)
             fcursor.execute(qk, (code, s, e, max_step + time_shift))
             col_names = fcursor.column_names
@@ -109,7 +164,7 @@ class DataLoader(object):
                 fcursor.close()
             cnx.close()
 
-    def get_ymstr(self, date_start, date_end):
+    def _get_ymstr(self, date_start, date_end):
         sy, sm, _ = date_start.split('-')
         ey, em, _ = date_end.split('-')
         sy, sm, ey, em = int(sy), int(sm), int(ey), int(em)

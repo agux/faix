@@ -138,6 +138,7 @@ def run(args):
         'db_pwd': args.db_pwd,
         'max_step': MAX_STEP,
         'time_shift': TIME_SHIFT,
+        'corl_prior': CORL_PRIOR,
         'qk': qk,
         'qk2': qk2,
         'qd': qd,
@@ -145,12 +146,16 @@ def run(args):
         'index_list': _getIndex(),
         'anchors': anchors,
     }
-    shared_args_oid = ray.put(shared_args)
     num_actors = args.num_cpus or psutil.cpu_count(logical=False)
     print("{} num_actors = {}".format(
         strftime("%H:%M:%S"), num_actors))
-    predict_wcc(0, num_actors, CORL_PRIOR, MIN_RCODE, args.max_batch_size, args.model,
-                TOP_K, shared_args, shared_args_oid)
+    predict_wcc(0,
+                num_actors,
+                MIN_RCODE,
+                args.max_batch_size,
+                args.model,
+                TOP_K,
+                shared_args)
 
 
 if __name__ == '__main__':

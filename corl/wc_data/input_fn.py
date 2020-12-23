@@ -475,7 +475,7 @@ def _getFtQuery(cols=None):
     qk = ftQueryTpl.format(p_kline, 'kline_d_b_lr',
                            " AND d.klid BETWEEN %s AND %s ")
     qk2 = ftQueryTpl.format(p_kline, 'kline_d_b_lr',
-                           " AND d.ym in ({}) AND d.klid BETWEEN %s AND %s ")
+                            " AND d.ym in ({}) AND d.klid BETWEEN %s AND %s ")
     qd = ftQueryTpl.format(p_kline, 'kline_d_b_lr',
                            " AND d.ym in ({}) AND d.date in ({})")
     qd_idx = ftQueryTpl.format(p_index, 'index_d_n_lr',
@@ -624,32 +624,23 @@ def getInputs(start_bno=0,
     }
 
 
-def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, max_step, time_shift, host, port, pwd):
+def getWorkloadForPrediction(actor_pool, start_anchor, stop_anchor, corl_prior, max_step, time_shift, host, port, pwd):
     '''
     Returns list of tuples (code, date, klid)
     '''
     global cnxpool
     if cnxpool is None:
         _init_db(1, host, port, pwd)
-    tpl = (
-        "SELECT  "
-        "    t.code, t_pre.date start_date, t.date end_date, t.klid  "
-        "FROM  "
-        "    kline_d_b_lr t_pre, kline_d_b_lr t "
+    qry = (
+        "SELECT "
+        "    partition_name "
+        "FROM "
+        "    information_schema.partitions "
         "WHERE "
-        "    {cond} "
-        "    AND t_pre.code = t.code "
-        "    AND t_pre.klid = t.klid - {offset} "
-        "    AND (t.code, t.date) NOT IN ( "
-        "        SELECT "
-        "            code, date  "
-        "        FROM  "
-        "            wcc_predict  "
-        "    )"
-        "ORDER BY "
-        "    t.code, t.klid"
+        "    table_schema = 'secu' "
+        "        AND table_name = 'kline_d_b_lr' "
     )
-    cond = ' t.klid >= {} '.format(corl_prior)
+    cond = ''
     if start_anchor is not None:
         c1, k1 = start_anchor
         cond += '''
@@ -667,22 +658,28 @@ def getWorkloadForPrediction(start_anchor, stop_anchor, corl_prior, max_step, ti
             )
         '''.format(c2, c2, k2)
     cnx = cnxpool.get_connection()
+    cursor = None
     try:
-        print('{} querying workload for segment [{}, {}]'.format(
-            strftime("%H:%M:%S"), start_anchor, stop_anchor))
+        print('{} querying partitions for kline_d_b_lr'.format(strftime("%H:%M:%S")))
         cursor = cnx.cursor()
-        cursor.execute(tpl.format(cond=cond, offset=max_step+time_shift-1))
+        cursor.execute(qry)
         rows = cursor.fetchall()
         total = cursor.rowcount
-        print('{} workload for segment: {}'.format(
-            strftime("%H:%M:%S"), total))
-        cursor.close()
+        print('{} #partitions: {}'.format(strftime("%H:%M:%S"), total))
     except:
         print(sys.exc_info()[0])
         raise
     finally:
+        if cursor is not None:
+            cursor.close()
         cnx.close()
-    return [(c, d1, d2, k) for c, d1, d2, k in rows]
+
+    tasks = actor_pool.map(
+        lambda a, part: a.get_wcc_infer_work_request.remote(part, cond),
+        rows
+    )
+    workloads = sorted(list(tasks), key=lambda tup: (tup[0], tup[3])) # sort by code and klid in ascending order
+    return workloads
 
 
 def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):

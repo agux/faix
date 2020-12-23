@@ -144,7 +144,7 @@ def _get_rcodes(code, klid, steps, shift):
     return rcodes_k + rcodes_i
 
 
-def _process(pool, code, klid, date_start, date_end, min_rcode, shared_args, shared_args_oid):
+def _process(pool, code, klid, date_start, date_end, min_rcode, shared_args):
     # find eligible rcodes
     rcodes = _get_rcodes(
         code, klid, shared_args['max_step'], shared_args['time_shift'])
@@ -155,11 +155,9 @@ def _process(pool, code, klid, date_start, date_end, min_rcode, shared_args, sha
             code, klid, date_start, date_end, len(rcodes),
         ))
         return [], []
-    # retrieve objectID for shared_sargs and pass to getSeries_v2
-    # tasks = [getSeries_v2.remote(
-    #     code, klid, rcode, None, shared_args_oid) for rcode in rcodes]
-    tasks = pool.map(lambda a, rcode: a.get_series.remote(
-        code, klid, date_start, date_end, rcode, None, shared_args_oid),
+    tasks = pool.map(
+        lambda a, rcode: a.get_series.remote(
+            code, klid, date_start, date_end, rcode, None),
         rcodes
     )
     return np.array(list(tasks), np.float32), np.array(rcodes, object)
@@ -247,7 +245,7 @@ def _load_model(model_path):
 
 
 @ray.remote
-def _load_data(work, num_actors, min_rcode, shared_args, shared_args_oid, data_queue):
+def _load_data(work, num_actors, min_rcode, shared_args, data_queue):
     global cnxpool
     host = shared_args['db_host']
     port = shared_args['db_port']
@@ -257,8 +255,7 @@ def _load_data(work, num_actors, min_rcode, shared_args, shared_args_oid, data_q
 
     actor_pool = ray.util.ActorPool(
         # [ray.get_actor("DataLoader_" + str(i)) for i in range(num_actors)]
-        [DataLoader.remote(host=host, port=port, pwd=pwd)
-         for _ in range(num_actors)]
+        [DataLoader.remote(shared_args) for _ in range(num_actors)]
     )
 
     # poll work request from 'work_queue' for data loading, and push to 'data_queue'
@@ -270,8 +267,8 @@ def _load_data(work, num_actors, min_rcode, shared_args, shared_args_oid, data_q
                                  date_start,
                                  date_end,
                                  min_rcode,
-                                 shared_args,
-                                 shared_args_oid)
+                                 shared_args
+                                 )
         if len(batch) < min_rcode or len(rcodes) < min_rcode:
             print('{} {}@({},{},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
                 strftime("%H:%M:%S"), code, klid, date_start, date_end, len(batch), len(rcodes)))
@@ -403,7 +400,7 @@ def _save_infer_result(top_k, shared_args, infer_queue):
     return done
 
 
-def predict_wcc(anchor, num_actors, corl_prior, min_rcode, max_batch_size, model_path, top_k, shared_args, shared_args_oid):
+def predict_wcc(anchor, num_actors, min_rcode, max_batch_size, model_path, top_k, shared_args):
     data_queue = Queue(maxsize=128)
     infer_queue = Queue(maxsize=128)
     db_host = shared_args['db_host']
@@ -412,9 +409,18 @@ def predict_wcc(anchor, num_actors, corl_prior, min_rcode, max_batch_size, model
     anchors = shared_args['anchors']
     max_step = shared_args['max_step']
     time_shift = shared_args['time_shift']
+    corl_prior = shared_args['corl_prior']
     start_anchor = None if anchor == 0 else anchors[anchor-1]
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
-    work = getWorkloadForPrediction(start_anchor,
+
+    actor_pool = ray.util.ActorPool(
+        # [ray.get_actor("DataLoader_" + str(i)) for i in range(num_actors)]
+        [DataLoader.options(name='data_loader#{}'.format(i)).remote(
+            shared_args) for i in range(num_actors)]
+    )
+
+    work = getWorkloadForPrediction(actor_pool,
+                                    start_anchor,
                                     stop_anchor,
                                     corl_prior,
                                     max_step,
@@ -427,7 +433,6 @@ def predict_wcc(anchor, num_actors, corl_prior, min_rcode, max_batch_size, model
                           num_actors,
                           min_rcode,
                           shared_args,
-                          shared_args_oid,
                           data_queue)
 
     s = _save_infer_result.remote(top_k,

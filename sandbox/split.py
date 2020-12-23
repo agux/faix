@@ -22,3 +22,26 @@ def get_ymstr(date_start, date_end):
 
 
 print(get_ymstr('2020-02-01', '2020-12-20'))
+
+import numpy as np
+import pandas as pd
+
+offset = 38
+
+code = ['000001', '300013', '613002', '002131', '000001']
+date = ['2020-01-01', '2019-12-10', '2018-05-09', '2017-11-30', '2020-12-31']
+klid = [100, 300, 400, 500, 99]
+
+df = pd.DataFrame([code, date, klid], index=['code', 'date', 'klid']).T
+
+tp = list(zip(code, date, np.array(klid)-offset))
+
+print(tp)
+print(df)
+
+sorted_tp = sorted(tp, key=lambda tup: (tup[0], tup[2]))
+
+print(sorted_tp)
+
+
+
