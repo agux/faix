@@ -79,6 +79,7 @@ class DataLoader(object):
         '''
         Returns code, start_date, end_date, klid for the given table partition.
         '''
+        part = part[0]
         cnxpool = self.conn_pool
         cnx = cnxpool.get_connection()
         fcursor = None
