@@ -676,9 +676,12 @@ def getWorkloadForPrediction(actor_pool, start_anchor, stop_anchor, corl_prior, 
 
     tasks = actor_pool.map(
         lambda a, part: a.get_wcc_infer_work_request.remote(part, cond),
-        rows
+        [p for p in rows]
     )
-    workloads = sorted(list(tasks), key=lambda tup: (tup[0], tup[3])) # sort by code and klid in ascending order
+
+    # sort by code and klid in ascending order
+    workloads = sorted(list(tasks), key=lambda tup: (tup[0], tup[3]))
+    
     return workloads
 
 
