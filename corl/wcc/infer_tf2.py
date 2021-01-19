@@ -9,7 +9,7 @@ import numpy as np
 
 from time import strftime
 from pathlib import Path
-from corl.wc_data.input_fn import getWorkSegmentsForPrediction, _getFtQuery, _getIndex
+from corl.wc_data.input_fn import _getFtQuery, _getIndex, _init_db
 from corl.wc_test.test27_mdnc import create_regressor
 from corl.wcc.worker import predict_wcc
 
@@ -90,10 +90,11 @@ def init(args):
 def run(args):
     print("{} started inference, pid:{}".format(
         strftime("%H:%M:%S"), os.getpid()))
+    _init_db(1, args.db_host, args.db_port, args.db_pwd)
     # load workload segmentation anchors from db
     # anchors = getWorkSegmentsForPrediction(
     #     CORL_PRIOR, args.db_host, args.db_port, args.db_pwd, 1)
-    
+
     # in each worker, load input data from db, run model prediction, and save predictions back to wcc_predict table with bucketing
     qk, qd, qd_idx, qk2 = _getFtQuery(COLS)
     shared_args = {
