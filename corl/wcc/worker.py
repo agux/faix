@@ -245,6 +245,8 @@ def _load_model(model_path):
 
 
 def _setupTensorflow(args):
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    
     # interim workaround to fix memory leak issue
     tf.keras.backend.clear_session()
     physical_devices = tf.config.list_physical_devices('GPU')
@@ -343,7 +345,6 @@ def _load_data(work, num_actors, min_rcode, shared_args, data_queue):
 
 @ray.remote
 def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
-    os.environ('CUDA_VISIBLE_DEVICES') = '0'
     _setupTensorflow(args)
     # poll work from 'data_queue', run inference, and push result to infer_queue
     model = _load_model(model_path)
