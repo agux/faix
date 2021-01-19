@@ -355,11 +355,12 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
             if isinstance(next_work, str) and next_work == 'done':
                 if data_queue.empty():
                     infer_queue.put('done')
+                    return True
                 else:
                     print('{} warning, data_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
                         strftime("%H:%M:%S"), data_queue.size()))
                     data_queue.put_nowait('done')
-                    return
+                    return False
             batch = next_work['batch']
             p = model.predict(batch, batch_size=max_batch_size)
             p = np.squeeze(p)
@@ -373,6 +374,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
         except Exception:
             sleep(0.5)
             pass
+        return False
 
     c = 0
     elapsed = 0
@@ -384,7 +386,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
 
         if c >= 1000 and c < 2000:
             s = time.time()
-            predict()
+            done = predict()
             e = time.time()
             et = e-s
             elapsed += et
@@ -396,6 +398,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
                     strftime("%H:%M:%S"), elapsed/1000), file=sys.stderr)
             predict()
         c += 1
+
     return done
 
 
@@ -496,7 +499,7 @@ def predict_wcc(num_actors, min_rcode, max_batch_size, model_path, top_k, shared
                                                      args) for _ in range(args.parallel)
          ]
 
-    if d == True and s == True and all(r == True for r in p):
+    if ray.get(d) and ray.get(s) and all(r == True for r in list(ray.get(p))):
         print('{} inference completed. total workload: {}'.format(
             strftime("%H:%M:%S"), len(work)))
     else:

@@ -113,6 +113,8 @@ def run(args):
         'args': args,
     }
     num_actors = args.num_cpus or psutil.cpu_count(logical=False)
+    print("{} parallel = {}".format(
+        strftime("%H:%M:%S"), args.parallel))
     print("{} num_actors = {}".format(
         strftime("%H:%M:%S"), num_actors))
     predict_wcc(num_actors,
