@@ -244,12 +244,52 @@ def _load_model(model_path):
     return model
 
 
+def _setupTensorflow(args):
+    # interim workaround to fix memory leak issue
+    tf.keras.backend.clear_session()
+    physical_devices = tf.config.list_physical_devices('GPU')
+    if len(physical_devices) > 0:
+        if args.gpu_grow_mem:
+            try:
+                print('{} enabling memory growth for {}'.format(
+                    strftime("%H:%M:%S"), physical_devices[0]))
+                tf.config.experimental.set_memory_growth(
+                    physical_devices[0], True)
+            except:
+                print(
+                    'Invalid device or cannot modify virtual devices once initialized.\n'
+                    + sys.exc_info()[0])
+                pass
+        if args.limit_gpu_mem is not None:
+            # Restrict TensorFlow to only allocate the specified memory on the first GPU
+            try:
+                print('{} setting GPU memory limit to {} MB'.format(
+                    strftime("%H:%M:%S"), args.limit_gpu_mem*1024))
+                tf.config.experimental.set_virtual_device_configuration(
+                    physical_devices[0],
+                    [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=args.limit_gpu_mem*1024)])
+                logical_gpus = tf.config.experimental.list_logical_devices(
+                    'GPU')
+                print(strftime("%H:%M:%S"), len(physical_devices),
+                      "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            except RuntimeError as e:
+                # Virtual devices must be set before GPUs have been initialized
+                print(e)
+
+    if args.enable_xla:
+        # enalbe XLA
+        tf.config.optimizer.set_jit(True)
+        os.environ['TF_XLA_FLAGS'] = '--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit'
+
+
 @ray.remote
 def _load_data(work, num_actors, min_rcode, shared_args, data_queue):
     global cnxpool
     host = shared_args['db_host']
     port = shared_args['db_port']
     pwd = shared_args['db_pwd']
+    parallel = shared_args['args'].parallel
+
     if cnxpool is None:
         _init(1, host, port, pwd)
 
@@ -295,11 +335,16 @@ def _load_data(work, num_actors, min_rcode, shared_args, data_queue):
         c += 1
         # sleep(0.1)
 
+    for _ in range(parallel):
+        data_queue.put('done')
+
     return True
 
 
-def _predict(model_path, max_batch_size, data_queue, infer_queue):
-    # os.environ('CUDA_VISIBLE_DEVICES') = '0'
+@ray.remote
+def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
+    os.environ('CUDA_VISIBLE_DEVICES') = '0'
+    _setupTensorflow(args)
     # poll work from 'data_queue', run inference, and push result to infer_queue
     model = _load_model(model_path)
 
@@ -309,7 +354,6 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue):
             if isinstance(next_work, str) and next_work == 'done':
                 if data_queue.empty():
                     infer_queue.put('done')
-                    done = True
                 else:
                     print('{} warning, data_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
                         strftime("%H:%M:%S"), data_queue.size()))
@@ -410,6 +454,7 @@ def predict_wcc(anchor, num_actors, min_rcode, max_batch_size, model_path, top_k
     max_step = shared_args['max_step']
     time_shift = shared_args['time_shift']
     corl_prior = shared_args['corl_prior']
+    args = shared_args['args']
     start_anchor = None if anchor == 0 else anchors[anchor-1]
     stop_anchor = None if anchor == len(anchors) else anchors[anchor]
 
@@ -439,12 +484,18 @@ def predict_wcc(anchor, num_actors, min_rcode, max_batch_size, model_path, top_k
                                   shared_args,
                                   infer_queue)
 
-    # prediction using GPU will be running in master process. There're many unknown issues running in ray worker
-    p = _predict(model_path,
-                 max_batch_size,
-                 data_queue,
-                 infer_queue)
+    # There're many unknown issues running GPU inference in ray worker...
+    gpu_alloc = 1.0 / args.parallel
+    p = [_predict.option(num_gpus=gpu_alloc).remote(model_path,
+                                                    max_batch_size,
+                                                    data_queue,
+                                                    infer_queue,
+                                                    args) for _ in range(args.parallel)
+         ]
 
-    if d and s and p:
+    if d and s and all(r for r in p):
         print('{} inference completed. total workload: {}'.format(
+            strftime("%H:%M:%S"), len(work)))
+    else:
+        print('{} inference completed with exception. total workload: {}'.format(
             strftime("%H:%M:%S"), len(work)))
