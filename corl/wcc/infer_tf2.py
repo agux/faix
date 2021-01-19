@@ -91,8 +91,9 @@ def run(args):
     print("{} started inference, pid:{}".format(
         strftime("%H:%M:%S"), os.getpid()))
     # load workload segmentation anchors from db
-    anchors = getWorkSegmentsForPrediction(
-        CORL_PRIOR, args.db_host, args.db_port, args.db_pwd, 1)
+    # anchors = getWorkSegmentsForPrediction(
+    #     CORL_PRIOR, args.db_host, args.db_port, args.db_pwd, 1)
+    
     # in each worker, load input data from db, run model prediction, and save predictions back to wcc_predict table with bucketing
     qk, qd, qd_idx, qk2 = _getFtQuery(COLS)
     shared_args = {
@@ -107,14 +108,13 @@ def run(args):
         'qd': qd,
         'qd_idx': qd_idx,
         'index_list': _getIndex(),
-        'anchors': anchors,
+        # 'anchors': anchors,
         'args': args,
     }
     num_actors = args.num_cpus or psutil.cpu_count(logical=False)
     print("{} num_actors = {}".format(
         strftime("%H:%M:%S"), num_actors))
-    predict_wcc(0,
-                num_actors,
+    predict_wcc(num_actors,
                 MIN_RCODE,
                 args.max_batch_size,
                 args.model,

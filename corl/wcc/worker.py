@@ -445,19 +445,21 @@ def _save_infer_result(top_k, shared_args, infer_queue):
     return done
 
 
-def predict_wcc(anchor, num_actors, min_rcode, max_batch_size, model_path, top_k, shared_args):
+def predict_wcc(num_actors, min_rcode, max_batch_size, model_path, top_k, shared_args):
     data_queue = Queue(maxsize=128)
     infer_queue = Queue(maxsize=128)
     db_host = shared_args['db_host']
     db_port = shared_args['db_port']
     db_pwd = shared_args['db_pwd']
-    anchors = shared_args['anchors']
+    # anchors = shared_args['anchors']
     max_step = shared_args['max_step']
     time_shift = shared_args['time_shift']
     corl_prior = shared_args['corl_prior']
     args = shared_args['args']
-    start_anchor = None if anchor == 0 else anchors[anchor-1]
-    stop_anchor = None if anchor == len(anchors) else anchors[anchor]
+    # start_anchor = None if anchor == 0 else anchors[anchor-1]
+    # stop_anchor = None if anchor == len(anchors) else anchors[anchor]
+    start_anchor = None
+    stop_anchor = None
 
     actor_pool = ray.util.ActorPool(
         # [ray.get_actor("DataLoader_" + str(i)) for i in range(num_actors)]
