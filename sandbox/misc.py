@@ -80,3 +80,5 @@ print("hello")
 time.sleep(1)
 end = time.time()
 print(end - start)
+
+print(1.0/2)
