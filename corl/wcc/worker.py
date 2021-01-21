@@ -163,7 +163,7 @@ def _process(pool, code, klid, date_start, date_end, min_rcode, shared_args):
     return np.array(list(tasks), np.float32), np.array(rcodes, object)
 
 
-def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, predictions=None):
+def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, predictions=None, udate=None, utime=None):
     global bucket, cnxpool
     if code is not None:
         # get top and bottom k
@@ -194,8 +194,8 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
             *bottom_k_code,
             *(bottom_k_corl.tolist()),
             len(rcodes),
-            strftime("%Y-%m-%d"),
-            strftime("%H:%M:%S")
+            udate or strftime("%Y-%m-%d"),
+            utime or strftime("%H:%M:%S")
         ))
         if len(bucket) < BUCKET_SIZE:
             return
@@ -369,7 +369,10 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
                  'date': next_work['date'],
                  'klid': next_work['klid'],
                  'result': p,
-                 'rcodes': next_work['rcodes']}
+                 'rcodes': next_work['rcodes'],
+                 'udate': strftime("%Y-%m-%d"),
+                 'utime': strftime("%H:%M:%S")
+                 }
             )
         except Exception:
             sleep(0.5)
@@ -433,7 +436,10 @@ def _save_infer_result(top_k, shared_args, infer_queue):
                 code = next_result['code']
                 date = next_result['date']
                 klid = next_result['klid']
-                _save_prediction(code, klid, date, rcodes, top_k, result)
+                udate = next_result['udate']
+                utime = next_result['utime']
+                _save_prediction(code, klid, date, rcodes,
+                                 top_k, result, udate, utime)
         except Exception:
             pass
         sleep(2)
