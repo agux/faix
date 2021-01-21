@@ -492,12 +492,15 @@ def predict_wcc(num_actors, min_rcode, max_batch_size, model_path, top_k, shared
 
     # There're many unknown issues running GPU inference in ray worker...
     gpu_alloc = 1.0 / args.parallel
-    p = [_predict.options(num_gpus=gpu_alloc).remote(model_path,
-                                                     max_batch_size,
-                                                     data_queue,
-                                                     infer_queue,
-                                                     args) for _ in range(args.parallel)
-         ]
+    p = []
+    for _ in range(args.parallel):
+        p.append(_predict.options(num_gpus=gpu_alloc).remote(model_path,
+                                                             max_batch_size,
+                                                             data_queue,
+                                                             infer_queue,
+                                                             args)
+                 )
+        sleep(0.7)
 
     if ray.get(d) and ray.get(s) and all(r == True for r in list(ray.get(p))):
         print('{} inference completed. total workload: {}'.format(
