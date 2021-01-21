@@ -441,8 +441,9 @@ def _save_infer_result(top_k, shared_args, infer_queue):
                 _save_prediction(code, klid, date, rcodes,
                                  top_k, result, udate, utime)
         except Exception:
+            sleep(2)
             pass
-        sleep(2)
+        
         return False
 
     done = False
