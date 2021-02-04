@@ -5,7 +5,7 @@ import shutil
 import math
 import logging
 from pathlib import Path
-from corl.wc_test.common import parseArgs, LOG_DIR, log, setupPath, DebugCallback, TracemallocCallback
+from common.common import parseArgs, LOG_DIR, log, setupPath, DebugCallback, TracemallocCallback
 from corl.wc_data import input_fn
 from time import strftime
 import tensorflow as tf
@@ -29,15 +29,16 @@ FEAT_COLS = ["close"]
 
 # pylint: disable-msg=E0601,E1101
 
-def run(id=None, 
-    regressor=None, 
-    vset=None, 
-    max_step=None, 
-    time_shift=None, 
-    feat_cols=None, 
-    val_save_freq=None, 
-    steps_per_epoch=None,
-    include_seqlens=True):
+
+def run(id=None,
+        regressor=None,
+        vset=None,
+        max_step=None,
+        time_shift=None,
+        feat_cols=None,
+        val_save_freq=None,
+        steps_per_epoch=None,
+        data_pipeline=None):
 
     global VSET, MAX_STEP, TIME_SHIFT, FEAT_COLS, VAL_SAVE_FREQ, STEPS_PER_EPOCH
     VSET = vset or VSET
@@ -51,26 +52,17 @@ def run(id=None,
     args = parseArgs()
     setupPath()
     _setupTensorflow(args)
-    _main(args, regressor, id, include_seqlens)
+    _main(args, regressor, id, data_pipeline)
 
-def _getInput(start_epoch, args, include_seqlens):
-    ds = args.ds.lower()
+
+def _getInput(start_epoch, args, data_pipeline):
     print('{} using data source: {}'.format(strftime("%H:%M:%S"), args.ds))
     start_bno = start_epoch * STEPS_PER_EPOCH + 1
-    input_dict = {}
-    if ds == 'db':
-        if include_seqlens:
-            input_dict = input_fn.getInputs(start_bno, TIME_SHIFT, FEAT_COLS,
-                                            MAX_STEP, args.parallel, args.prefetch,
-                                            args.db_pool, args.db_host,
-                                            args.db_port, args.db_pwd, args.vset
-                                            or VSET, args.check_input)
-        else:
-            input_dict = input_fn.getInputs_v2(start_bno, TIME_SHIFT, FEAT_COLS,
-                                            MAX_STEP, args.parallel, args.prefetch,
-                                            args.db_pool, args.db_host,
-                                            args.db_port, args.db_pwd, args.vset
-                                            or VSET, args.check_input)
+    input_dict = data_pipeline(start_bno, TIME_SHIFT, FEAT_COLS,
+                               MAX_STEP, args.parallel, args.prefetch,
+                               args.db_pool, args.db_host,
+                               args.db_port, args.db_pwd, args.vset
+                               or VSET, args.check_input)
     input_dict['start_epoch'] = start_epoch
     return input_dict
 
@@ -106,15 +98,15 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
         log_dir=log_dir,
         # how often to log histogram visualizations
         histogram_freq=VAL_SAVE_FREQ,
-        #Profile the batch to sample compute characteristics. 
-        # By default, it will profile the second batch. 
+        # Profile the batch to sample compute characteristics.
+        # By default, it will profile the second batch.
         # Set profile_batch=0 to disable profiling. Must run in TensorFlow eager mode.
         profile_batch=args.profile_batch or 0,
-        #the log file can become quite large when write_graph is set to True.
+        # the log file can become quite large when write_graph is set to True.
         # write_graph=True,
-        #whether to write model weights to visualize as image in TensorBoard.
+        # whether to write model weights to visualize as image in TensorBoard.
         # write_images=True,
-        
+
         # 'batch' or 'epoch' or integer.
         # When using 'batch', writes the losses and metrics to TensorBoard after each batch.
         # The same applies for 'epoch'. If using an integer, let's say 1000,
@@ -124,7 +116,8 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
         # decay,
         tensorboard_cbk,
         DebugCallback() if args.check_weights else None,
-        TracemallocCallback(batches=args.tracemalloc) if args.tracemalloc is not None else None,
+        TracemallocCallback(
+            batches=args.tracemalloc) if args.tracemalloc is not None else None,
         keras.callbacks.CSVLogger('train_perf.log'),
         keras.callbacks.TerminateOnNaN() if args.terminate_on_nan else None,
         # tf.keras.callbacks.ProgbarLogger(count_mode='steps',
@@ -178,7 +171,7 @@ def _train(args, regressor, input_dict, base_dir, training_dir):
         # If a Container, specifies the epochs on which to run validation
         validation_freq=1,
         callbacks=callbacks,
-        )
+    )
 
     iterations = model.optimizer.iterations.numpy()
     print('{} Training ended. Finished iterations: {}/{}'.format(
@@ -239,7 +232,7 @@ def _load_model(regressor, training_dir):
     return start_epoch
 
 
-def _main(args, regressor, id=None, include_seqlens=True):
+def _main(args, regressor, id=None, data_pipeline=None):
     model_name = regressor.getName()
     print('{} using model: {}'.format(strftime("%H:%M:%S"), model_name))
 
@@ -253,8 +246,9 @@ def _main(args, regressor, id=None, include_seqlens=True):
     start_epoch = _load_model(regressor, training_dir)
 
     print('{} querying datasource...'.format(strftime("%H:%M:%S")))
-    input_dict = _getInput(start_epoch, args, include_seqlens)
+    input_dict = _getInput(start_epoch, args, data_pipeline)
     _train(args, regressor, input_dict, base_dir, training_dir)
+
 
 def _setupTensorflow(args):
     # interim workaround to fix memory leak issue
@@ -265,8 +259,10 @@ def _setupTensorflow(args):
     if len(physical_devices) > 0:
         if args.gpu_grow_mem:
             try:
-                print('{} enabling memory growth for {}'.format(strftime("%H:%M:%S"), physical_devices[0]))
-                tf.config.experimental.set_memory_growth(physical_devices[0], True)
+                print('{} enabling memory growth for {}'.format(
+                    strftime("%H:%M:%S"), physical_devices[0]))
+                tf.config.experimental.set_memory_growth(
+                    physical_devices[0], True)
             except:
                 print(
                     'Invalid device or cannot modify virtual devices once initialized.\n'
@@ -275,20 +271,22 @@ def _setupTensorflow(args):
         if args.limit_gpu_mem is not None:
             # Restrict TensorFlow to only allocate the specified memory on the first GPU
             try:
-                print('{} setting GPU memory limit to {} MB'.format(strftime("%H:%M:%S"),args.limit_gpu_mem*1024))
+                print('{} setting GPU memory limit to {} MB'.format(
+                    strftime("%H:%M:%S"), args.limit_gpu_mem*1024))
                 tf.config.experimental.set_virtual_device_configuration(
                     physical_devices[0],
                     [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=args.limit_gpu_mem*1024)])
-                logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-                print(strftime("%H:%M:%S"), len(physical_devices), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+                logical_gpus = tf.config.experimental.list_logical_devices(
+                    'GPU')
+                print(strftime("%H:%M:%S"), len(physical_devices),
+                      "Physical GPUs,", len(logical_gpus), "Logical GPUs")
             except RuntimeError as e:
                 # Virtual devices must be set before GPUs have been initialized
                 print(e)
-    
+
     if args.enable_xla:
         # enalbe XLA
         tf.config.optimizer.set_jit(True)
     # use of mixed precision gives TypeError: Tensors in list passed to 'values' of 'ConcatV2' Op have types [float16, float32] that don't all match.
     # policy  = tf.keras.mixed_precision.experimental.Policy('mixed_float16')   # 'mixed_float16' or 'float32'
     # tf.keras.mixed_precision.experimental.set_policy(policy)
-
