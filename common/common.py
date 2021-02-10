@@ -131,6 +131,9 @@ def parseArgs():
     return parser.parse_args()
 
 
+def next_power_of_2(x):
+    return 1 if x == 0 else 2**(x - 1).bit_length()
+
 def setupPath():
     p1 = os.path.dirname(os.path.abspath(__file__))
     p2 = os.path.dirname(p1)

@@ -1,8 +1,7 @@
 
-from corl.wc_test.test_runner import run
-from corl.model.tf2 import dnc_regressor
-from corl.wc_test.common import next_power_of_2
-from time import strftime
+from common.train_runner import run
+from model import dnc_regressor
+from common.common import next_power_of_2
 # Path hack.
 import sys
 import os
@@ -38,6 +37,8 @@ WORD_SIZE = 32
 MEMORY_SIZE = 32
 NUM_READ_HEADS = 8
 
+NUM_CLASSES = 5
+
 VAL_SAVE_FREQ = 500
 STEPS_PER_EPOCH = 500
 
@@ -48,7 +49,7 @@ INCLUDE_SEQLENS = False
 
 
 def create_regressor():
-    regressor = dnc_regressor.DNC_Model_V8(
+    regressor = dnc_regressor.BaseModel(
         num_cnn_layers=NUM_CNN_LAYERS,
         num_dnc_layers=NUM_DNC_LAYERS,
         num_fcn_layers=NUM_FCN_LAYERS,
@@ -70,6 +71,7 @@ def create_regressor():
         decayed_lr_start=DECAYED_LR_START,
         lr_decay_steps=LR_DECAY_STEPS,
         clipvalue=CLIP_VALUE,
+        num_classes=NUM_CLASSES,
         seed=SEED,
     )
     return regressor
@@ -78,15 +80,15 @@ def create_regressor():
 if __name__ == '__main__':
 
     np.random.seed(SEED)
+
     regressor = create_regressor()
 
-    run(
-        id="test27_mdnc",
+    run(id="stock_trend_test24_mdnc",
         regressor=regressor,
+        vset=None,
         max_step=MAX_STEP,
         time_shift=TIME_SHIFT,
         feat_cols=FEAT_COLS,
         val_save_freq=VAL_SAVE_FREQ,
         steps_per_epoch=STEPS_PER_EPOCH,
-        include_seqlens=INCLUDE_SEQLENS,
-    )
+        data_pipeline=None)
