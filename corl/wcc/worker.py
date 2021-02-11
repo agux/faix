@@ -281,7 +281,7 @@ def _setupTensorflow(args):
     if args.enable_xla:
         # enalbe XLA
         tf.config.optimizer.set_jit(True)
-        os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
+        os.environ['TF_XLA_FLAGS'] = '--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit --tf_xla_enable_xla_devices'
 
 
 @ray.remote
