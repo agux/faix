@@ -4,7 +4,7 @@ from tensorflow import keras
 from time import strftime
 
 from tensorflow.python.keras.utils import tf_utils
-from tensorflow.python.framework import smart_cond
+from tensorflow.python.framework.smart_cond import smart_cond
 
 class AlphaDropout(keras.layers.Layer):
   """Applies Alpha Dropout to the input.
