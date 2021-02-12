@@ -85,7 +85,7 @@ def init(args):
     _init_db(1, args.db_host, args.db_port, args.db_pwd)
 
     #call tensorflow to init GPU binding and check if any error
-    tf.reduce_sum(tf.random.normal([1000, 1000]))
+    # tf.reduce_sum(tf.random.normal([1000, 1000]))
     
     # _setupTensorflow(args)
 
