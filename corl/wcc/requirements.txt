@@ -1,0 +1,5 @@
+numpy
+ray
+psutil
+mysql-connector-python
+tensorflow_addons

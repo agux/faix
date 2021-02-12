@@ -3,15 +3,13 @@ import os
 import psutil
 import math
 import ray
-import sys
-import tensorflow as tf
-import numpy as np
 
 from time import strftime
-from pathlib import Path
 from corl.wc_data.input_fn import _getFtQuery, _getIndex, _init_db
 from corl.wc_test.test27_mdnc import create_regressor
 from corl.wcc.worker import predict_wcc
+
+import tensorflow as tf
 
 CORL_PRIOR = 100
 MAX_BATCH_SIZE = 600
@@ -84,13 +82,17 @@ def init(args):
         _memory=8 * 1024 * 1024 * 1024,  # 8G
         _driver_object_store_memory=256 * 1024 * 1024,    # 256M
     )
+    _init_db(1, args.db_host, args.db_port, args.db_pwd)
+
+    #call tensorflow to init GPU binding and check if any error
+    tf.reduce_sum(tf.random.normal([1000, 1000]))
+    
     # _setupTensorflow(args)
 
 
 def run(args):
     print("{} started inference, pid:{}".format(
         strftime("%H:%M:%S"), os.getpid()))
-    _init_db(1, args.db_host, args.db_port, args.db_pwd)
     # load workload segmentation anchors from db
     # anchors = getWorkSegmentsForPrediction(
     #     CORL_PRIOR, args.db_host, args.db_port, args.db_pwd, 1)
