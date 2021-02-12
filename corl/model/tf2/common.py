@@ -4,6 +4,7 @@ from tensorflow import keras
 from time import strftime
 
 from tensorflow.python.keras.utils import tf_utils
+from tensorflow.python.framework import smart_cond
 
 class AlphaDropout(keras.layers.Layer):
   """Applies Alpha Dropout to the input.
@@ -64,7 +65,7 @@ class AlphaDropout(keras.layers.Layer):
         x = inputs * kept_idx + alpha_p * (1 - kept_idx)
         # Do affine transformation
         return a * x + b
-    return tf.cond(
+    return smart_cond(
         tf.math.logical_and(
             tf.math.greater(self.rate, 0.),
             tf.math.less(self.rate, 1.)
@@ -168,7 +169,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
 
         def dropout():
             self.global_step.assign_add(1)
-            rate = tf.cond(
+            rate = smart_cond(
                 tf.math.less(self.global_step, self._decay_start),
                 lambda: self.initial_dropout_rate,
                 lambda: self.cosine_decay_restarts(self.global_step-self._decay_start+1)
@@ -176,7 +177,7 @@ class DecayedDropoutLayer(keras.layers.Layer):
             self.dropout_layer.rate = rate
             return self.dropout_layer(inputs, training)
 
-        output = tf.cond(
+        output = smart_cond(
             training,
             dropout,
             lambda: tf.identity(inputs)
