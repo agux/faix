@@ -337,7 +337,7 @@ class WaveNetModel(object):
 
     def _generator_conv(self, input_batch, state_batch, weights):
         '''Perform convolution for a single convolutional processing step.'''
-        # TODO generalize to filter_width > 2
+        # TD: generalize to filter_width > 2
         past_weights = weights[0, :, :]
         curr_weights = weights[1, :, :]
         output = tf.matmul(state_batch, past_weights) + tf.matmul(

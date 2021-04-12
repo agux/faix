@@ -174,11 +174,9 @@ class RnnPredictorV2:
     @staticmethod
     def rnn(self, input):
         # Recurrent network.
-        # TODO add tf.contrib.rnn.ConvLSTMCell?
         step = int(input.get_shape()[1])
         feat = int(input.get_shape()[2])
         c = feat // self._input_width  # channel
-        # TODO step & width must equal?
         input = tf.reshape(input, [-1, step, self._input_width, c])
         clc = tf.contrib.rnn.ConvLSTMCell(
             conv_ndims=1,

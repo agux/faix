@@ -62,19 +62,20 @@ def _getIndex():
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
-    print("{} [PID={}]: initializing mysql connection pool...".format(
-        strftime("%H:%M:%S"), os.getpid()))
-    cnxpool = MySQLConnectionPool(
-        pool_name="dbpool",
-        pool_size=db_pool_size or 5,
-        host=db_host or '127.0.0.1',
-        port=db_port or 3306,
-        user='mysql',
-        database='secu',
-        password=db_pwd or '123456',
-        # ssl_ca='',
-        # use_pure=True,
-        connect_timeout=90000)
+    if cnxpool is None:
+        print("{} [PID={}]: initializing mysql connection pool...".format(
+            strftime("%H:%M:%S"), os.getpid()))
+        cnxpool = MySQLConnectionPool(
+            pool_name="dbpool",
+            pool_size=db_pool_size or 5,
+            host=db_host or '127.0.0.1',
+            port=db_port or 3306,
+            user='mysql',
+            database='secu',
+            password=db_pwd or '123456',
+            # ssl_ca='',
+            # use_pure=True,
+            connect_timeout=90000)
     ray.init(
         num_cpus=psutil.cpu_count(logical=False),
         webui_host='127.0.0.1',

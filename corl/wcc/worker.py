@@ -12,7 +12,7 @@ from pathlib import Path
 from mysql.connector.pooling import MySQLConnectionPool
 from corl.wc_data.series import DataLoader, getSeries_v2
 from corl.wc_test.test27_mdnc import create_regressor
-from corl.wc_data.input_fn import getWorkloadForPrediction
+from corl.wc_data.input_fn import getWorkloadForPrediction, getWorkloadForPredictionFromTags
 
 REGRESSOR = create_regressor()
 cnxpool = None
@@ -36,6 +36,18 @@ WCC_INSERT = """
         %s,%s,%s)
 """
 
+KLINE_TAG_UPSERT = """
+    INSERT INTO `secu`.`kline_d_b_lr_tags`
+        (`code`,`date`,`klid`,`tags`,`udate`,`utime`)
+    VALUES
+        (%s,%s,%s,%s,%s,%s)
+    ON DUPLICATE KEY
+        UPDATE 
+            `tags`=concat(`tags`,';',VALUES(`tags`)),
+            `udate`=VALUES(`udate`),
+            `utime`=VALUES(`utime`)
+"""
+
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     # FIXME too many db initialization message in the log and 'aborted clients' in mysql dashboard
@@ -54,13 +66,6 @@ def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
         # ssl_ca='',
         # use_pure=True,
         connect_timeout=90000)
-    # ray.init(
-    #     num_cpus=psutil.cpu_count(logical=False),
-    #     webui_host='127.0.0.1',  # TODO need a different port?
-    #     memory=2 * 1024 * 1024 * 1024,  # 2G
-    #     object_store_memory=512 * 1024 * 1024,  # 512M
-    #     driver_object_store_memory=256 * 1024 * 1024    # 256M
-    # )
 
 
 def _get_rcodes_for(code, table, dates):
@@ -206,6 +211,8 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
     try:
         cursor = cnx.cursor()
         cursor.executemany(WCC_INSERT, bucket)
+        cursor.executemany(KLINE_TAG_UPSERT,
+                           [(t[0], t[1], t[2], 'wcc_predict', t[-2], t[-1]) for t in bucket])
         cnx.commit()
     except:
         print(sys.exc_info()[0])
@@ -352,15 +359,11 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
     def predict():
         try:
             next_work = data_queue.get()
+
             if isinstance(next_work, str) and next_work == 'done':
-                if data_queue.empty():
-                    infer_queue.put('done')
-                    return True
-                else:
-                    print('{} warning, data_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
-                        strftime("%H:%M:%S"), data_queue.size()))
-                    data_queue.put_nowait('done')
-                    return False
+                infer_queue.put('done')
+                return True
+
             batch = next_work['batch']
             p = model.predict(batch, batch_size=max_batch_size)
             p = np.squeeze(p)
@@ -399,7 +402,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
             if c == 2000:
                 print('{} predict average: {}'.format(
                     strftime("%H:%M:%S"), elapsed/1000), file=sys.stderr)
-            predict()
+            done = predict()
         c += 1
 
     return done
@@ -411,6 +414,8 @@ def _save_infer_result(top_k, shared_args, infer_queue):
     db_host = shared_args['db_host']
     db_port = shared_args['db_port']
     db_pwd = shared_args['db_pwd']
+    parallel = shared_args['args'].parallel
+
     if cnxpool is None:
         _init(1, db_host, db_port, db_pwd)
 
@@ -418,37 +423,33 @@ def _save_infer_result(top_k, shared_args, infer_queue):
         # poll work request from 'infer_queue' for saving inference result and handle persistence
         if infer_queue.empty():
             sleep(5)
-            return False
+            return 0
         try:
             next_result = infer_queue.get()
+
             if isinstance(next_result, str) and next_result == 'done':
-                if infer_queue.empty():
-                    # flush bucket
-                    _save_prediction()
-                    return True
-                else:
-                    print('{} warning, infer_queue is still not empty when ''done'' signal is received. qsize: {}'.format(
-                        strftime("%H:%M:%S"), infer_queue.size()))
-                    infer_queue.put_nowait('done')
-            else:
-                result = next_result['result']
-                rcodes = next_result['rcodes']
-                code = next_result['code']
-                date = next_result['date']
-                klid = next_result['klid']
-                udate = next_result['udate']
-                utime = next_result['utime']
-                _save_prediction(code, klid, date, rcodes,
-                                 top_k, result, udate, utime)
+                # flush bucket
+                _save_prediction()
+                return 1
+
+            result = next_result['result']
+            rcodes = next_result['rcodes']
+            code = next_result['code']
+            date = next_result['date']
+            klid = next_result['klid']
+            udate = next_result['udate']
+            utime = next_result['utime']
+            _save_prediction(code, klid, date, rcodes,
+                             top_k, result, udate, utime)
         except Exception:
             sleep(2)
             pass
-        
-        return False
 
-    done = False
-    while not done:
-        done = _inner_work()
+        return 0
+
+    done = 0
+    while done < parallel:
+        done += _inner_work()
 
     cnxpool._remove_connections()
 
@@ -477,7 +478,7 @@ def predict_wcc(num_actors, min_rcode, max_batch_size, model_path, top_k, shared
             shared_args) for i in range(num_actors)]
     )
 
-    work = getWorkloadForPrediction(actor_pool,
+    work = getWorkloadForPredictionFromTags(actor_pool,
                                     start_anchor,
                                     stop_anchor,
                                     corl_prior,

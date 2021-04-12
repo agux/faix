@@ -59,7 +59,6 @@ class TcnPredictorV1:
     @staticmethod
     def tcn(self, inputs):
         # Temporal Convolutional Network
-        #TODO: implement me
         return  None
 
 

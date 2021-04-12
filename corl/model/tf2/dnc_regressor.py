@@ -301,8 +301,6 @@ class DNC_Model_V5(DNC_Model):
             # name='features',
             dtype=tf.float32)
 
-        #TODO add CNN before RNN?
-
         # create sequence of DNC layers
         layer = inputs
         for i in range(self._num_dnc_layers):
@@ -319,11 +317,8 @@ class DNC_Model_V5(DNC_Model):
                 return_sequences=True if i+1 < self._num_dnc_layers else False,
                 name='rnn_{}'.format(i),
             )
-            # TODO use separate dnc cell for forward & backward pass?
             layer = keras.layers.Bidirectional(layer=rnn, name='bidir_{}'.format(i))(layer)
         
-        # TODO add batch normalization layer before FCN?
-
         if self._dropout_rate > 0:
             layer = keras.layers.AlphaDropout(self._dropout_rate)(layer)
 

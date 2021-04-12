@@ -314,7 +314,6 @@ class LSTMRegressorV1:
         return self.model
 
     def compile(self):
-        # TODO study how to use ReduceLROnPlateau and CosineDecayRestarts on adam optimizer
         # decay = tf.keras.experimental.CosineDecayRestarts(self._lr,
         #                                                   self._lr_decay_steps,
         #                                                   t_mul=1.02,

@@ -60,6 +60,8 @@ cnxpool = None
 
 def _init_db(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     global cnxpool
+    if cnxpool is not None:
+        return
     print("{} [PID={}]: initializing mysql connection pool...".format(
         strftime("%H:%M:%S"), os.getpid()))
     cnxpool = MySQLConnectionPool(
@@ -624,13 +626,79 @@ def getInputs(start_bno=0,
     }
 
 
+def getWorkloadForPredictionFromTags(actor_pool, start_anchor, stop_anchor, corl_prior, max_step, time_shift, host, port, pwd):
+    ##TODO realize me. query workload from tag table
+    '''
+    Returns list of tuples (code, date, klid)
+    '''
+    global cnxpool
+    _init_db(1, host, port, pwd)
+    qry = (
+        "SELECT "
+        "    partition_name "
+        "FROM "
+        "    information_schema.partitions "
+        "WHERE "
+        "    table_schema = 'secu' "
+        "        AND table_name = 'kline_d_b_lr' "
+    )
+    cond = ''
+    if start_anchor is not None:
+        c1, k1 = start_anchor
+        cond += '''
+            and (
+                t.code > '{}'
+                or (t.code = '{}' and t.klid >= {})
+            )
+        '''.format(c1, c1, k1)
+    if stop_anchor is not None:
+        c2, k2 = stop_anchor
+        cond += '''
+            and (
+                t.code < '{}'
+                or (t.code = '{}' and t.klid < {})
+            )
+        '''.format(c2, c2, k2)
+    cnx = cnxpool.get_connection()
+    cursor = None
+    try:
+        print('{} querying partitions for kline_d_b_lr'.format(strftime("%H:%M:%S")))
+        cursor = cnx.cursor()
+        cursor.execute(qry)
+        rows = cursor.fetchall()
+        total = cursor.rowcount
+        print('{} #partitions: {}'.format(strftime("%H:%M:%S"), total))
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        if cursor is not None:
+            cursor.close()
+        cnx.close()
+
+    tasks = actor_pool.map(
+        lambda a, part: a.get_wcc_infer_work_request.remote(part, cond),
+        rows
+    )
+
+    # remove empty sublists
+    workloads = [t for t in list(tasks) if t]
+    # flatten the list and remove empty tuples
+    workloads = [val for sublist in workloads for val in sublist if val]
+    # sort by code and klid in ascending order
+    workloads.sort(key=lambda tup: (tup[0], tup[3]))
+
+    print('{} total workloads: {}'.format(
+        strftime("%H:%M:%S"), len(workloads)))
+
+    return workloads
+
 def getWorkloadForPrediction(actor_pool, start_anchor, stop_anchor, corl_prior, max_step, time_shift, host, port, pwd):
     '''
     Returns list of tuples (code, date, klid)
     '''
     global cnxpool
-    if cnxpool is None:
-        _init_db(1, host, port, pwd)
+    _init_db(1, host, port, pwd)
     qry = (
         "SELECT "
         "    partition_name "

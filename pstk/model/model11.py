@@ -88,7 +88,6 @@ class DRnnPredictorV6:
     @staticmethod
     def rnn(self, inputs):
         # Deep Residual RNN
-        # TODO: try MultiRNNCell of MultiRNNCell, wrapped in a residual wrapper
         cells = []
         feat_size = int(inputs.get_shape()[-1])
         # p = int(round(self._rnn_layers ** 0.5))

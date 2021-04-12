@@ -363,7 +363,7 @@ def testTasklist():
     # print('#talst: {}'.format(len(talst)))
     # for i in range(50):
     #     print_talst_element(i, talst)
-    # TODO test efficient status update
+    # test efficient status update
     # for i in range(50):
     #     delayed_write_talst(i, talst)
     # print("job done")
