@@ -12,7 +12,7 @@ from pathlib import Path
 from mysql.connector.pooling import MySQLConnectionPool
 from corl.wc_data.series import DataLoader, getSeries_v2
 from corl.wc_test.test27_mdnc import create_regressor
-from corl.wc_data.input_fn import getWorkloadForPrediction, getWorkloadForPredictionFromTags
+from corl.wc_data.input_fn import getWorkloadForPredictionFromTags
 
 REGRESSOR = create_regressor()
 cnxpool = None
@@ -170,6 +170,7 @@ def _process(pool, code, klid, date_start, date_end, min_rcode, shared_args):
 
 def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, predictions=None, udate=None, utime=None):
     global bucket, cnxpool
+    # TODO update tag table, replace 'wcc_predict_ready' with 'wcc_predict'
     if code is not None:
         # get top and bottom k
         top_k = top_k if top_k <= MAX_K else MAX_K
@@ -304,7 +305,6 @@ def _load_data(work, num_actors, min_rcode, shared_args, data_queue):
 
     actor_pool = ray.util.ActorPool(
         [ray.get_actor("DataLoader_{}".format(i)) for i in range(num_actors)]
-        # [DataLoader.remote(shared_args) for _ in range(num_actors)]
     )
 
     # poll work request from 'work_queue' for data loading, and push to 'data_queue'
@@ -321,6 +321,7 @@ def _load_data(work, num_actors, min_rcode, shared_args, data_queue):
         if len(batch) < min_rcode or len(rcodes) < min_rcode:
             print('{} {}@({},{},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
                 strftime("%H:%M:%S"), code, klid, date_start, date_end, len(batch), len(rcodes)))
+            # TODO update tags table with tag 'wcc_predict_insufficient'
             return
         data_queue.put({'code': code, 'date': date_end,
                         'klid': klid, 'batch': batch, 'rcodes': rcodes})
@@ -439,8 +440,12 @@ def _save_infer_result(top_k, shared_args, infer_queue):
             klid = next_result['klid']
             udate = next_result['udate']
             utime = next_result['utime']
-            _save_prediction(code, klid, date, rcodes,
-                             top_k, result, udate, utime)
+            if result is None or len(result) == 0:
+                # TODO realize this function
+                _tag_wcc_predict_insufficient(code, klid, udate, utime)
+            else:
+                _save_prediction(code, klid, date, rcodes,
+                                top_k, result, udate, utime)
         except Exception:
             sleep(2)
             pass
@@ -467,26 +472,21 @@ def predict_wcc(num_actors, min_rcode, max_batch_size, model_path, top_k, shared
     time_shift = shared_args['time_shift']
     corl_prior = shared_args['corl_prior']
     args = shared_args['args']
-    # start_anchor = None if anchor == 0 else anchors[anchor-1]
-    # stop_anchor = None if anchor == len(anchors) else anchors[anchor]
-    start_anchor = None
-    stop_anchor = None
 
-    actor_pool = ray.util.ActorPool(
+    # actors will be retrieved by name
+    ray.util.ActorPool(
         # [ray.get_actor("DataLoader_" + str(i)) for i in range(num_actors)]
         [DataLoader.options(name='DataLoader_{}'.format(i)).remote(
             shared_args) for i in range(num_actors)]
     )
 
-    work = getWorkloadForPredictionFromTags(actor_pool,
-                                    start_anchor,
-                                    stop_anchor,
-                                    corl_prior,
-                                    max_step,
-                                    time_shift,
-                                    db_host,
-                                    db_port,
-                                    db_pwd)
+    work = getWorkloadForPredictionFromTags(
+        corl_prior,
+        max_step,
+        time_shift,
+        db_host,
+        db_port,
+        db_pwd)
 
     d = _load_data.remote(work,
                           num_actors,

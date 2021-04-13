@@ -626,48 +626,31 @@ def getInputs(start_bno=0,
     }
 
 
-def getWorkloadForPredictionFromTags(actor_pool, start_anchor, stop_anchor, corl_prior, max_step, time_shift, host, port, pwd):
-    ##TODO realize me. query workload from tag table
+def getWorkloadForPredictionFromTags(corl_prior, max_step, time_shift, host, port, pwd):
+    # TODO realize me. query workload from tag table
     '''
     Returns list of tuples (code, date, klid)
     '''
     global cnxpool
     _init_db(1, host, port, pwd)
-    qry = (
-        "SELECT "
-        "    partition_name "
-        "FROM "
-        "    information_schema.partitions "
-        "WHERE "
-        "    table_schema = 'secu' "
-        "        AND table_name = 'kline_d_b_lr' "
-    )
-    cond = ''
-    if start_anchor is not None:
-        c1, k1 = start_anchor
-        cond += '''
-            and (
-                t.code > '{}'
-                or (t.code = '{}' and t.klid >= {})
-            )
-        '''.format(c1, c1, k1)
-    if stop_anchor is not None:
-        c2, k2 = stop_anchor
-        cond += '''
-            and (
-                t.code < '{}'
-                or (t.code = '{}' and t.klid < {})
-            )
-        '''.format(c2, c2, k2)
     cnx = cnxpool.get_connection()
     cursor = None
     try:
-        print('{} querying partitions for kline_d_b_lr'.format(strftime("%H:%M:%S")))
+        print('{} synchronizing kline_d_b_lr_tags from main table...'.format(
+            strftime("%H:%M:%S")))
         cursor = cnx.cursor()
-        cursor.execute(qry)
-        rows = cursor.fetchall()
-        total = cursor.rowcount
-        print('{} #partitions: {}'.format(strftime("%H:%M:%S"), total))
+        cursor.execute('''
+            INSERT IGNORE INTO kline_d_b_lr_tags (code, date, klid, tags, udate, utime)
+            SELECT code, date, klid,
+                            'wcc_predict_ready ',
+                            date_format(CONVERT_TZ(CURRENT_TIMESTAMP(),'+00:00','+08:00'),'%Y-%m-%d'),
+                            date_format(CONVERT_TZ(CURRENT_TIMESTAMP(),'+00:00','+08:00'),'%H:%i:%s')
+            FROM kline_d_b_lr
+        ''')
+        cursor.execute('''
+            UPDATE kline_d_b_lr_tags SET tags = CONCAT_WS(' ', tags, 'wcc_predict_ready')
+            WHERE MATCH(tags) AGAINST('-wcc_predict_ready -wcc_predict -wcc_predict_insufficient' IN BOOLEAN MODE)
+        ''')
     except:
         print(sys.exc_info()[0])
         raise
@@ -676,15 +659,38 @@ def getWorkloadForPredictionFromTags(actor_pool, start_anchor, stop_anchor, corl
             cursor.close()
         cnx.close()
 
-    tasks = actor_pool.map(
-        lambda a, part: a.get_wcc_infer_work_request.remote(part, cond),
-        rows
-    )
+    offset = max_step+time_shift-1
+    qry = """
+        SELECT t.code,
+            t_pre.date start_date,
+            t.date end_date,
+            t.klid
+        FROM kline_d_b_lr_tags t_pre,
+            (SELECT code, date, klid
+            FROM kline_d_b_lr_tags
+            WHERE klid >= %s
+                AND MATCH(tags) AGAINST('+wcc_predict_ready -wcc_predict -wcc_predict_insufficient' IN BOOLEAN MODE)) t
+        WHERE t_pre.code = t.code
+            AND t_pre.klid = t.klid - %s
+    """
+    cursor = None
+    workloads = None
+    cnx = cnxpool.get_connection()
+    try:
+        print('{} querying workload from kline_d_b_lr_tags'.format(
+            strftime("%H:%M:%S")))
+        cursor = cnx.cursor()
+        cursor.execute(qry, (corl_prior, offset))
+        rows = cursor.fetchall()
+        workloads = [(c, d1, d2, k) for c, d1, d2, k in rows]
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        if cursor is not None:
+            cursor.close()
+        cnx.close()
 
-    # remove empty sublists
-    workloads = [t for t in list(tasks) if t]
-    # flatten the list and remove empty tuples
-    workloads = [val for sublist in workloads for val in sublist if val]
     # sort by code and klid in ascending order
     workloads.sort(key=lambda tup: (tup[0], tup[3]))
 
@@ -692,6 +698,7 @@ def getWorkloadForPredictionFromTags(actor_pool, start_anchor, stop_anchor, corl
         strftime("%H:%M:%S"), len(workloads)))
 
     return workloads
+
 
 def getWorkloadForPrediction(actor_pool, start_anchor, stop_anchor, corl_prior, max_step, time_shift, host, port, pwd):
     '''
