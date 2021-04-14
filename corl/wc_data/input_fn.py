@@ -627,7 +627,6 @@ def getInputs(start_bno=0,
 
 
 def getWorkloadForPredictionFromTags(corl_prior, max_step, time_shift, host, port, pwd):
-    # TODO realize me. query workload from tag table
     '''
     Returns list of tuples (code, date, klid)
     '''
@@ -642,7 +641,7 @@ def getWorkloadForPredictionFromTags(corl_prior, max_step, time_shift, host, por
         cursor.execute('''
             INSERT IGNORE INTO kline_d_b_lr_tags (code, date, klid, tags, udate, utime)
             SELECT code, date, klid,
-                            'wcc_predict_ready ',
+                            'wcc_predict_ready',
                             date_format(CONVERT_TZ(CURRENT_TIMESTAMP(),'+00:00','+08:00'),'%Y-%m-%d'),
                             date_format(CONVERT_TZ(CURRENT_TIMESTAMP(),'+00:00','+08:00'),'%H:%i:%s')
             FROM kline_d_b_lr

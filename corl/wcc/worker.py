@@ -36,18 +36,6 @@ WCC_INSERT = """
         %s,%s,%s)
 """
 
-KLINE_TAG_UPSERT = """
-    INSERT INTO `secu`.`kline_d_b_lr_tags`
-        (`code`,`date`,`klid`,`tags`,`udate`,`utime`)
-    VALUES
-        (%s,%s,%s,%s,%s,%s)
-    ON DUPLICATE KEY
-        UPDATE 
-            `tags`=concat(`tags`,';',VALUES(`tags`)),
-            `udate`=VALUES(`udate`),
-            `utime`=VALUES(`utime`)
-"""
-
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
     # FIXME too many db initialization message in the log and 'aborted clients' in mysql dashboard
@@ -170,7 +158,6 @@ def _process(pool, code, klid, date_start, date_end, min_rcode, shared_args):
 
 def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, predictions=None, udate=None, utime=None):
     global bucket, cnxpool
-    # TODO update tag table, replace 'wcc_predict_ready' with 'wcc_predict'
     if code is not None:
         # get top and bottom k
         top_k = top_k if top_k <= MAX_K else MAX_K
@@ -209,11 +196,21 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
         return
     cnx = cnxpool.get_connection()
     cursor = None
+    stmt = """
+        UPDATE secu.kline_d_b_lr_tags
+        SET 
+            tags = REPLACE('wcc_predict_ready', 'wcc_predict'),
+            udate = %s,
+            utime = %s,
+        WHERE 
+            code = %s
+            AND klid = %s
+            AND MATCH(tags) AGAINST('wcc_predict_ready')
+    """
     try:
         cursor = cnx.cursor()
         cursor.executemany(WCC_INSERT, bucket)
-        cursor.executemany(KLINE_TAG_UPSERT,
-                           [(t[0], t[1], t[2], 'wcc_predict', t[-2], t[-1]) for t in bucket])
+        cursor.executemany(stmt, [(t[-2], t[-1], t[0], t[2]) for t in bucket])
         cnx.commit()
     except:
         print(sys.exc_info()[0])
@@ -321,7 +318,8 @@ def _load_data(work, num_actors, min_rcode, shared_args, data_queue):
         if len(batch) < min_rcode or len(rcodes) < min_rcode:
             print('{} {}@({},{},{}) insufficient data for prediction. #batch: {}, #rcode: {}'.format(
                 strftime("%H:%M:%S"), code, klid, date_start, date_end, len(batch), len(rcodes)))
-            # TODO update tags table with tag 'wcc_predict_insufficient'
+            data_queue.put({'code': code, 'date': date_end,
+                            'klid': klid, 'batch': None, 'rcodes': None})
             return
         data_queue.put({'code': code, 'date': date_end,
                         'klid': klid, 'batch': batch, 'rcodes': rcodes})
@@ -364,10 +362,12 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
             if isinstance(next_work, str) and next_work == 'done':
                 infer_queue.put('done')
                 return True
-
+            
             batch = next_work['batch']
-            p = model.predict(batch, batch_size=max_batch_size)
-            p = np.squeeze(p)
+            p = None
+            if batch is not None and len(batch) > 0:
+                p = model.predict(batch, batch_size=max_batch_size)
+                p = np.squeeze(p)
             infer_queue.put(
                 {'code': next_work['code'],
                  'date': next_work['date'],
@@ -409,6 +409,33 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
     return done
 
 
+def _tag_wcc_predict_insufficient(code, klid, udate, utime):
+    global cnxpool
+    cnx = cnxpool.get_connection()
+    cursor = None
+    stmt = """
+        UPDATE secu.kline_d_b_lr_tags
+        SET 
+            tags = REPLACE('wcc_predict_ready', 'wcc_predict_insufficient'),
+            udate = %s,
+            utime = %s,
+        WHERE 
+            code = %s
+            AND klid = %s
+            AND MATCH(tags) AGAINST('wcc_predict_ready')
+    """
+    try:
+        cursor = cnx.cursor()
+        cursor.execute(stmt, (udate, utime, code, klid))
+        cnx.commit()
+    except:
+        print(sys.exc_info()[0])
+        raise
+    finally:
+        if cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
 @ray.remote
 def _save_infer_result(top_k, shared_args, infer_queue):
     global cnxpool
@@ -441,11 +468,10 @@ def _save_infer_result(top_k, shared_args, infer_queue):
             udate = next_result['udate']
             utime = next_result['utime']
             if result is None or len(result) == 0:
-                # TODO realize this function
                 _tag_wcc_predict_insufficient(code, klid, udate, utime)
             else:
                 _save_prediction(code, klid, date, rcodes,
-                                top_k, result, udate, utime)
+                                 top_k, result, udate, utime)
         except Exception:
             sleep(2)
             pass
