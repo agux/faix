@@ -362,7 +362,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
             if isinstance(next_work, str) and next_work == 'done':
                 infer_queue.put('done')
                 return True
-            
+
             batch = next_work['batch']
             p = None
             if batch is not None and len(batch) > 0:
@@ -436,6 +436,7 @@ def _tag_wcc_predict_insufficient(code, klid, udate, utime):
             cursor.close()
             cnx.close()
 
+
 @ray.remote
 def _save_infer_result(top_k, shared_args, infer_queue):
     global cnxpool
@@ -500,11 +501,13 @@ def predict_wcc(num_actors, min_rcode, max_batch_size, model_path, top_k, shared
     args = shared_args['args']
 
     # actors will be retrieved by name
-    ray.util.ActorPool(
-        # [ray.get_actor("DataLoader_" + str(i)) for i in range(num_actors)]
-        [DataLoader.options(name='DataLoader_{}'.format(i)).remote(
-            shared_args) for i in range(num_actors)]
-    )
+    DataLoader.options(name='DataLoader_{}'.format(i)).remote(
+        shared_args) for i in range(num_actors)
+    # ray.util.ActorPool(
+    #     # [ray.get_actor("DataLoader_" + str(i)) for i in range(num_actors)]
+    #     [DataLoader.options(name='DataLoader_{}'.format(i)).remote(
+    #         shared_args) for i in range(num_actors)]
+    # )
 
     work = getWorkloadForPredictionFromTags(
         corl_prior,
