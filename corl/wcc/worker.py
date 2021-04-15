@@ -19,6 +19,7 @@ REGRESSOR = create_regressor()
 cnxpool = None
 BUCKET_SIZE = 64
 bucket = []
+bucket_insufficient = []
 MAX_K = 5
 WCC_INSERT = """
     INSERT INTO `secu`.`wcc_predict`
@@ -206,7 +207,6 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
         WHERE 
             code = %s
             AND klid = %s
-            AND MATCH(tags) AGAINST('+wcc_predict_ready' IN BOOLEAN MODE)
     """
     try:
         cursor = cnx.cursor()
@@ -411,7 +411,13 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
 
 
 def _tag_wcc_predict_insufficient(code, klid, udate, utime):
-    global cnxpool
+    global bucket_insufficient, cnxpool
+    if code is not None:
+        bucket_insufficient.append((code, klid, udate, utime))
+        if len(bucket_insufficient) < BUCKET_SIZE:
+            return
+    if len(bucket_insufficient) == 0:
+        return
     cnx = cnxpool.get_connection()
     cursor = None
     stmt = """
@@ -423,16 +429,16 @@ def _tag_wcc_predict_insufficient(code, klid, udate, utime):
         WHERE 
             code = %s
             AND klid = %s
-            AND MATCH(tags) AGAINST('+wcc_predict_ready' IN BOOLEAN MODE)
     """
     try:
         cursor = cnx.cursor()
-        cursor.execute(stmt, (udate, utime, code, klid))
+        cursor.executemany(stmt, bucket_insufficient)
         cnx.commit()
     except:
         traceback.print_exc()
         raise
     finally:
+        bucket_insufficient = []
         if cnx.is_connected():
             cursor.close()
             cnx.close()
@@ -529,7 +535,7 @@ def predict_wcc(num_actors, min_rcode, max_batch_size, model_path, top_k, shared
                                   infer_queue)
 
     # There're many unknown issues running GPU inference in ray worker...
-    gpu_alloc = 1.0 / args.parallel
+    gpu_alloc = 0.999 / args.parallel  #use 0.999 instead of integer 1 to avoid exceeding resource limit in total
     p = []
     for i in range(args.parallel):
         p.append(_predict.options(num_gpus=gpu_alloc).remote(model_path,
