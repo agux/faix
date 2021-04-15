@@ -4,6 +4,7 @@ from time import strftime
 from mysql.connector.pooling import MySQLConnectionPool
 import sys
 import ray
+import traceback
 import numpy as np
 
 cnxpool = None
@@ -94,7 +95,7 @@ class DataLoader(object):
             print('{} workload for partition {}: {}'.format(
                 strftime("%H:%M:%S"), part, total))
         except:
-            print(sys.exc_info()[0])
+            traceback.print_exc()
             raise
         finally:
             if fcursor is not None:
@@ -158,7 +159,7 @@ class DataLoader(object):
                 batch.append(steps)
             return np.concatenate(batch, 1).astype(np.float32)
         except:
-            print(sys.exc_info()[0])
+            traceback.print_exc()
             raise
         finally:
             if fcursor is not None:
@@ -245,7 +246,7 @@ def _getBatch(code, s, e, rcode, shared_args):
             batch.append(steps)
         return np.concatenate(batch, 1), total - time_shift
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         fcursor.close()
@@ -309,7 +310,7 @@ def _getBatch_v2(code, s, e, rcode, shared_args, pool=None):
             batch.append(steps)
         return np.concatenate(batch, 1).astype(np.float32)
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         if fcursor is not None:

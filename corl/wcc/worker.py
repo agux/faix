@@ -2,6 +2,7 @@ import ray
 import sys
 import os
 import time
+import traceback
 
 import numpy as np
 import tensorflow as tf
@@ -85,7 +86,7 @@ def _get_rcodes_for(code, table, dates):
         rows = cursor.fetchall()
         return [r[0] for r in rows]
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         if cursor is not None:
@@ -122,7 +123,7 @@ def _get_rcodes(code, klid, steps, shift):
             return None
         rows = cursor.fetchall()
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         if cursor is not None:
@@ -201,7 +202,7 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
         SET 
             tags = REPLACE(tags, 'wcc_predict_ready', 'wcc_predict'),
             udate = %s,
-            utime = %s,
+            utime = %s
         WHERE 
             code = %s
             AND klid = %s
@@ -213,7 +214,7 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
         cursor.executemany(stmt, [(t[-2], t[-1], t[0], t[2]) for t in bucket])
         cnx.commit()
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         bucket = []
@@ -418,7 +419,7 @@ def _tag_wcc_predict_insufficient(code, klid, udate, utime):
         SET 
             tags = REPLACE(tags, 'wcc_predict_ready', 'wcc_predict_insufficient'),
             udate = %s,
-            utime = %s,
+            utime = %s
         WHERE 
             code = %s
             AND klid = %s
@@ -429,7 +430,7 @@ def _tag_wcc_predict_insufficient(code, klid, udate, utime):
         cursor.execute(stmt, (udate, utime, code, klid))
         cnx.commit()
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         if cnx.is_connected():

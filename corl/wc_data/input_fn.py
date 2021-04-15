@@ -10,6 +10,7 @@ import sys
 import ray
 import os
 import psutil
+import traceback
 import numpy as np
 
 np.set_printoptions(threshold=np.inf,
@@ -154,7 +155,7 @@ def _getBatch(code, s, e, rcode, max_step, time_shift, qk, qd):
             batch.append(steps)
         return np.concatenate(batch, 1), total - time_shift
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         fcursor.close()
@@ -214,7 +215,7 @@ def _loadTestSet(max_step, ntest, vset=None):
             'seqlens': np.expand_dims(np.array(seqlen, 'i'), axis=1)
         }, np.expand_dims(np.array(vals, 'f'), axis=1)
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         cnx.close()
@@ -246,7 +247,7 @@ def _loadTestSet_v2(max_step, ntest, vset=None):
         data, vals = zip(*r)
         return np.array(data, np.float32, copy=False), np.expand_dims(np.array(vals, np.float32, copy=False), axis=1)
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         cnx.close()
@@ -270,7 +271,7 @@ def _getIndex():
         idxlst = {c[0] for c in rows}
         return idxlst
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         cnx.close()
@@ -371,7 +372,7 @@ def _loadTrainingData(bno):
 
         return d, s, v
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         cnx.close()
@@ -411,7 +412,7 @@ def _loadTrainingData_v2(bno):
         v = np.expand_dims(np.array(vals, np.float32, copy=False), axis=1)
         return d, v
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         cnx.close()
@@ -450,7 +451,7 @@ def _getStats():
                                                    stats))
         return stats
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         cnx.close()
@@ -514,7 +515,7 @@ def _getDataSetMeta(flag):
             return None, None
         cursor.close()
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         cnx.close()
@@ -652,7 +653,7 @@ def getWorkloadForPredictionFromTags(corl_prior, max_step, time_shift, host, por
         ''')
         cnx.commit()
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         if cursor is not None:
@@ -684,7 +685,7 @@ def getWorkloadForPredictionFromTags(corl_prior, max_step, time_shift, host, por
         rows = cursor.fetchall()
         workloads = [(c, d1, d2, k) for c, d1, d2, k in rows]
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         if cursor is not None:
@@ -742,7 +743,7 @@ def getWorkloadForPrediction(actor_pool, start_anchor, stop_anchor, corl_prior, 
         total = cursor.rowcount
         print('{} #partitions: {}'.format(strftime("%H:%M:%S"), total))
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         if cursor is not None:
@@ -821,7 +822,7 @@ def getWorkSegmentsForPrediction(corl_prior, host, port, pwd, segments):
             ret.append((c, k))
         cursor.close()
     except:
-        print(sys.exc_info()[0])
+        traceback.print_exc()
         raise
     finally:
         cnx.close()
