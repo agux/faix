@@ -199,13 +199,13 @@ def _save_prediction(code=None, klid=None, date=None, rcodes=None, top_k=None, p
     stmt = """
         UPDATE secu.kline_d_b_lr_tags
         SET 
-            tags = REPLACE('wcc_predict_ready', 'wcc_predict'),
+            tags = REPLACE(tags, 'wcc_predict_ready', 'wcc_predict'),
             udate = %s,
             utime = %s,
         WHERE 
             code = %s
             AND klid = %s
-            AND MATCH(tags) AGAINST('wcc_predict_ready')
+            AND MATCH(tags) AGAINST('+wcc_predict_ready' IN BOOLEAN MODE)
     """
     try:
         cursor = cnx.cursor()
@@ -416,13 +416,13 @@ def _tag_wcc_predict_insufficient(code, klid, udate, utime):
     stmt = """
         UPDATE secu.kline_d_b_lr_tags
         SET 
-            tags = REPLACE('wcc_predict_ready', 'wcc_predict_insufficient'),
+            tags = REPLACE(tags, 'wcc_predict_ready', 'wcc_predict_insufficient'),
             udate = %s,
             utime = %s,
         WHERE 
             code = %s
             AND klid = %s
-            AND MATCH(tags) AGAINST('wcc_predict_ready')
+            AND MATCH(tags) AGAINST('+wcc_predict_ready' IN BOOLEAN MODE)
     """
     try:
         cursor = cnx.cursor()
