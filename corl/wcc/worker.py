@@ -410,7 +410,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
     return done
 
 
-def _tag_wcc_predict_insufficient(code, klid, udate, utime):
+def _tag_wcc_predict_insufficient(code=None, klid=None, udate=None, utime=None):
     global bucket_insufficient, cnxpool
     if code is not None:
         bucket_insufficient.append((udate, utime, code, klid))
