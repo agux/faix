@@ -413,7 +413,7 @@ def _predict(model_path, max_batch_size, data_queue, infer_queue, args):
 def _tag_wcc_predict_insufficient(code, klid, udate, utime):
     global bucket_insufficient, cnxpool
     if code is not None:
-        bucket_insufficient.append((code, klid, udate, utime))
+        bucket_insufficient.append((udate, utime, code, klid))
         if len(bucket_insufficient) < BUCKET_SIZE:
             return
     if len(bucket_insufficient) == 0:
@@ -535,7 +535,8 @@ def predict_wcc(num_actors, min_rcode, max_batch_size, model_path, top_k, shared
                                   infer_queue)
 
     # There're many unknown issues running GPU inference in ray worker...
-    gpu_alloc = 0.999 / args.parallel  #use 0.999 instead of integer 1 to avoid exceeding resource limit in total
+    # use 0.999 instead of integer 1 to avoid exceeding resource limit in total
+    gpu_alloc = 0.999 / args.parallel
     p = []
     for i in range(args.parallel):
         p.append(_predict.options(num_gpus=gpu_alloc).remote(model_path,
