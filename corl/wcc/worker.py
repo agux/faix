@@ -500,9 +500,9 @@ def predict_wcc(num_actors, min_rcode, max_batch_size, model_path, top_k, shared
     corl_prior = shared_args['corl_prior']
     args = shared_args['args']
 
-    # actors will be retrieved by name
-    DataLoader.options(name='DataLoader_{}'.format(i)).remote(
-        shared_args) for i in range(num_actors)
+    # actors will be retrieved by name in remote functions
+    actors = [DataLoader.options(name='DataLoader_{}'.format(i)).remote(
+        shared_args) for i in range(num_actors)]
     # ray.util.ActorPool(
     #     # [ray.get_actor("DataLoader_" + str(i)) for i in range(num_actors)]
     #     [DataLoader.options(name='DataLoader_{}'.format(i)).remote(
