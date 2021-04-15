@@ -650,7 +650,7 @@ def getWorkloadForPredictionFromTags(corl_prior, max_step, time_shift, host, por
             UPDATE kline_d_b_lr_tags SET tags = CONCAT_WS(' ', tags, 'wcc_predict_ready')
             WHERE MATCH(tags) AGAINST('-wcc_predict_ready -wcc_predict -wcc_predict_insufficient' IN BOOLEAN MODE)
         ''')
-        cursor.commit()
+        cnx.commit()
     except:
         print(sys.exc_info()[0])
         raise
