@@ -490,8 +490,6 @@ def _save_infer_result(top_k, shared_args, infer_queue):
     while done < parallel:
         done += _inner_work()
 
-    cnxpool._remove_connections()
-
     return done
 
 
