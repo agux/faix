@@ -466,6 +466,7 @@ def _save_infer_result(top_k, shared_args, infer_queue):
             if isinstance(next_result, str) and next_result == 'done':
                 # flush bucket
                 _save_prediction()
+                _tag_wcc_predict_insufficient()
                 return 1
 
             result = next_result['result']
