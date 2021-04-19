@@ -40,7 +40,6 @@ WCC_INSERT = """
 
 
 def _init(db_pool_size=None, db_host=None, db_port=None, db_pwd=None):
-    # FIXME too many db initialization message in the log and 'aborted clients' in mysql dashboard
     global cnxpool
     size = db_pool_size or 5
     print("{} initializing mysql connection pool of size {}".format(

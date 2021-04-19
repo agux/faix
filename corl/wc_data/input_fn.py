@@ -631,6 +631,7 @@ def getWorkloadForPredictionFromTags(corl_prior, max_step, time_shift, host, por
     '''
     Returns list of tuples (code, date, klid)
     '''
+    # TODO need to compare corl_prior and max_step with snapshot values in db (secu.params), and opt to re-initialize tag table if 2 versions differ.
     global cnxpool
     _init_db(1, host, port, pwd)
     cnx = cnxpool.get_connection()

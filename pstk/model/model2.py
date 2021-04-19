@@ -39,7 +39,7 @@ def lazy_property(function):
 
 
 def length(data):
-    # with tf.variable_scope("rnn_length"):    #FIXME no scope?
+    # with tf.variable_scope("rnn_length"):    
     used = tf.sign(tf.reduce_max(input_tensor=tf.abs(data), axis=2))
     length = tf.reduce_sum(input_tensor=used, axis=1)
     length = tf.cast(length, tf.int32)
@@ -52,7 +52,7 @@ def fusedBN(input, scale, offset, mean, variance, training):
 
 
 def last_relevant(output, length):
-    # with tf.variable_scope("rnn_last"):       #FIXME no scope?
+    # with tf.variable_scope("rnn_last"):       
     batch_size = tf.shape(input=output)[0]
     max_length = int(output.get_shape()[1])
     output_size = int(output.get_shape()[2])
@@ -64,7 +64,7 @@ def last_relevant(output, length):
 
 def conv2d(input, filters, seq):
     conv = tf.compat.v1.layers.conv2d(
-        # name="conv_lv{}".format(seq),    #FIXME perhaps no name?
+        # name="conv_lv{}".format(seq),    
         inputs=input,
         filters=filters,
         kernel_size=2,
@@ -72,11 +72,11 @@ def conv2d(input, filters, seq):
             stddev=0.01),
         bias_initializer=tf.compat.v1.constant_initializer(0.1),
         padding="same",
-        activation=tf.nn.elu)  # FIXME or perhaps relu6??
+        activation=tf.nn.elu)  
     h_stride = 2 if int(conv.get_shape()[1]) >= 2 else 1
     w_stride = 2 if int(conv.get_shape()[2]) >= 2 else 1
     pool = tf.compat.v1.layers.max_pooling2d(
-        # name="pool_lv{}".format(seq),    #FIXME perhaps no name?
+        # name="pool_lv{}".format(seq),    
         inputs=conv, pool_size=2, strides=[h_stride, w_stride],
         padding="same")
     # can't use tf.nn.batch_normalization in a mapped function
@@ -119,10 +119,10 @@ class CRnnPredictorV1:
         rnn = self.rnn(self, cnn)
         dense = tf.compat.v1.layers.dense(
             inputs=rnn,
-            units=self._num_hidden * 3,  # FIXME fallback to 3 * hidden size?
+            units=self._num_hidden * 3,  
             kernel_initializer=tf.compat.v1.truncated_normal_initializer(stddev=0.01),
             bias_initializer=tf.compat.v1.constant_initializer(0.1),
-            activation=tf.nn.elu)  # FIXME sure elu?
+            activation=tf.nn.elu)  
         dropout = tf.compat.v1.layers.dropout(
             inputs=dense, rate=0.5, training=self.training)
         output = tf.compat.v1.layers.dense(
@@ -130,14 +130,14 @@ class CRnnPredictorV1:
             units=int(self.target.get_shape()[1]),
             kernel_initializer=tf.compat.v1.truncated_normal_initializer(stddev=0.01),
             bias_initializer=tf.compat.v1.constant_initializer(0.1),
-            activation=tf.nn.relu6)  # FIXME fall back to relu6?
+            activation=tf.nn.relu6)  
         return output
 
     @staticmethod
     def rnn(self, input):
         # Recurrent network.
         cells = []
-        state_size = self._num_hidden  # FIXME fallback to 128
+        state_size = self._num_hidden  
         for _ in range(self._num_layers):
             # Or LSTMCell(num_units), or use ConvLSTMCell?
             cell = tf.compat.v1.nn.rnn_cell.GRUCell(
@@ -145,7 +145,7 @@ class CRnnPredictorV1:
                 kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                     stddev=0.01),
                 bias_initializer=tf.compat.v1.constant_initializer(0.1))
-            # activation=None)  # FIXME fall back to None?
+            # activation=None)  
             cells.append(cell)
         cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell(cells)
         _length = length(input)
@@ -167,7 +167,7 @@ class CRnnPredictorV1:
         accepts input shape: [step_size, time_shift*features]
         transformed to: [step_size, time_shift(height), features(width), channel]
         """
-        # with tf.variable_scope("conv2d_parent"):    #FIXME no scope?
+        # with tf.variable_scope("conv2d_parent"):    
         print("shape of cnn input: {}".format(input.get_shape()))
         width = int(input.get_shape()[1])//height
         input2d = tf.reshape(input, [-1, height, width, 1])
@@ -191,17 +191,17 @@ class CRnnPredictorV1:
         convlayer = tf.squeeze(convlayer, [1, 2])
         print("squeeze: {}".format(convlayer.get_shape()))
         dense = tf.compat.v1.layers.dense(
-            # name="cnn2d_dense",     #FIXME no name?
+            # name="cnn2d_dense",     
             inputs=convlayer,
             units=convlayer.get_shape()[1]*2,
             kernel_initializer=tf.compat.v1.truncated_normal_initializer(
                 stddev=0.01),
             bias_initializer=tf.compat.v1.constant_initializer(0.1),
-            activation=tf.nn.elu  # FIXME or perhaps elu?
+            activation=tf.nn.elu  
         )
         print("dense: {}".format(dense.get_shape()))
         dropout = tf.compat.v1.layers.dropout(
-            # name="cnn2d_dropout",    #FIXME no name?
+            # name="cnn2d_dropout",    
             inputs=dense, rate=0.5, training=training)
         return dropout
 

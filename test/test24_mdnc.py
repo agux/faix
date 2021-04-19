@@ -3,10 +3,8 @@ from common.train_runner import run
 from model import dnc_regressor
 from common.common import next_power_of_2
 # Path hack.
-import sys
-import os
 import numpy as np
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
+# sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 # pylint: disable-msg=E0401
 
@@ -78,6 +76,7 @@ def create_regressor():
 
 
 if __name__ == '__main__':
+    # TODO add data pipeline, make it fully runnable
 
     np.random.seed(SEED)
 

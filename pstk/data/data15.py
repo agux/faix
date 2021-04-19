@@ -1,5 +1,3 @@
-
-
 import os
 import sys
 import psutil
@@ -9,6 +7,8 @@ import tensorflow as tf
 
 from time import strftime
 from mysql.connector.pooling import MySQLConnectionPool
+
+#TODO establish data pipeline prototype for stock trend prediction
 
 k_cols = ["lr"]
 
